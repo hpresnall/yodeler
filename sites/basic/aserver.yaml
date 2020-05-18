@@ -1,0 +1,17 @@
+motd: "hello, I am a server"
+memory_mb: 256
+primary_domain: infra.example.com
+is_vm: false
+interfaces:
+  - ipv4_address: 192.168.210.5
+    ipv6_address: fd24:87e8:06c7:10::5
+    ipv6_dhcp: false
+    vswitch: public
+    firewall_zone: PUB
+    vlan: 10
+  - ipv4_address: 172.16.251.5
+    vswitch: private
+    firewall_zone: PRIV
+install_private_ssh_key: true
+packages: [ ndisc6 tcpdump ]
+roles: ["vmhost"]

@@ -1,0 +1,24 @@
+<domain type="kvm" >
+  <name></name>
+  <memory unit="MiB">256</memory>
+  <vcpu>1</vcpu>
+  <os>
+    <type arch="x86_64" machine="q35">hvm</type>
+  </os>
+  <features>
+    <acpi />
+    <apic />
+  </features>
+  <cpu mode="host-passthrough" check="none" />
+  <devices>
+    <disk type="file" device="disk">
+      <driver name="qemu" type="raw" />
+      <source file="" />
+      <target dev="vda" bus="virtio" />
+    </disk>
+    <console type="pty">
+      <target type="serial" port="0" />
+    </console>
+    <controller type="usb" model="none" /><!-- disable USB -->
+  </devices>
+</domain>

@@ -1,0 +1,14 @@
+hostname: server
+motd: server
+packages: [ "both_need", "server_needs" ]
+remove_packages: ["both_remove", "site_needs" ]
+interfaces:
+  - ipv4_address: 192.168.1.5
+    ipv6_address: 2001:db8:0:1::5
+    vswitch: public
+    firewall_zone: PUB
+    vlan: 10
+  - ipv4_address: 192.168.2.5
+    ipv6_address:
+    vswitch: private
+    firewall_zone: PRIV

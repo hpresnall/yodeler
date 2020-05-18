@@ -1,0 +1,27 @@
+# answerfile for basic Alpine physical host install
+
+# use the main CDN repo with no proxy
+APKREPOSOPTS="-1"
+PROXYOPTS=none
+
+KEYMAPOPTS="$KEYMAP"
+TIMEZONEOPTS="-z $TIMEZONE"
+HOSTNAMEOPTS="-n $HOSTNAME"
+
+# use DHCP to bootstrap
+INTERFACESOPTS="auto lo
+iface lo inet loopback  
+
+auto eth0
+iface eth0 inet dhcp
+"
+
+DNSOPTS="-n $EXTERNAL_DNS_STR"
+
+SSHDOPTS="-c openssh"
+NTPOPTS="-c chrony"
+
+# install system to $ROOT_DEV
+export DISKLABEL=gpt
+export ERASE_DISKS=$ROOT_DEV
+DISKOPTS="-m sys $ROOT_DEV"

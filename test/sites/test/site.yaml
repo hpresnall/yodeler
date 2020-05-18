@@ -1,0 +1,24 @@
+site: test_site
+public_ssh_key: ssh
+packages: [ "both_need", "site_needs"]
+remove_packages: ["both_remove", "server_needs"]
+vswitches:
+  - name: public
+    uplink: eth0
+    vlans:
+      - name: test
+        id: 10
+        ipv4_subnet: 192.168.1.0/24
+        ipv6_subnet: 2001:db8:0:1::/64
+  - name: private
+    vlans:
+      - name: test
+        id: 10
+        ipv4_subnet: 192.168.2.0/24
+        ipv6_subnet: 2001:db8:0:2::/64
+interfaces:
+  - ipv4_address: 192.168.1.1
+    ipv6_address: 2001:db8:0:1::1
+    vswitch: public
+    firewall_zone: PUB
+    vlan: 10

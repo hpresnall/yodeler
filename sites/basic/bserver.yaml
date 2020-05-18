@@ -1,0 +1,11 @@
+motd: "hello, I am a vm"
+memory_mb: 256
+primary_domain: infra.example.com
+interfaces:
+  - ipv4_address: dhcp
+    vswitch: public
+    firewall_zone: PUB
+    vlan: 10
+  - ipv4_address: 172.16.251.6
+    vswitch: private
+    firewall_zone: PRIV

@@ -1,0 +1,74 @@
+domain: example.com
+local_dns:
+  - 192.168.210.2
+  - fd24:87e8:06c7:10::2
+local_ntp: time.example.com
+ntp_pool_servers:
+  - 0.us.pool.ntp.org
+  - 1.us.pool.ntp.org
+  - 2.us.pool.ntp.org
+  - 3.us.pool.ntp.org
+timezone: US/Eastern
+motd: Welcome to Example!\n
+alpine_repositories:
+  - http://dl-cdn.alpinelinux.org/alpine/latest-stable/main
+  - http://dl-cdn.alpinelinux.org/alpine/latest-stable/community
+  - http://dl-cdn.alpinelinux.org/alpine/edge/testing
+public_ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQC9Av51+kAxf3Tozo/TueBDN3rWEcLWrTUjh672JpQGUAu71IzHBCxi4R6mZNi3+Z9HA4Ur2CeQWFZO1ZTZKwstJibaLh7SFoU1EggH9b0GNHPV35xVY+P2k0WNMXuKrKAAPeSL0kNh0TnTqF4qOX/rHwdORNvwXy4izLKFFH5uPQ== example
+private_ssh_key: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAlwAAAAdzc2gtcn
+  NhAAAAAwEAAQAAAIEAvQL+dfpAMX906M6P07ngQzd61hHC1q01I4eu9iaUBlALu9SMxwQs
+  YuEepmTYt/mfRwOFK9gnkFhWTtWU2SsLLSYm2i4e0haFNRIIB/W9BjRz1d+cVWPj9pNFjT
+  F7iqygAD3ki9JDYdE506heKjl/6x8HTkTb8F8uIsyyhRR+bj0AAAIIeZHyEnmR8hIAAAAH
+  c3NoLXJzYQAAAIEAvQL+dfpAMX906M6P07ngQzd61hHC1q01I4eu9iaUBlALu9SMxwQsYu
+  EepmTYt/mfRwOFK9gnkFhWTtWU2SsLLSYm2i4e0haFNRIIB/W9BjRz1d+cVWPj9pNFjTF7
+  iqygAD3ki9JDYdE506heKjl/6x8HTkTb8F8uIsyyhRR+bj0AAAADAQABAAAAgCAlRDW4a/
+  Z/INj/WIK/2B5WbzO9LY/pQWJbjywZ/47bSkOVsKOgWBQxCU9vU1RmxeoD9UAxsPjhrTwX
+  IwuUQIAQOtThTSEcdFwYgj0mHEr+CBozJggunsZ/5XXrc7ovp1O4Hxs2w89rg0yv2sY/rZ
+  ucZugJnRiBVBCj0xT4LxIBAAAAQQCov165S7bSHIeDoviC34r7iN8DNAwrxzhr+/qr2B1Q
+  +phaCwcs5T3HyY8p3MYxCOKNq9Dzz3xeKL5ZH6otCls1AAAAQQDsYKrQmrdtdhsOe786BL
+  sSNtQCyQN4wy/jDn/LgBNrTjE7nyX5f3NVcOweX+S8NGQ4qDe4l+O5NXkR7ZzdH5rBAAAA
+  QQDMs71CABNGN6Z3KR3eADQcyvGG1BIBwJtbAU/M7rQ545+GIjnvY17P4GtBnGFFKjGklF
+  0MH/yy6YFDQC4xfV59AAAADkh1bnRlckBQbGFuY2hhAQIDBA==
+  -----END OPENSSH PRIVATE KEY-----
+vswitches:
+  - name: public
+    vlans:
+      - name: infra
+        id: 10
+        domain: infra.example.com
+        ipv4_subnet: 192.168.210.0/24
+        ipv6_subnet: fd24:87e8:06c7:10::/64
+        allow_dhcp: false # DHCP server will not be configured
+        allow_internet: true # firewall will not restrict outbound internet access
+        access_vlans: [20] # firewall will not restrict access
+        allow_access_stopped_firewall: true # allow internet access when firewall is stopped
+        allow_dns_update: true # allow this subnet to make DDNS updates
+      - name: user
+        id: 20
+        domain: user.example.com
+        ipv4_subnet: 192.168.220.0/24
+        ipv6_subnet: fd24:87e8:06c7:20::/64
+        default: true # if not specified, VMs default to this vlan
+        allow_internet: false # firewall will restrict outbound internet access
+        dhcp_min_address_ipv4: 2
+        dhcp_max_address_ipv4: 252
+        dhcp_min_address_ipv6: 2
+        dhcp_max_address_ipv6: 0xffff
+        known_hosts:
+          - hostname: laptop
+            ipv4_address: 192.168.220.3
+            ipv6_address: fd24:87e8:06c7:20::2
+            mac_address: 34:8c:56:5f:1e:02 # will add static DHCP assignment
+  - name: private
+    uplink: eth1
+    vlans:
+      - name: mgmt
+        id: # vswitch will not vlan tag
+        routable: false # no router interface and no firewall will be created
+        domain: mgmt.example.com
+        ipv4_subnet: 172.16.251.0/24
+        ipv6_disable: true
+        dhcp_min_address_ipv4: 2
+        dhcp_max_address_ipv4: 16

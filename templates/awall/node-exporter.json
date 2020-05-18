@@ -1,0 +1,13 @@
+{
+  "description": "allow Prometheus node_exporter",
+  "filter": [
+    {
+      "in": [],
+      "service": {
+        "proto": "tcp",
+        "port": 9100
+      },
+      "action": "accept"
+    }
+  ]
+}

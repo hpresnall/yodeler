@@ -1,0 +1,13 @@
+{
+  "description": "allow DHCPv6 server responses",
+  "filter": [
+    {
+      "in": [],
+      "service": {
+        "proto": "udp",
+        "port": 546
+      },
+      "action": "accept"
+    }
+  ]
+}

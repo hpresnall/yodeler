@@ -1,0 +1,10 @@
+{
+  "description": "allow SSH",
+  "filter": [
+    {
+      "in": [],
+      "service": "ssh",
+      "action": "accept"
+    }
+  ]
+}
