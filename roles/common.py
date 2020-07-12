@@ -5,6 +5,9 @@ import xml.etree.ElementTree as xml
 import util.shell
 import util.file
 
+# use Debian's better ifupdown and the Linux ip command, instead of Busybox's built-ins
+packages = {"ifupdown", "iproute2"}
+
 
 def setup(cfg, dir):
     common = util.shell.ShellScript("common.sh")
@@ -15,23 +18,21 @@ def setup(cfg, dir):
     cfg["apk_opts"] = "--no-progress --no-network --allow-untrusted --repository " + cfg["apk_cache"]
 
     common.append(_setup_repos(cfg))
-    common.append("")
 
     cfg["remove_packages_str"] = " ".join(cfg["remove_packages"])
     common.append(util.file.substitute("templates/common/common.sh", cfg))
 
     if cfg["metrics"]:
         common.append(_setup_metrics)
-        common.append("")
 
     if cfg["local_firewall"]:
         common.append(_setup_local_firewall(cfg, dir))
 
+    common.write_file(dir)
+
     _create_interfaces(cfg, dir)
     _create_resolv_conf(cfg, dir)
     _create_chrony_conf(cfg, dir)
-
-    common.write_file(dir)
 
     if cfg["is_vm"]:
         # create the XML vm definition
@@ -51,7 +52,7 @@ def setup(cfg, dir):
 
         install = util.shell.ShellScript("install_alpine.sh")
         install.append_self_dir()
-        install.append(util.file.substitute("templates/alpine/alpine_install.sh", cfg))
+        install.append(util.file.substitute("templates/alpine/install_alpine.sh", cfg))
         install.write_file(dir)
         # note not returning install script
         # it must be run manually by another process
@@ -176,7 +177,7 @@ def _setup_local_firewall(cfg, dir):
     os.mkdir(awall)
 
     b = ["# configure awall"]
-    b.append("rootinstall awall/base.json /etc/awall/optional")
+    b.append("rootinstall $DIR/awall/base.json /etc/awall/optional")
     b.append("awall enable base")
 
     util.file.write("base.json",  json.dumps(base, indent=2), awall)
@@ -184,7 +185,7 @@ def _setup_local_firewall(cfg, dir):
     for name, service in services.items():
         util.file.write(name, json.dumps(service, indent=2), awall)
 
-        b.append(f"rootinstall awall/{name} /etc/awall/optional")
+        b.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
         b.append("awall enable {}".format(name[:-5]))  # name without .json
 
     b.append("")
@@ -193,6 +194,8 @@ def _setup_local_firewall(cfg, dir):
     b.append("rootinstall /tmp/rules-save /tmp/rules6-save /etc/iptables")
     b.append("rc-update add iptables boot")
     b.append("rc-update add ip6tables boot")
+    b.append("rc-service start iptables")
+    b.append("rc-service start ip6tables")
 
     return "\n".join(b)
 
@@ -282,4 +285,5 @@ echo "ARGS=\\\"--log.level=warn\
 --web.disable-exporter-metrics\
 --collector.diskstats.ignored-devices='^(ram|loop|fd|(h|s|v|xv)d[a-z]|nbd|sr|nvme\\d+n\\d+p)\\d+$'\
 --collector.filesystem.ignored-fs-types='^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs)$'\\\""\
-> /etc/conf.d/node-exporter"""
+> /etc/conf.d/node-exporter
+"""

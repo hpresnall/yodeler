@@ -36,6 +36,9 @@ class ShellScript():
 
     def write_file(self, dir):
         path = os.path.join(dir, self.name)
+        # ensure final blank line
+        if not self._script_fragments[-1] == "":
+            self._script_fragments.append("")
         script = "\n".join(self._script_fragments)
         util.file.write(path, script)
         os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP)

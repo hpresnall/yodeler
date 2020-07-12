@@ -18,11 +18,6 @@ def load_all_configs(sites_dir, site_name):
 
     _logger.info("processing hosts for site '%s'", site_name)
 
-    # vmhost needs a combined set of all packages
-    # start with packages required by alpine-make-vm-image script
-    all_packages = {"alpine-base", "qemu-img", "mkinitfs", "syslinux", "linux-virt", "linux-lts"}
-    vmhost = None
-
     host_cfgs = {}
     for path in os.listdir(sites_dir):
         if path == "site.yaml":
@@ -60,6 +55,7 @@ def create_scripts_for_host(cfg, output_dir):
     shutil.copytree("config", host_dir)
 
     scripts = common.setup(cfg, host_dir)
+    cfg["packages"] |= common.packages
 
     # load modules for each role
     # update packages
@@ -97,6 +93,6 @@ def create_scripts_for_host(cfg, output_dir):
         setup_script.append("")
 
     for script in scripts:
-        setup_script.append(". " + script)
+        setup_script.append(". $DIR/" + script)
 
     setup_script.write_file(host_dir)

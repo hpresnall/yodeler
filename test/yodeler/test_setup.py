@@ -33,5 +33,6 @@ class TestSetup(unittest.TestCase):
                              "dhclient.conf",
                              "chrony.conf",
                              "resolv.conf.head",
+                             "packages",
                              hostname + ".xml"]:
                     self.assertTrue(os.path.isfile(os.path.join(host_dir, path)), path + " not created")

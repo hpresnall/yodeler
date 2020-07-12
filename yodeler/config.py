@@ -472,7 +472,7 @@ def _validate_interfaces(cfg):
 
 # properties that are unique and cannot be set as defaults
 required_properties = ["site", "hostname", "public_ssh_key"]
-default_packages = {"acpi", "sudo", "openssh", "chrony", "awall", "ifupdown", "dhclient"}
+default_packages = {"acpi", "sudo", "openssh", "chrony", "awall", "dhclient"}
 default_config = {
     "is_vm": True,
     "vcpus": 1,
