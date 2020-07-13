@@ -1,3 +1,8 @@
+# temorarily change the umask
+# VM creation with a 027 umask results in the nonroot user not being able to
+# run commands due to library permission / loader issues
+umask 022
+
 # create the virtual machine
 # run setup.sh inside a chroot of the VM's filesystem
 echo "Building VM image for $HOSTNAME"
