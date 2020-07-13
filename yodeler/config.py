@@ -492,8 +492,6 @@ default_config = {
     "password": "apassword",
     "timezone": "UTC",
     "keymap": "us us",
-    # location of cached apks in vmhost; used by vm creation script
-    "apk_cache": "/root/yodeler_apks",
     "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main"],
     "ntp_pool_servers": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
     "local_dns": [],

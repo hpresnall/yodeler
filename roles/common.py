@@ -12,12 +12,18 @@ packages = {"ifupdown", "iproute2"}
 def setup(cfg, dir):
     common = util.shell.ShellScript("common.sh")
 
-    common.append("echo \"running common config...\"")
+    common.append("echo \"Running common config\"")
     common.append("")
 
-    cfg["apk_opts"] = "--no-progress --no-network --allow-untrusted --repository " + cfg["apk_cache"]
-
     common.append(_setup_repos(cfg))
+
+    if not cfg["is_vm"]:
+        # for physical servers, add packages manually
+        # VMs will have packages installed as part of image creation
+        common.append("# install necessary packages")
+        common.append("apk -q update")
+        common.append("apk -q add `cat $DIR/packages`")
+        common.append("")
 
     cfg["remove_packages_str"] = " ".join(cfg["remove_packages"])
     common.append(util.file.substitute("templates/common/common.sh", cfg))
@@ -194,8 +200,6 @@ def _setup_local_firewall(cfg, dir):
     b.append("rootinstall /tmp/rules-save /tmp/rules6-save /etc/iptables")
     b.append("rc-update add iptables boot")
     b.append("rc-update add ip6tables boot")
-    b.append("rc-service start iptables")
-    b.append("rc-service start ip6tables")
 
     return "\n".join(b)
 
@@ -250,13 +254,13 @@ def _create_virsh_xml(cfg, dir):
 
 
 _ipv4_static_template = """auto {name}
-  iface {name} inet {ipv4_method}
+iface {name} inet {ipv4_method}
   address {ipv4_address}
   netmask {ipv4_netmask}
   gateway {ipv4_gateway}"""
 
 _ipv4_static_unroutable_template = """auto {name}
-  iface {name} inet {ipv4_method}
+iface {name} inet {ipv4_method}
   address {ipv4_address}
   netmask {ipv4_netmask}"""
 

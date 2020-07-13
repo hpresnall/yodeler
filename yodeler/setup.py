@@ -86,11 +86,7 @@ def create_scripts_for_host(cfg, output_dir):
     setup_script.append_self_dir()
     setup_script.append_rootinstall()
 
-    if not cfg["is_vm"]:
-        # for physical servers, add packages manually
-        # VMs will have packages installed as part of image creation
-        setup_script.append("apk " + cfg["apk_opts"] + " add `cat $DIR/packages`")
-        setup_script.append("")
+    setup_script.append(f"echo \"Setting up {cfg['hostname']}\"\n")
 
     for script in scripts:
         setup_script.append(". $DIR/" + script)

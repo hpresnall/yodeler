@@ -2,7 +2,7 @@ motd: "hello, I am a vm"
 memory_mb: 256
 primary_domain: infra.example.com
 interfaces:
-  - ipv4_address: dhcp
+  - ipv4_address: 192.168.210.100
     vswitch: public
     firewall_zone: PUB
     vlan: 10

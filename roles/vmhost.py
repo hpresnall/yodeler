@@ -11,33 +11,24 @@ packages = {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
 def setup(cfg, dir):
     scripts = []
 
-    cfg["apk_opts"] = "--update-cache " + cfg["apk_opts"]
-
     scripts.append(_setup_open_vswitch(cfg, dir))
     scripts.append(_setup_libvirt(cfg, dir))
 
-    # create bootstrap wrapper script
+    # create bootstrap wrapper script and setup script for locald
+    # these are _separate_ from setup
     bootstrap = util.shell.ShellScript("bootstrap.sh")
     bootstrap.append_self_dir()
-    bootstrap.append("")
-
-    # install_alpine.sh should have been created by common setup
-    bootstrap.append(". $DIR/install_alpine.sh")
-    bootstrap.append("")
-
-    bootstrap.append(util.file.substitute("templates/vmhost/cache_apks.sh", cfg))
-    bootstrap.append("")
-
-    bootstrap.append("# copy yodeler scripts into install")
-    bootstrap.append("cp -R $DIR/../../yodeler $INSTALL/root/\n")
-    bootstrap.append("")
-
-    bootstrap.append('echo "base install complete! please reboot and immediately run /root/yodeler/' +
-                     cfg["hostname"] + '/setup.sh"')
-
+    bootstrap.append(util.file.substitute("templates/vmhost/bootstrap.sh", cfg))
     bootstrap.write_file(dir)
 
-    # --no-network --allow-untrusted --repository " + cfg["apk_cache"] + "
+    # create local.d file that runs setup on first reboot after Alpine install
+    setup = util.shell.ShellScript("setup.start")
+    setup.append(util.file.substitute("templates/vmhost/locald_setup.sh", cfg))
+    setup.write_file(dir)
+
+    # libvirt cannot be started by locald, so create a 2nd locald script
+    # for doing the rest of the config
+    _configure_libvirt(cfg, dir)
 
     return scripts
 
@@ -98,12 +89,12 @@ def _setup_open_vswitch(cfg, dir):
 
         shell.append("")
 
-    # replace existing interfaces with new vswitch port names
-    interfaces = util.file.read("interfaces", dir)
-
     if cfg["local_firewall"]:
         # replace existing interfaces with new vswitch port names
         awall_base = util.file.read("awall/base.json", dir)
+
+    # replace existing interfaces with new vswitch port names
+    interfaces = util.file.read("interfaces", dir)
 
     for iface in cfg["interfaces"]:
         vswitch_name = iface["vswitch"]["name"]
@@ -124,7 +115,7 @@ def _setup_open_vswitch(cfg, dir):
 
         shell.append("")
 
-    shell.append("rc-service networking start")
+#    shell.append("rc-service networking start")
     shell.write_file(dir)
 
     # overwrite the original interfaces file from common setup
@@ -141,6 +132,14 @@ def _setup_open_vswitch(cfg, dir):
 def _setup_libvirt(cfg, dir):
     shell = util.shell.ShellScript("libvirt.sh")
     shell.append(util.file.substitute("templates/vmhost/libvirt.sh", cfg))
+    shell.write_file(dir)
+
+    return shell.name
+
+
+def _configure_libvirt(cfg, dir):
+    shell = util.shell.ShellScript("libvirt.start")
+    shell.append(util.file.substitute("templates/vmhost/locald_libvirt.sh", cfg))
 
     # for each vswitch, create an XML network definition
     shell.append("# create all networks")
@@ -193,17 +192,23 @@ def _setup_libvirt(cfg, dir):
         # save the file and add the virsh commands to the script
         network_xml = name.text + ".xml"
         template.write(os.path.join(dir, network_xml))
-        shell.append(f"virsh net-define {network_xml}")
+
+        shell.append(f"virsh net-define $DIR/{network_xml}")
         shell.append(f"virsh net-start {name.text}")
         shell.append(f"virsh net-autostart {name.text}")
         shell.append("")
+
+    shell.append("# remove from local.d so setup is only run once")
+    shell.append("rm $0")
 
     shell.write_file(dir)
 
     return shell.name
 
 
-_setup_ovs = """rc-update add ovs-modules boot
+_setup_ovs = """echo "Configuring OpenVSwitch"
+
+rc-update add ovs-modules boot
 rc-update add ovsdb-server boot
 rc-update add ovs-vswitchd boot
 
@@ -216,7 +221,7 @@ rc-service ovs-vswitchd start
 
 modprobe tun
 
-rc-service networking stop
+#rc-service networking stop
 """
 
 # interface definition for vswitch itself
