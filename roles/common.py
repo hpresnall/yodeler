@@ -50,6 +50,11 @@ def setup(cfg, dir):
         create_vm.append_self_dir()
         create_vm.append(util.file.substitute("templates/vm/create_vm.sh", cfg))
         create_vm.write_file(dir)
+
+        # helper script to delete & remove VM
+        delete_vm = util.shell.ShellScript("delete_vm.sh")
+        delete_vm.append(util.file.substitute("templates/vm/delete_vm.sh", cfg))
+        delete_vm.write_file(dir)
     else:
         # create Alpine setup answerfile for physical servers
         # use external DNS for initial Alpine setup
