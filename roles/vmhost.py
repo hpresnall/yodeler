@@ -1,5 +1,6 @@
 import os.path
 import xml.etree.ElementTree as xml
+import shutil
 
 import util.shell
 import util.file
@@ -29,6 +30,8 @@ def setup(cfg, dir):
     # libvirt cannot be started by locald, so create a 2nd locald script
     # for doing the rest of the config
     _configure_libvirt(cfg, dir)
+
+    shutil.copyfile("templates/vmhost/cache.patch", os.path.join(dir, "cache.patch"))
 
     return scripts
 
@@ -114,8 +117,6 @@ def _setup_open_vswitch(cfg, dir):
             shell.append(f"ovs-vsctl set port {port} vlan_mode=access")
 
         shell.append("")
-
-#    shell.append("rc-service networking start")
     shell.write_file(dir)
 
     # overwrite the original interfaces file from common setup
