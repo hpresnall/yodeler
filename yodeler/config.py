@@ -3,7 +3,8 @@ import logging
 import os.path
 import ipaddress
 
-import util.file as file
+import util.file
+import util.interfaces
 
 _logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ def load_site_config(site_dir):
     This config _is not_ valid for host configuration. load_host_config()
     _must_ be called to complete configuration."""
     site_dir = os.path.abspath(site_dir)
-    site_cfg = file.load_yaml(os.path.join(site_dir, "site.yaml"))
+    site_cfg = util.file.load_yaml(os.path.join(site_dir, "site.yaml"))
     _logger.debug("loaded site YAML file from '%s'", site_dir)
 
     if site_cfg is None:
@@ -44,7 +45,7 @@ def load_host_config(site_cfg, hostname):
 
     host_dir = os.path.abspath(os.path.join(
         site_cfg["site_dir"], hostname + ".yaml"))
-    host_cfg = file.load_yaml(host_dir)
+    host_cfg = util.file.load_yaml(host_dir)
     _logger.debug("loaded host YAML file for '%s' from '%s'", hostname, host_dir)
 
     if host_cfg is None:
@@ -83,7 +84,7 @@ def load_host_config(site_cfg, hostname):
 
 
 def config_from_string(config_string):
-    cfg = file.load_yaml_string(config_string)
+    cfg = util.file.load_yaml_string(config_string)
     return config_from_dict(cfg)
 
 
@@ -340,134 +341,36 @@ def _validate_vlans(domain, vswitch):
 
 
 def _validate_interfaces(cfg):
-    interfaces = cfg.get("interfaces")
-    if (interfaces is None) or (len(interfaces) == 0):
+    ifaces = cfg.get("interfaces")
+    if (ifaces is None) or (len(ifaces) == 0):
         raise KeyError("no interfaces defined")
 
+    vswitches = cfg["vswitches"]
     matching_domain = None
+    n = 0
 
-    for i, iface in enumerate(interfaces):
-        # vswitch is required
-        vswitch_name = iface.get("vswitch")
+    for i, iface in enumerate(ifaces):
+        if iface.get("name") is None:
+            iface["name"] = f"eth{n}"
+            n += 1
 
-        if (vswitch_name is None) or (vswitch_name == ""):
-            raise KeyError(f"no vswitch defined for interface {i}: {iface}")
+        try:
+            util.interfaces.validate(iface, vswitches)
+        except KeyError as err:
+            msg = err.args[0]
+            raise KeyError(f"{msg} for interface {i}: {iface}")
 
-        vswitch = cfg["vswitches"].get(vswitch_name)
-        if vswitch is None:
-            raise KeyError(
-                f"invalid vswitch {vswitch_name} for interface {i}: {iface}")
-
-        iface["vswitch"] = vswitch
-
-        vlan_id = iface.get("vlan")
-        # allow interface vlan to be a name or id
-        if isinstance(vlan_id, str):
-            lookup = vswitch["vlans_by_name"]
-        else:
-            lookup = vswitch["vlans_by_id"]  # also handles None
-
-        # no vlan set; could be a PVID vlan on the vswitch
-        # if not, use the default vlan
-        vlan = lookup.get(vlan_id)
-        if vlan_id is None:
-            if vlan is None:
-                vlan = vswitch["default_vlan"]
-                if vlan is None:
-                    raise KeyError(
-                        f"vlan must be set for interface {i} when vswitch {vswitch_name} has no default vlan: {iface}")
-        else:
-            if vlan is None:
-                raise KeyError(
-                    f"invalid vlan {vlan_id} for interface {i}; not defined in vswitch {vswitch_name}: {iface}")
-
-        iface["vlan"] = vlan
-
+        vlan = iface["vlan"]
         if cfg["primary_domain"] == vlan["domain"]:
             matching_domain = vlan["domain"]
-
-        # required ipv4 address, but allow special 'dhcp' value
-        address = iface.get("ipv4_address")
-        if address is None:
-            raise KeyError(
-                f"no ipv4_address defined for interface {i}: {iface}")
-        elif address == "dhcp":
-            iface["ipv4_method"] = "dhcp"
-        else:
-            iface["ipv4_method"] = "static"
-            try:
-                address = iface["ipv4_address"] = ipaddress.ip_address(
-                    address)
-            except:
-                raise KeyError(
-                    f"invalid ipv4_address {address} defined for interface {i}: {iface}")
-
-            subnet = vlan["ipv4_subnet"]
-            if address not in subnet:
-                raise KeyError(
-                    f"invalid ipv4_address {address} for interface {i}; it is not in vlan {vlan_id}'s subnet {subnet}: {iface}")
-
-            iface["ipv4_netmask"] = subnet.netmask
-            iface["ipv4_gateway"] = subnet.network_address + 1
-
-        # ipv6 disabled at vlan level
-        if vlan["ipv6_disable"]:
-            iface["ipv6_method"] = "manual"
-        else:
-            # optional ipv6 address, but always enable autoconfg
-            iface["ipv6_method"] = "auto"
-
-        address = iface.get("ipv6_address")
-        if address is not None:
-            subnet = vlan.get("ipv6_subnet")
-            if subnet is None:
-                raise KeyError(
-                    f"invalid ipv6_address for interface {i}; no ipv6 subnet defined for vlan {vlan_id}: {iface}")
-
-            try:
-                address = iface["ipv6_address"] = ipaddress.ip_address(
-                    address)
-            except:
-                raise KeyError(
-                    f"invalid ipv6_address {address} defined for interface {i}: {iface}")
-
-            if address not in subnet:
-                raise KeyError(
-                    f"invalid ipv6_address {address} for interface {i}; it is not in vlan {vlan_id}'s subnet {subnet}: {iface}")
-
-            iface["ipv6_prefixlen"] = subnet.prefixlen
-        else:
-            iface["ipv6_address"] = None
-
-        # add default values
-        for key in default_interface_config.keys():
-            if key not in iface:
-                iface[key] = default_interface_config[key]
-            elif iface[key]:
-                if "privext" == key:
-                    if iface[key] > 2:
-                        raise KeyError(f"invalid privext for interface {i}; it must be 0, 1 or 2: {iface}")
-                    else:
-                        iface[key] = int(iface[key])
-                else:
-                    iface[key] = 1
-            else:
-                iface[key] = 0
-
-        iface["firewall_zone"] = iface.get(
-            "firewall_zone", vswitch_name.upper())
-
-        # assume interfaces are defined in order and that Alpine assigns them as ethx
-        iface["name"] = f"eth{i}"
-    # end for each iface
 
     if cfg["primary_domain"]:
         if (matching_domain is None):
             raise KeyError(
                 f"invalid primary_domain: no vlan domain matches {cfg['primary_domain']}")
     else:
-        if (len(interfaces) == 1):
-            cfg["primary_domain"] = interfaces[0]["vlan"]["domain"]
+        if (len(ifaces) == 1):
+            cfg["primary_domain"] = ifaces[0]["vlan"]["domain"]
 
 
 # properties that are unique and cannot be set as defaults
@@ -517,10 +420,4 @@ default_vlan_config = {
     "dhcp_min_address_ipv6": 2,
     "dhcp_max_address_ipv6": 0xffff,
     "known_hosts": []
-}
-
-default_interface_config = {
-    "ipv6_dhcp": 1,
-    "accept_ra": 1,
-    "privext": 2
 }

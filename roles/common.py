@@ -4,6 +4,7 @@ import xml.etree.ElementTree as xml
 
 import util.shell
 import util.file
+import util.interfaces
 
 # use Debian's better ifupdown and the Linux ip command, instead of Busybox's built-ins
 packages = {"ifupdown", "iproute2"}
@@ -36,7 +37,8 @@ def setup(cfg, dir):
 
     common.write_file(dir)
 
-    _create_interfaces(cfg, dir)
+    util.file.write("interfaces", "\n".join([util.interfaces.loopback,
+                                             util.interfaces.as_etc_network(*cfg["interfaces"])]), dir)
     _create_resolv_conf(cfg, dir)
     _create_chrony_conf(cfg, dir)
 
@@ -45,7 +47,7 @@ def setup(cfg, dir):
         _create_virsh_xml(cfg, dir)
 
         # note not adding create_vm to setup script
-        # for VMs, create_vm.sh will run setup.sh _inside_ a chroot for the vm
+        # for VMs, create_vm.sh will run setup _inside_ a chroot for the vm
         create_vm = util.shell.ShellScript("create_vm.sh")
         create_vm.append_self_dir()
         create_vm.append(util.file.substitute("templates/vm/create_vm.sh", cfg))
@@ -85,39 +87,6 @@ def _setup_repos(cfg):
     b.append("")
 
     return "\n".join(b)
-
-
-def _create_interfaces(cfg, dir):
-    b = []
-
-    b.append("auto lo")
-    b.append("iface lo inet loopback")
-    b.append("iface lo inet6 loopback")
-    b.append("")
-
-    for iface in cfg["interfaces"]:
-        if iface["ipv4_method"] == "static":
-            if iface["vlan"]["routable"]:
-                template = _ipv4_static_template
-            else:
-                template = _ipv4_static_unroutable_template
-            b.append(template.format_map(iface))
-        elif iface["ipv4_method"] == "dhcp":
-            b.append("auto {name}\niface {name} inet {ipv4_method}".format_map(iface))
-        else:
-            raise KeyError(f"invalid ipv4_method {iface['ipv4_method']} for interface {iface}")
-
-        if iface["ipv6_method"] == "manual":
-            b.append("iface {name} inet6 {ipv6_method}".format_map(iface))
-        else:
-            b.append(_ipv6_auto_template.format_map(iface))
-
-            if iface["ipv6_address"] is not None:
-                b.append(_ipv6_address_template.format_map(iface))
-
-        b.append("")
-
-    util.file.write("interfaces", "\n".join(b), dir)
 
 
 def _create_resolv_conf(cfg, dir):
@@ -257,25 +226,6 @@ def _create_virsh_xml(cfg, dir):
 
     template.write(os.path.join(dir, cfg["hostname"] + ".xml"))
 
-
-_ipv4_static_template = """auto {name}
-iface {name} inet {ipv4_method}
-  address {ipv4_address}
-  netmask {ipv4_netmask}
-  gateway {ipv4_gateway}"""
-
-_ipv4_static_unroutable_template = """auto {name}
-iface {name} inet {ipv4_method}
-  address {ipv4_address}
-  netmask {ipv4_netmask}"""
-
-_ipv6_auto_template = """iface {name} inet6 {ipv6_method}
-  dhcp {ipv6_dhcp}
-  accept_ra {accept_ra}
-  privext {privext}"""
-
-_ipv6_address_template = """  post-up ip -6 addr add {ipv6_address}/{ipv6_prefixlen} dev {name}
-  pre-down ip -6 addr del {ipv6_address}/{ipv6_prefixlen} dev {name}"""
 
 _setup_metrics = """# setup Prometheus
 rc-update add node-exporter default
