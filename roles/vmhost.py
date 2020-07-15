@@ -1,9 +1,11 @@
 import os.path
 import xml.etree.ElementTree as xml
 import shutil
+import ipaddress
 
 import util.shell
 import util.file
+import util.interfaces
 
 packages = {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
             "libvirt", "libvirt-daemon", "libvirt-qemu", "dbus", "polkit", "git"}
@@ -32,6 +34,8 @@ def setup(cfg, dir):
     _configure_libvirt(cfg, dir)
 
     shutil.copyfile("templates/vmhost/cache.patch", os.path.join(dir, "cache.patch"))
+
+    _before_router(cfg, dir)
 
     return scripts
 
@@ -206,6 +210,58 @@ def _configure_libvirt(cfg, dir):
 
     return shell.name
 
+def _before_router(cfg, dir):
+    before = cfg["interfaces_before_router"]
+
+    for i, iface in enumerate(before):
+        if iface.get("name") is None:
+            raise KeyError(f"name not defined for interface {i}: {iface}")
+
+        vswitches = cfg["vswitches"]
+        vswitch = iface.get("vswitch")
+
+        if vswitch is None:
+            vswitches = _configure_iface(iface)
+
+        util.interfaces.validate(iface, vswitches)
+
+    print("before router")
+    print(util.interfaces.as_etc_network(*before))
+
+def _configure_iface(iface):
+    vswitches = {"before": {"name": "before"}}
+    vlan = {"name": "before", "ipv6_disable": False}
+
+    # no vlan => cannot lookup subnet so it must be defined explicitly
+    if iface.get("ipv4_address") is not None:
+        if (iface["ipv4_address"] != 'dhcp'):
+            if (iface.get("ipv4_subnet") is None):
+                raise KeyError(
+                    f"ipv4_subnet not defined when using static ipv4_address on interface {i}: {iface}")
+            else:
+                try:
+                    vlan["ipv4_subnet"] = ipaddress.ip_network(iface["ipv4_subnet"])
+                except:
+                    raise KeyError(f"invalid ipv4_subnet defined for interface {i}: {iface}")
+    # else util.interface.validate() handles None
+
+    if iface.get("ipv6_address") is not None:
+        if iface.get("ipv6_subnet") is None:
+            raise KeyError(f"ipv6_subnet not defined when using static ipv6_address on interface {i}: {iface}")
+        else:
+            try:
+                vlan["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
+            except:
+                raise KeyError(f"invalid ipv6_subnet defined for interface {i}: {iface}")
+    # else util.interface.validate() handles None
+
+    vlan["id"] = iface.get("vlan")  # None case handled in util.interface.validate()
+    vswitches["before"]["vlans_by_id"] = {vlan["id"]: vlan}
+    vswitches["before"]["vlans_by_name"] = {vlan["name"]: vlan}
+
+    iface["vswitch"] = "before"
+
+    return vswitches
 
 _setup_ovs = """echo "Configuring OpenVSwitch"
 

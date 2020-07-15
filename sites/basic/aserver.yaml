@@ -12,6 +12,10 @@ interfaces:
   - ipv4_address: 172.16.251.5
     vswitch: private
     firewall_zone: PRIV
+interfaces_before_router:
+  - name: eth0
+    ipv4_address: dhcp
+    ipv6_dhcp: false
 install_private_ssh_key: true
 packages: [ ndisc6 tcpdump ]
 roles: ["vmhost"]
