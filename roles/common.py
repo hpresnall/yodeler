@@ -1,10 +1,10 @@
 import os
-import json
 import xml.etree.ElementTree as xml
 
 import util.shell
 import util.file
 import util.interfaces
+import util.awall
 
 # use Debian's better ifupdown and the Linux ip command, instead of Busybox's built-ins
 packages = {"ifupdown", "iproute2"}
@@ -33,12 +33,12 @@ def setup(cfg, dir):
         common.append(_setup_metrics)
 
     if cfg["local_firewall"]:
-        common.append(_setup_local_firewall(cfg, dir))
+        common.append(util.awall.configure(cfg["interfaces"], dir))
 
     common.write_file(dir)
 
-    util.file.write("interfaces", "\n".join([util.interfaces.loopback,
-                                             util.interfaces.as_etc_network(*cfg["interfaces"])]), dir)
+    util.file.write("interfaces", util.interfaces.as_etc_network(cfg["interfaces"]), dir)
+
     _create_resolv_conf(cfg, dir)
     _create_chrony_conf(cfg, dir)
 
@@ -119,63 +119,6 @@ def _create_resolv_conf(cfg, dir):
     # else leave empty & assume DHCP will setup resolv.confg otherwise
 
     util.file.write("resolv.conf.head", "\n".join(b), dir)
-
-
-def _setup_local_firewall(cfg, dir):
-    # create all JSON config from template
-    # see https://wiki.alpinelinux.org/wiki/Zero-To-Awall
-
-    # base json template; add a zone and policy for each interface
-    base = {"description": "base zones and policies", "zone": {}, "policy": []}
-
-    # load all template services
-    services = {}
-    for path in os.listdir("templates/awall"):
-        with open(os.path.join("templates/awall", path)) as f:
-            service = json.load(f)
-        # assume service has a single filter and it is for input
-        service["filter"][0]["in"] = []
-        services[path] = service
-
-    for iface in cfg["interfaces"]:
-        zone = iface["firewall_zone"]
-        name = iface["name"]
-
-        # add zones for each interface
-        base["zone"][zone] = {"iface": name}
-        # allow all traffic out
-        # allow no traffic in, except as configured by servics
-        base["policy"].append({"out": zone, "action": "accept"})
-        base["policy"].append({"in": zone, "action": "drop"})
-
-        # all zones can retrieve traffic for all services
-        for service in services.values():
-            service["filter"][0]["in"].append(zone)
-
-    # write JSON config to awall subdirectory
-    awall = os.path.join(dir, "awall")
-    os.mkdir(awall)
-
-    b = ["# configure awall"]
-    b.append("rootinstall $DIR/awall/base.json /etc/awall/optional")
-    b.append("awall enable base")
-
-    util.file.write("base.json",  json.dumps(base, indent=2), awall)
-
-    for name, service in services.items():
-        util.file.write(name, json.dumps(service, indent=2), awall)
-
-        b.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
-        b.append("awall enable {}".format(name[:-5]))  # name without .json
-
-    b.append("")
-    b.append("# create iptables rules and apply at boot")
-    b.append("awall translate -o /tmp")
-    b.append("rootinstall /tmp/rules-save /tmp/rules6-save /etc/iptables")
-    b.append("rc-update add iptables boot")
-    b.append("rc-update add ip6tables boot")
-
-    return "\n".join(b)
 
 
 def _create_chrony_conf(cfg, dir):

@@ -5,14 +5,13 @@ is_vm: false
 interfaces:
   - ipv4_address: 192.168.210.5
     ipv6_address: fd24:87e8:06c7:10::5
-    ipv6_dhcp: false
     vswitch: public
     firewall_zone: PUB
     vlan: 10
   - ipv4_address: 172.16.251.5
     vswitch: private
     firewall_zone: PRIV
-interfaces_before_router:
+initial_interfaces:
   - name: eth0
     ipv4_address: dhcp
     ipv6_dhcp: false

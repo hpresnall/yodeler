@@ -6,6 +6,7 @@ import ipaddress
 import util.shell
 import util.file
 import util.interfaces
+import util.awall
 
 packages = {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
             "libvirt", "libvirt-daemon", "libvirt-qemu", "dbus", "polkit", "git"}
@@ -35,7 +36,7 @@ def setup(cfg, dir):
 
     shutil.copyfile("templates/vmhost/cache.patch", os.path.join(dir, "cache.patch"))
 
-    _before_router(cfg, dir)
+    _configure_initial_network(cfg, dir)
 
     return scripts
 
@@ -45,18 +46,23 @@ def _setup_open_vswitch(cfg, dir):
     shell.append(_setup_ovs)
 
     # create new entries in /etc/network/interfaces for each switch
-    new_interfaces = ""
+    vswitch_interfaces = []
+    uplink_interfaces = []
 
-    # create Open Vswitches for each vswitch configuration
+    # create Open vswitches for each configuration
+    # create interfaces for each switch
     # add uplink ports with correct tagging where specified
     for vswitch in cfg["vswitches"].values():
         vswitch_name = vswitch["name"]
         shell.append(f"# setup {vswitch_name} vswitch")
         shell.append(f"ovs-vsctl add-br {vswitch_name}")
 
-        # ensure switch iface is configured
-        new_interfaces += _vswitch_iface_template.format(vswitch_name)
+        # iface for switch itself
+        iface = util.interfaces.create_port(vswitch_name)
+        iface["comment"] = "vswitch"
+        vswitch_interfaces.append(iface)
 
+        # for each uplink, create a port on the vswitch and an iface definition
         uplink = vswitch["uplink"]
         if uplink is None:
             shell.append("")
@@ -66,14 +72,16 @@ def _setup_open_vswitch(cfg, dir):
             shell.append(f"ovs-vsctl add-bond {vswitch_name} uplink {bond_ifaces} lacp=active")
 
             for iface in uplink:
-                # ensure physical uplink ifaces are configured
-                new_interfaces += _vswitch_iface_template.format(iface)
+                iface = util.interfaces.create_port(uplink)
+                iface["comment"] = "uplink for vswitch " + vswitch_name
+                uplink_interfaces.append(iface)
 
             uplink = "uplink"
         else:
             shell.append(f"ovs-vsctl add-port {vswitch_name} {uplink}")
-            # ensure physical uplink iface is configured
-            new_interfaces += _vswitch_iface_template.format(uplink)
+            iface = util.interfaces.create_port(uplink)
+            iface["comment"] = "uplink for vswitch " + vswitch_name
+            uplink_interfaces.append(iface)
 
         vlans_by_id = vswitch["vlans_by_id"].keys()
         if len(vlans_by_id) == 1:
@@ -100,15 +108,13 @@ def _setup_open_vswitch(cfg, dir):
         # replace existing interfaces with new vswitch port names
         awall_base = util.file.read("awall/base.json", dir)
 
-    # replace existing interfaces with new vswitch port names
-    interfaces = util.file.read("interfaces", dir)
-
+    # each system interface needs a port on the vswitch too
+    # change original interface name to the port name
     for iface in cfg["interfaces"]:
         vswitch_name = iface["vswitch"]["name"]
         port = f"{cfg['hostname']}-{vswitch_name}"
 
-        # fix existing interface name
-        interfaces = interfaces.replace(iface["name"], port)
+        iface["name"] = port
 
         if cfg["local_firewall"]:
             awall_base = awall_base.replace(iface["name"], port)
@@ -123,9 +129,11 @@ def _setup_open_vswitch(cfg, dir):
         shell.append("")
     shell.write_file(dir)
 
+    cfg["vmhost_interfaces"] = vswitch_interfaces + uplink_interfaces
+
     # overwrite the original interfaces file from common setup
-    # switch ifaces first so they are up before the host's ports
-    util.file.write("interfaces", new_interfaces + interfaces, dir)
+    # vswitch & uplink ifaces first so they are up before the vm host's ports
+    util.file.write("interfaces", util.interfaces.as_etc_network(cfg["vmhost_interfaces"] + cfg["interfaces"]), dir)
 
     # overwrite the original awall base config
     if cfg["local_firewall"]:
@@ -210,26 +218,73 @@ def _configure_libvirt(cfg, dir):
 
     return shell.name
 
-def _before_router(cfg, dir):
-    before = cfg["interfaces_before_router"]
 
-    for i, iface in enumerate(before):
+def _configure_initial_network(cfg, dir):
+    # move final config
+    shutil.move(os.path.join(dir, "awall"), os.path.join(dir, "awall.final"))
+    shutil.move(os.path.join(dir, "interfaces"), os.path.join(dir, "interfaces.final"))
+
+    # create interfaces for initial setup
+    initial_interfaces = cfg["initial_interfaces"]
+    names = set()
+
+    for i, iface in enumerate(initial_interfaces):
+        # usual configuration numbers ifaces by array order
+        # initial config may not use all ifaces, so name must be specified
+        # to ignoring ordering
         if iface.get("name") is None:
-            raise KeyError(f"name not defined for interface {i}: {iface}")
+            raise KeyError(f"name not defined for initial interface {i}: {iface}")
 
-        vswitches = cfg["vswitches"]
+        if iface["name"] in names:
+            raise KeyError(f"duplicate name defined for initial interface {i}: {iface}")
+        names.add(iface["name"])
+
         vswitch = iface.get("vswitch")
 
         if vswitch is None:
-            vswitches = _configure_iface(iface)
+            vswitches = _configure_initial_iface(i, iface)
+        else:
+            vswitches = cfg["vswitches"]
+
+        iface["firewall_zone"] = "initial_" + iface["name"]
 
         util.interfaces.validate(iface, vswitches)
 
-    print("before router")
-    print(util.interfaces.as_etc_network(*before))
+    shell = util.shell.ShellScript("finalize_network.sh")
+    shell.append_self_dir()
+    shell.append_rootinstall()
+    shell.append("mv $DIR/awall $DIR/awall.initial")
+    shell.append("mv $DIR/awall.final $DIR/awall")
+    shell.append("")
+    shell.append(util.awall.configure(initial_interfaces, dir))
+    shell.append("service iptables restart")
+    shell.append("")
+    shell.append("rc-service networking stop")
+    shell.append("rootinstall $$DIR/interfaces.final /etc/network/interfaces")
+    shell.append("rc-service networking start")
 
-def _configure_iface(iface):
-    vswitches = {"before": {"name": "before"}}
+    shell.write_file(dir)
+   
+    # also add original interface unless
+    # DHCP since that will hang boot if it cannot get an IP address
+    # initial interface will be reused
+    initial_interfaces += [iface for iface in cfg["vmhost_interfaces"]
+                           if (iface["ipv4_method"] != ["dhcp"]) and not iface["ipv6_dhcp"] and (iface["name"] not in names)]
+
+    util.file.write("interfaces", util.interfaces.as_etc_network(initial_interfaces), dir)
+
+
+def _configure_initial_iface(i, iface):
+    """Finalize configuration so validation will pass.
+
+    For initial_interfaces, allow:
+    1) interfaces to be defined without a vswitch or vlan
+    2) static ip addresses in a subnet not on any vlan
+
+    To pass util.interfaces.validate(), create a fake vswitch and vlan.
+    """
+    before = {"name": "before"}
+    vswitches = {"before": before}
     vlan = {"name": "before", "ipv6_disable": False}
 
     # no vlan => cannot lookup subnet so it must be defined explicitly
@@ -256,12 +311,15 @@ def _configure_iface(iface):
     # else util.interface.validate() handles None
 
     vlan["id"] = iface.get("vlan")  # None case handled in util.interface.validate()
-    vswitches["before"]["vlans_by_id"] = {vlan["id"]: vlan}
-    vswitches["before"]["vlans_by_name"] = {vlan["name"]: vlan}
+    vlan["default"] = True
+    before["vlans_by_id"] = {vlan["id"]: vlan}
+    before["vlans_by_name"] = {vlan["name"]: vlan}
+    before["default_vlan"] = vlan
 
     iface["vswitch"] = "before"
 
     return vswitches
+
 
 _setup_ovs = """echo "Configuring OpenVSwitch"
 
@@ -278,16 +336,5 @@ rc-service ovs-vswitchd start
 
 modprobe tun
 
-#rc-service networking stop
-"""
-
-# interface definition for vswitch itself
-# set 0 ipv4 address and disable ipv6 router advertisements
-_vswitch_iface_template = """auto {0}
-iface {0} inet manual
-  up ifconfig {0} 0.0.0.0 up
-  down ifconfig {0} down
-iface {0} inet6 auto
-  accept_ra 0
-
+# rc-service networking stop
 """

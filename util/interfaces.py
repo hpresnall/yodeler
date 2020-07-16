@@ -1,5 +1,6 @@
 import ipaddress
 
+
 def validate(iface, vswitches):
     """ Validate a single interface from the config.
     """
@@ -107,13 +108,34 @@ def validate(iface, vswitches):
         "firewall_zone", vswitch_name.upper())
 
 
-def as_etc_network(*interfaces):
+def create_port(name):
+    """ Create an interface configuration for "port" interfaces like vswitches and vlan parents.
+
+    The resulting object _will not_ pass validate() but it will be output by as_etc_network().
+    """
+    return {
+        "name": name,
+        # special value; not set or used in config.py
+        # but as_etc_network() will create a 0 ipv4 address
+        "ipv4_method": "vswitch",
+        "ipv6_method": "auto",
+        # do not assign any ipv4 address other than link local
+        "ipv6_address": None,
+        "ipv6_dhcp": 0,
+        "accept_ra": 0,
+        "privext": 0}
+
+
+def as_etc_network(interfaces):
     """Convert the interfaces to a form for use in /etc/network/interfaces.
 
     The list of interfaces must be from a valid config."""
-    b = []
+    b = [_loopback]
 
     for iface in interfaces:
+        if iface.get("comment") is not None:
+            b.append("# " + iface["comment"])
+
         if iface["ipv4_method"] == "static":
             if iface["vlan"]["routable"]:
                 template = _ipv4_static_template
@@ -122,12 +144,15 @@ def as_etc_network(*interfaces):
             b.append(template.format_map(iface))
         elif iface["ipv4_method"] == "dhcp":
             b.append("auto {name}\niface {name} inet {ipv4_method}".format_map(iface))
+        elif iface["ipv4_method"] == "vswitch":
+            b.append(_ipv4_vswitch_template.format_map(iface))
         else:
             raise KeyError(f"invalid ipv4_method {iface['ipv4_method']} for interface {iface}")
-
+        # use auto method for vswitches; note create_port() disables ra and dhcp
         if iface["ipv6_method"] == "manual":
             # disable IPv6; no SLAAC or DHCP
             b.append("iface {name} inet6 {ipv6_method}".format_map(iface))
+
         else:
             b.append(_ipv6_auto_template.format_map(iface))
 
@@ -135,10 +160,11 @@ def as_etc_network(*interfaces):
                 b.append(_ipv6_address_template.format_map(iface))
 
         b.append("")
-    
+
     return "\n".join(b)
 
-loopback = """auto lo
+
+_loopback = """auto lo
 iface lo inet loopback
 iface lo inet6 loopback
 """
@@ -161,6 +187,12 @@ _ipv4_static_unroutable_template = """auto {name}
 iface {name} inet {ipv4_method}
   address {ipv4_address}
   netmask {ipv4_netmask}"""
+
+# vswitches manually set 0 IP
+_ipv4_vswitch_template = """auto {name}
+iface {name} inet manual
+  post-up ip addr add 0.0.0.0/32 dev {name}
+  pre-down ip addr del 0.0.0./32 dev {name}"""
 
 # SLAAC IPv6 address and / or DHCP address
 _ipv6_auto_template = """iface {name} inet6 {ipv6_method}
