@@ -5,6 +5,7 @@ import util.shell
 import util.file
 import util.interfaces
 import util.awall
+import util.resolv
 
 # use Debian's better ifupdown and the Linux ip command, instead of Busybox's built-ins
 packages = {"ifupdown", "iproute2"}
@@ -39,7 +40,8 @@ def setup(cfg, dir):
 
     util.file.write("interfaces", util.interfaces.as_etc_network(cfg["interfaces"]), dir)
 
-    _create_resolv_conf(cfg, dir)
+    util.resolv.create_conf(cfg["interfaces"], cfg["primary_domain"], cfg["domain"],
+                            cfg["local_dns"], cfg["external_dns"], dir)
     _create_chrony_conf(cfg, dir)
 
     if cfg["is_vm"]:
@@ -87,38 +89,6 @@ def _setup_repos(cfg):
     b.append("")
 
     return "\n".join(b)
-
-
-def _create_resolv_conf(cfg, dir):
-    # determine if any interface is using DHCP
-    dhcp = False
-    search_domains = []
-    for iface in cfg["interfaces"]:
-        dhcp |= iface["ipv4_method"] == "dhcp"
-        # search all vlan domains
-        search_domains.append(iface["vlan"]["domain"])
-
-    b = []
-
-    if not dhcp: # manually set DNS servers
-        if (cfg["primary_domain"]):
-            b.append(f"domain {cfg['primary_domain']}")
-
-        if cfg["local_dns"]:
-            # can search local domains if there is local dns
-            search_domains.append(cfg["domain"])
-            b.append("search {}".format(" ".join(search_domains)))
-
-            nameservers = cfg["local_dns"]
-        else:
-            nameservers = cfg["external_dns"]
-
-        for server in nameservers:
-            b.append("nameserver " + server)
-        b.append("")
-    # else leave empty & assume DHCP will setup resolv.conf
-
-    util.file.write("resolv.conf", "\n".join(b), dir)
 
 
 def _create_chrony_conf(cfg, dir):

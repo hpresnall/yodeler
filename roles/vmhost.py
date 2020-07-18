@@ -7,6 +7,7 @@ import util.shell
 import util.file
 import util.interfaces
 import util.awall
+import util.resolv
 
 packages = {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
             "libvirt", "libvirt-daemon", "libvirt-qemu", "dbus", "polkit", "git"}
@@ -127,6 +128,7 @@ def _setup_open_vswitch(cfg, dir):
             shell.append(f"ovs-vsctl set port {port} vlan_mode=access")
 
         shell.append("")
+
     shell.write_file(dir)
 
     cfg["vmhost_interfaces"] = vswitch_interfaces + uplink_interfaces
@@ -150,6 +152,7 @@ def _setup_libvirt(cfg, dir):
     return shell.name
 
 
+# actions to run _after_ libvirtd is started
 def _configure_libvirt(cfg, dir):
     shell = util.shell.ShellScript("libvirt.start")
     shell.append(util.file.substitute("templates/vmhost/locald_libvirt.sh", cfg))
@@ -223,6 +226,7 @@ def _configure_initial_network(cfg, dir):
     # move final config
     shutil.move(os.path.join(dir, "awall"), os.path.join(dir, "awall.final"))
     shutil.move(os.path.join(dir, "interfaces"), os.path.join(dir, "interfaces.final"))
+    shutil.move(os.path.join(dir, "resolv.conf"), os.path.join(dir, "resolv.conf.final"))
 
     # create interfaces for initial setup
     initial_interfaces = cfg["initial_interfaces"]
@@ -259,12 +263,14 @@ def _configure_initial_network(cfg, dir):
     shell.append(util.awall.configure(initial_interfaces, dir))
     shell.append("service iptables restart")
     shell.append("")
+    shell.append("rootinstall $$DIR/resolv.conf.final /etc/resolv.conf")
+    shell.append("")
     shell.append("rc-service networking stop")
     shell.append("rootinstall $$DIR/interfaces.final /etc/network/interfaces")
     shell.append("rc-service networking start")
 
     shell.write_file(dir)
-   
+
     # also add original interface unless
     # DHCP since that will hang boot if it cannot get an IP address
     # initial interface will be reused
@@ -272,6 +278,9 @@ def _configure_initial_network(cfg, dir):
                            if (iface["ipv4_method"] != ["dhcp"]) and not iface["ipv6_dhcp"] and (iface["name"] not in names)]
 
     util.file.write("interfaces", util.interfaces.as_etc_network(initial_interfaces), dir)
+
+    util.resolv.create_conf(initial_interfaces, cfg["primary_domain"], cfg["domain"],
+                            cfg["local_dns"], cfg["external_dns"], dir)
 
 
 def _configure_initial_iface(i, iface):
@@ -283,9 +292,9 @@ def _configure_initial_iface(i, iface):
 
     To pass util.interfaces.validate(), create a fake vswitch and vlan.
     """
-    before = {"name": "before"}
-    vswitches = {"before": before}
-    vlan = {"name": "before", "ipv6_disable": False}
+    initial_vswitch = {"name": "initial"}
+    vswitches = {"initial": initial_vswitch}
+    initial_vlan = {"name": "initial", "ipv6_disable": False}
 
     # no vlan => cannot lookup subnet so it must be defined explicitly
     if iface.get("ipv4_address") is not None:
@@ -295,7 +304,7 @@ def _configure_initial_iface(i, iface):
                     f"ipv4_subnet not defined when using static ipv4_address on interface {i}: {iface}")
             else:
                 try:
-                    vlan["ipv4_subnet"] = ipaddress.ip_network(iface["ipv4_subnet"])
+                    initial_vlan["ipv4_subnet"] = ipaddress.ip_network(iface["ipv4_subnet"])
                 except:
                     raise KeyError(f"invalid ipv4_subnet defined for interface {i}: {iface}")
     # else util.interface.validate() handles None
@@ -305,18 +314,18 @@ def _configure_initial_iface(i, iface):
             raise KeyError(f"ipv6_subnet not defined when using static ipv6_address on interface {i}: {iface}")
         else:
             try:
-                vlan["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
+                initial_vlan["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
             except:
                 raise KeyError(f"invalid ipv6_subnet defined for interface {i}: {iface}")
     # else util.interface.validate() handles None
 
-    vlan["id"] = iface.get("vlan")  # None case handled in util.interface.validate()
-    vlan["default"] = True
-    before["vlans_by_id"] = {vlan["id"]: vlan}
-    before["vlans_by_name"] = {vlan["name"]: vlan}
-    before["default_vlan"] = vlan
+    initial_vlan["id"] = iface.get("vlan")  # None case handled in util.interfaces.validate()
+    initial_vlan["default"] = True
+    initial_vswitch["vlans_by_id"] = {initial_vlan["id"]: initial_vlan}
+    initial_vswitch["vlans_by_name"] = {initial_vlan["name"]: initial_vlan}
+    initial_vswitch["default_vlan"] = initial_vlan
 
-    iface["vswitch"] = "before"
+    iface["vswitch"] = initial_vswitch["name"]
 
     return vswitches
 

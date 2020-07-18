@@ -123,7 +123,8 @@ def create_port(name):
         "ipv6_address": None,
         "ipv6_dhcp": 0,
         "accept_ra": 0,
-        "privext": 0}
+        "privext": 0,
+        "vlan": {"domain": ""}} # for util.resolv.create_conf()
 
 
 def as_etc_network(interfaces):
