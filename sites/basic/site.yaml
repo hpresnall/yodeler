@@ -9,7 +9,7 @@ ntp_pool_servers:
   - 2.us.pool.ntp.org
   - 3.us.pool.ntp.org
 timezone: US/Eastern
-motd: Welcome to Example!\n
+motd: Welcome to Yodeler's Basic Example Site!\n
 alpine_repositories:
   - http://dl-cdn.alpinelinux.org/alpine/latest-stable/main
   - http://dl-cdn.alpinelinux.org/alpine/latest-stable/community
@@ -66,7 +66,7 @@ vswitches:
     vlans:
       - name: mgmt
         id: # vswitch will not vlan tag
-        routable: false # no router interface and no firewall will be created
+        routable: false # no interface and no firewall rules will be created on the router
         domain: mgmt.example.com
         ipv4_subnet: 172.16.251.0/24
         ipv6_disable: true

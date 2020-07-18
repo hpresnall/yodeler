@@ -1,11 +1,12 @@
-motd: "hello, I am a vm"
+motd: "hello, I am a minimal Alpine VM"
 memory_mb: 256
 primary_domain: infra.example.com
 interfaces:
   - ipv4_address: 192.168.210.100
+    ipv6_dhcp: false
     vswitch: public
     firewall_zone: PUB
-    vlan: 10
+    vlan: infra # vlan can be name or id
   - ipv4_address: 172.16.251.6
     vswitch: private
     firewall_zone: PRIV

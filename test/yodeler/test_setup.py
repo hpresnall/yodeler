@@ -32,7 +32,11 @@ class TestSetup(unittest.TestCase):
                              "interfaces",
                              "dhclient.conf",
                              "chrony.conf",
-                             "resolv.conf.head",
+                             "resolv.conf",
                              "packages",
+                             "create_vm.sh",
+                             "delete_vm.sh",
                              hostname + ".xml"]:
                     self.assertTrue(os.path.isfile(os.path.join(host_dir, path)), path + " not created")
+
+                    self.assertTrue(os.path.isdir(os.path.join(host_dir, "awall")), "awall" + " not created")

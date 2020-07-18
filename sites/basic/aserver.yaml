@@ -1,5 +1,4 @@
-motd: "hello, I am a server"
-memory_mb: 256
+motd: "hello, I am a KVM host"
 primary_domain: infra.example.com
 is_vm: false
 interfaces:
@@ -11,10 +10,13 @@ interfaces:
   - ipv4_address: 172.16.251.5
     vswitch: private
     firewall_zone: PRIV
+# before the router is configured, the final interfaces config will not work
+# use this instead for inital intallation and configuration
 initial_interfaces:
   - name: eth0
     ipv4_address: dhcp
     ipv6_dhcp: false
+# private key will be put on this server and it can be used as a jump box
 install_private_ssh_key: true
 packages: [ ndisc6 tcpdump ]
 roles: ["vmhost"]

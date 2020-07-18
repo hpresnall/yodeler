@@ -100,7 +100,7 @@ def _create_resolv_conf(cfg, dir):
 
     b = []
 
-    if not dhcp:
+    if not dhcp: # manually set DNS servers
         if (cfg["primary_domain"]):
             b.append(f"domain {cfg['primary_domain']}")
 
@@ -116,9 +116,9 @@ def _create_resolv_conf(cfg, dir):
         for server in nameservers:
             b.append("nameserver " + server)
         b.append("")
-    # else leave empty & assume DHCP will setup resolv.confg otherwise
+    # else leave empty & assume DHCP will setup resolv.conf
 
-    util.file.write("resolv.conf.head", "\n".join(b), dir)
+    util.file.write("resolv.conf", "\n".join(b), dir)
 
 
 def _create_chrony_conf(cfg, dir):
