@@ -30,7 +30,7 @@ def create_conf(interfaces, host_domain, site_domain, local_dns, external_dns, d
             if search_domains and search_domains != "":
                 search_domains.append(site_domain)
 
-            if len(search_domains) > 0:
+            if len(search_domains):
                 b.append("search {}".format(" ".join(search_domains)))
 
             nameservers = local_dns
@@ -42,4 +42,6 @@ def create_conf(interfaces, host_domain, site_domain, local_dns, external_dns, d
         b.append("")
     # else leave empty & assume DHCP will setup resolv.conf
 
-    util.file.write("resolv.conf", "\n".join(b), dir)
+    # do not write out empty file
+    if len(b):
+        util.file.write("resolv.conf", "\n".join(b), dir)

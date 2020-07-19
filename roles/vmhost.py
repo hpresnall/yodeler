@@ -19,8 +19,7 @@ def setup(cfg, dir):
     scripts.append(_setup_open_vswitch(cfg, dir))
     scripts.append(_setup_libvirt(cfg, dir))
 
-    # create bootstrap wrapper script and setup script for locald
-    # these are _separate_ from setup
+    # create bootstrap wrapper script
     bootstrap = util.shell.ShellScript("bootstrap.sh")
     bootstrap.append_self_dir()
     bootstrap.append(util.file.substitute("templates/vmhost/bootstrap.sh", cfg))
@@ -28,6 +27,7 @@ def setup(cfg, dir):
 
     # create local.d file that runs setup on first reboot after Alpine install
     setup = util.shell.ShellScript("setup.start")
+    setup.setup_logging(cfg["hostname"])
     setup.append(util.file.substitute("templates/vmhost/locald_setup.sh", cfg))
     setup.write_file(dir)
 
@@ -39,6 +39,7 @@ def setup(cfg, dir):
 
     _configure_initial_network(cfg, dir)
 
+    # note bootstrap and locald_setup are _separate_ scripts run outside of setup.sh
     return scripts
 
 
@@ -115,10 +116,10 @@ def _setup_open_vswitch(cfg, dir):
         vswitch_name = iface["vswitch"]["name"]
         port = f"{cfg['hostname']}-{vswitch_name}"
 
-        iface["name"] = port
-
         if cfg["local_firewall"]:
             awall_base = awall_base.replace(iface["name"], port)
+
+        iface["name"] = port
 
         shell.append(f"# setup switch port for interface on vswitch {vswitch_name}")
         shell.append(f"ovs-vsctl add-port {vswitch_name} {port} -- set interface {port} type=internal")
@@ -155,10 +156,10 @@ def _setup_libvirt(cfg, dir):
 # actions to run _after_ libvirtd is started
 def _configure_libvirt(cfg, dir):
     shell = util.shell.ShellScript("libvirt.start")
+    shell.setup_logging(cfg["hostname"])
     shell.append(util.file.substitute("templates/vmhost/locald_libvirt.sh", cfg))
 
     # for each vswitch, create an XML network definition
-    shell.append("# create all networks")
     for vswitch in cfg["vswitches"].values():
         template = xml.parse("templates/vm/network.xml")
         net = template.getroot()
@@ -219,8 +220,6 @@ def _configure_libvirt(cfg, dir):
 
     shell.write_file(dir)
 
-    return shell.name
-
 
 def _configure_initial_network(cfg, dir):
     # move final config
@@ -254,21 +253,18 @@ def _configure_initial_network(cfg, dir):
 
         util.interfaces.validate(iface, vswitches)
 
+
+    # script to switch network to final configuration
+    # run before adding to initial_interfaces since vswitches & uplinks do no need firewalling
     shell = util.shell.ShellScript("finalize_network.sh")
     shell.append_self_dir()
     shell.append_rootinstall()
-    shell.append("mv $DIR/awall $DIR/awall.initial")
-    shell.append("mv $DIR/awall.final $DIR/awall")
-    shell.append("")
-    shell.append(util.awall.configure(initial_interfaces, dir))
-    shell.append("service iptables restart")
-    shell.append("")
-    shell.append("rootinstall $$DIR/resolv.conf.final /etc/resolv.conf")
-    shell.append("")
-    shell.append("rc-service networking stop")
-    shell.append("rootinstall $$DIR/interfaces.final /etc/network/interfaces")
+    shell.setup_logging(cfg["hostname"])
+    shell.append(util.file.substitute("templates/vmhost/finalize_network.sh", cfg))
+    shell.append(util.awall.configure(initial_interfaces, dir, False))
+    shell.append("rc-service iptables start")
+    shell.append("rc-service ip6tables start")
     shell.append("rc-service networking start")
-
     shell.write_file(dir)
 
     # also add original interface unless

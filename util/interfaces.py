@@ -124,7 +124,7 @@ def create_port(name):
         "ipv6_dhcp": 0,
         "accept_ra": 0,
         "privext": 0,
-        "vlan": {"domain": ""}} # for util.resolv.create_conf()
+        "vlan": {"domain": ""}}  # for util.resolv.create_conf()
 
 
 def as_etc_network(interfaces):
@@ -193,7 +193,7 @@ iface {name} inet {ipv4_method}
 _ipv4_vswitch_template = """auto {name}
 iface {name} inet manual
   post-up ip addr add 0.0.0.0/32 dev {name}
-  pre-down ip addr del 0.0.0./32 dev {name}"""
+  pre-down ip addr del 0.0.0.0/32 dev {name}"""
 
 # SLAAC IPv6 address and / or DHCP address
 _ipv6_auto_template = """iface {name} inet6 {ipv6_method}

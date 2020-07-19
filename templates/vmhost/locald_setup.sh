@@ -1,11 +1,9 @@
-mkdir -p  /root/yodeler/logs
-
 # block all incoming traffic until awall is configured
-echo "Blocking incoming traffic before setup" >> /root/yodeler/logs/$HOSTNAME 2>&1 
+echo "Blocking incoming traffic before setup"
 iptables -P INPUT DROP
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
-/root/yodeler/$HOSTNAME/setup.sh >> /root/yodeler/logs/$HOSTNAME 2>&1
+/root/yodeler/$HOSTNAME/setup.sh
 
 # remove from local.d so setup is only run once
 rm $$0
@@ -14,4 +12,5 @@ rm $$0
 cp /root/yodeler/$HOSTNAME/libvirt.start /etc/local.d/
 chmod +x /etc/local.d/libvirt.start
 
+echo "Rebooting after installing final libvirt setup in local.d"
 reboot

@@ -50,9 +50,11 @@ echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
 # configure network
 echo "$HOSTNAME" > /etc/hostname
 rootinstall $$DIR/hosts /etc
-rootinstall $$DIR/resolv.conf /etc
 rootinstall $$DIR/interfaces /etc/network
 rootinstall $$DIR/dhclient.conf /etc/dhcp
+if [ -f $$DIR/resolv.conf ]; then
+  rootinstall $$DIR/resolv.conf /etc
+fi
 
 # Busybox's udhcpc does not work with Debian's ifup / ifdown, so remove it
 rm /sbin/udhcpc

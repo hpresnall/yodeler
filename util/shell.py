@@ -34,6 +34,11 @@ class ShellScript():
 }
 """)
 
+    def setup_logging(self, hostname):
+        self.append("mkdir -p  /root/yodeler/logs")
+        self.append("exec >> /root/yodeler/logs/" + hostname + " 2>&1")
+        self.append("")
+
     def write_file(self, dir):
         path = os.path.join(dir, self.name)
         # ensure final blank line

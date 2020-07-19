@@ -1,6 +1,6 @@
 # alpine install will setup the network
 # block all incoming traffic until awall is configured
-echo "Blocking incoming traffic before setup"
+echo "Blocking incoming traffic before installation"
 apk -q add iptables
 iptables -P INPUT DROP
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT

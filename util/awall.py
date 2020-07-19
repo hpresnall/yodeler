@@ -4,7 +4,7 @@ import json
 import util.file
 
 
-def configure(interfaces, dir):
+def configure(interfaces, dir, before_install=True):
     # create all JSON config from template
     # see https://wiki.alpinelinux.org/wiki/Zero-To-Awall
 
@@ -41,21 +41,28 @@ def configure(interfaces, dir):
 
     b = ["# configure awall"]
     b.append("rootinstall $DIR/awall/base.json /etc/awall/optional")
-    b.append("awall enable base")
+
+    # after install, only base will change due to different interfaces
+    if before_install:
+        b.append("awall enable base")
 
     util.file.write("base.json",  json.dumps(base, indent=2), awall)
 
     for name, service in services.items():
         util.file.write(name, json.dumps(service, indent=2), awall)
 
-        b.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
-        b.append("awall enable {}".format(name[:-5]))  # name without .json
+        # after_intall, services are already enabled
+        if before_install:
+            b.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
+            b.append("awall enable {}".format(name[:-5]))  # name without .json
 
     b.append("")
     b.append("# create iptables rules and apply at boot")
     b.append("awall translate -o /tmp")
     b.append("rootinstall /tmp/rules-save /tmp/rules6-save /etc/iptables")
-    b.append("rc-update add iptables boot")
-    b.append("rc-update add ip6tables boot")
+
+    if before_install:
+        b.append("rc-update add iptables boot")
+        b.append("rc-update add ip6tables boot")
 
     return "\n".join(b)
