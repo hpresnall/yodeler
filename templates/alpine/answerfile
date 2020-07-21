@@ -6,20 +6,11 @@ PROXYOPTS=none
 
 KEYMAPOPTS="$KEYMAP"
 TIMEZONEOPTS="-z $TIMEZONE"
-HOSTNAMEOPTS="-n $HOSTNAME"
-
-# use DHCP to bootstrap
-INTERFACESOPTS="auto lo
-iface lo inet loopback  
-
-auto eth0
-iface eth0 inet dhcp
-"
-
-DNSOPTS="-n $EXTERNAL_DNS_STR"
-
 SSHDOPTS="-c openssh"
 NTPOPTS="-c chrony"
+HOSTNAMEOPTS="-n $HOSTNAME"
+INTERFACESOPTS="$INSTALL_INTERFACES"
+DNSOPTS="-n $EXTERNAL_DNS_STR"
 
 # install system to $ROOT_DEV
 export DISKLABEL=gpt

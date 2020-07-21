@@ -13,3 +13,6 @@ virsh net-destroy default
 virsh net-undefine default
 
 DIR=/root/yodeler/$HOSTNAME
+
+# remove from local.d so config is only run once
+rm $$0

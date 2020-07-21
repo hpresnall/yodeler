@@ -1,5 +1,4 @@
 import os
-import xml.etree.ElementTree as xml
 
 import util.shell
 import util.file
@@ -44,34 +43,6 @@ def setup(cfg, dir):
                             cfg["local_dns"], cfg["external_dns"], dir)
     _create_chrony_conf(cfg, dir)
 
-    if cfg["is_vm"]:
-        # create the XML vm definition
-        _create_virsh_xml(cfg, dir)
-
-        # note not adding create_vm to setup script
-        # for VMs, create_vm.sh will run setup _inside_ a chroot for the vm
-        create_vm = util.shell.ShellScript("create_vm.sh")
-        create_vm.append_self_dir()
-        create_vm.append(util.file.substitute("templates/vm/create_vm.sh", cfg))
-        create_vm.write_file(dir)
-
-        # helper script to delete & remove VM
-        delete_vm = util.shell.ShellScript("delete_vm.sh")
-        delete_vm.append(util.file.substitute("templates/vm/delete_vm.sh", cfg))
-        delete_vm.write_file(dir)
-    else:
-        # create Alpine setup answerfile for physical servers
-        # use external DNS for initial Alpine setup
-        cfg["external_dns_str"] = " ".join(cfg["external_dns"])
-        util.file.write("answerfile", util.file.substitute("templates/alpine/answerfile", cfg), dir)
-
-        install = util.shell.ShellScript("install_alpine.sh")
-        install.append_self_dir()
-        install.append(util.file.substitute("templates/alpine/install_alpine.sh", cfg))
-        install.write_file(dir)
-        # note not returning install script
-        # it must be run manually by another process
-
     return [common.name]
 
 
@@ -109,35 +80,6 @@ def _create_chrony_conf(cfg, dir):
     b.append("rtcsync")
 
     util.file.write("chrony.conf", "\n".join(b), dir)
-
-
-def _create_virsh_xml(cfg, dir):
-    template = xml.parse("templates/vm/server.xml")
-    vm = template.getroot()
-
-    name = vm.find("name")
-    name.text = cfg["hostname"]
-
-    memory = vm.find("memory")
-    memory.text = str(cfg["memory_mb"])
-
-    vcpu = vm.find("vcpu")
-    vcpu.text = str(cfg["vcpus"])
-
-    devices = vm.find("devices")
-
-    disk_source = devices.find("disk/source")
-    disk_source.attrib["file"] = f"{cfg['vm_images_path']}/{cfg['hostname']}.img"
-
-    for iface in cfg["interfaces"]:
-        vlan_name = iface["vlan"]["name"]
-        interface = xml.SubElement(devices, "interface")
-        interface.attrib["type"] = "network"
-        xml.SubElement(interface, "source", {"network": iface["vswitch"]["name"], "portgroup": vlan_name})
-        xml.SubElement(interface, "target", {"dev": f"{cfg['hostname']}-{vlan_name}"})
-        xml.SubElement(interface, "model", {"type": "virtio"})
-
-    template.write(os.path.join(dir, cfg["hostname"] + ".xml"))
 
 
 _setup_metrics = """# setup Prometheus

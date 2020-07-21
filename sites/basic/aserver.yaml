@@ -16,6 +16,14 @@ initial_interfaces:
   - name: eth0
     ipv4_address: dhcp
     ipv6_dhcp: false
+# /etc/network/interfaces used during initial Alpine Linux install
+# if not set, install will prompt
+# this is the direct file contents, in _BusyBox's_ interfaces file format, not Debian's!
+install_interfaces: |
+  auto lo
+  iface lo inet loopback
+  auto eth0
+  iface eth0 inet dhcp
 # private key will be put on this server and it can be used as a jump box
 install_private_ssh_key: true
 packages: [ ndisc6 tcpdump ]

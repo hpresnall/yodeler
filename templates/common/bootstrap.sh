@@ -27,6 +27,6 @@ cp $$DIR/setup.start $$INSTALL/etc/local.d/
 chmod +x $$INSTALL/etc/local.d/setup.start
 
 echo "Base Alpine install complete!"
-echo "The system will reboot multiple times to complete all required setup tasks"
+echo "The system will now reboot to complete all required setup tasks"
 
 reboot

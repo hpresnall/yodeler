@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 import importlib
+import xml.etree.ElementTree as xml
 
 import yodeler.config as config
 import util.file as file
@@ -92,3 +93,80 @@ def create_scripts_for_host(cfg, output_dir):
         setup_script.append(". $DIR/" + script)
 
     setup_script.write_file(host_dir)
+
+    # final configuration known, now create installation script
+    if cfg["is_vm"]:
+        # create the XML vm definition
+        _create_virsh_xml(cfg, host_dir)
+
+        # note not adding create_vm to setup script
+        # for VMs, create_vm.sh will run setup _inside_ a chroot for the vm
+        create_vm = shell.ShellScript("create_vm.sh")
+        create_vm.append_self_dir()
+        create_vm.append(file.substitute("templates/vm/create_vm.sh", cfg))
+        create_vm.write_file(host_dir)
+
+        # helper script to delete & remove VM
+        delete_vm = shell.ShellScript("delete_vm.sh")
+        delete_vm.append(file.substitute("templates/vm/delete_vm.sh", cfg))
+        delete_vm.write_file(host_dir)
+    else:
+        # expected flow: boot with install media; run /media/<install_dev>/bootstrap.sh
+        # system reboots and runs local.d/setup.start
+
+        # create install script
+        install = shell.ShellScript("install_alpine.sh")
+        install.append_self_dir()
+        install.append(file.substitute("templates/alpine/install_alpine.sh", cfg))
+        install.write_file(host_dir)
+
+        # create Alpine setup answerfile for physical servers
+        # use external DNS for initial Alpine setup
+        cfg["external_dns_str"] = " ".join(cfg["external_dns"])
+        file.write("answerfile", file.substitute("templates/alpine/answerfile", cfg), host_dir)
+
+        # create bootstrap wrapper script
+        bootstrap = shell.ShellScript("bootstrap.sh")
+        bootstrap.append_self_dir()
+        bootstrap.append(file.substitute("templates/common/bootstrap.sh", cfg))
+        bootstrap.write_file(host_dir)
+
+        # create local.d file that runs setup on first reboot after Alpine install
+        setup = shell.ShellScript("setup.start")
+        setup.setup_logging(cfg["hostname"])
+        setup.append(file.substitute("templates/common/locald_setup.sh", cfg))
+        # each role can add setup
+        for role in cfg["roles"]:
+            path = os.path.join("templates", role, "locald_setup.sh")
+            if os.path.exists(path) and os.path.isfile(path):
+                setup.append(file.substitute(path, cfg))
+        setup.write_file(host_dir)
+
+
+def _create_virsh_xml(cfg, dir):
+    template = xml.parse("templates/vm/server.xml")
+    vm = template.getroot()
+
+    name = vm.find("name")
+    name.text = cfg["hostname"]
+
+    memory = vm.find("memory")
+    memory.text = str(cfg["memory_mb"])
+
+    vcpu = vm.find("vcpu")
+    vcpu.text = str(cfg["vcpus"])
+
+    devices = vm.find("devices")
+
+    disk_source = devices.find("disk/source")
+    disk_source.attrib["file"] = f"{cfg['vm_images_path']}/{cfg['hostname']}.img"
+
+    for iface in cfg["interfaces"]:
+        vlan_name = iface["vlan"]["name"]
+        interface = xml.SubElement(devices, "interface")
+        interface.attrib["type"] = "network"
+        xml.SubElement(interface, "source", {"network": iface["vswitch"]["name"], "portgroup": vlan_name})
+        xml.SubElement(interface, "target", {"dev": f"{cfg['hostname']}-{vlan_name}"})
+        xml.SubElement(interface, "model", {"type": "virtio"})
+
+    template.write(os.path.join(dir, cfg["hostname"] + ".xml"))

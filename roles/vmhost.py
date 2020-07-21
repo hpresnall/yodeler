@@ -19,18 +19,6 @@ def setup(cfg, dir):
     scripts.append(_setup_open_vswitch(cfg, dir))
     scripts.append(_setup_libvirt(cfg, dir))
 
-    # create bootstrap wrapper script
-    bootstrap = util.shell.ShellScript("bootstrap.sh")
-    bootstrap.append_self_dir()
-    bootstrap.append(util.file.substitute("templates/vmhost/bootstrap.sh", cfg))
-    bootstrap.write_file(dir)
-
-    # create local.d file that runs setup on first reboot after Alpine install
-    setup = util.shell.ShellScript("setup.start")
-    setup.setup_logging(cfg["hostname"])
-    setup.append(util.file.substitute("templates/vmhost/locald_setup.sh", cfg))
-    setup.write_file(dir)
-
     # libvirt cannot be started by locald, so create a 2nd locald script
     # for doing the rest of the config
     _configure_libvirt(cfg, dir)
@@ -252,7 +240,6 @@ def _configure_initial_network(cfg, dir):
         iface["firewall_zone"] = "initial_" + iface["name"]
 
         util.interfaces.validate(iface, vswitches)
-
 
     # script to switch network to final configuration
     # run before adding to initial_interfaces since vswitches & uplinks do no need firewalling
