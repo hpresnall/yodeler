@@ -10,7 +10,7 @@ echo "Building VM image for $HOSTNAME"
   --image-format raw \
   --serial-console \
   --image-size ${DISK_SIZE_MB}M \
-  --packages "`cat $$DIR/packages`" \
+  --packages "$$(cat $$DIR/packages)" \
   --script-chroot \
   $VM_IMAGES_PATH/$HOSTNAME.img \
   $$DIR/setup.sh

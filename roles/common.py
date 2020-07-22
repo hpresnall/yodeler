@@ -1,5 +1,4 @@
-import os
-
+"""Common configuration & setup for all Alpine hosts."""
 import util.shell
 import util.file
 import util.interfaces
@@ -10,7 +9,8 @@ import util.resolv
 packages = {"ifupdown", "iproute2"}
 
 
-def setup(cfg, dir):
+def setup(cfg, output_dir):
+    """Create the scripts and configuration files for the given host's configuration."""
     common = util.shell.ShellScript("common.sh")
 
     common.append("echo \"Running common config\"")
@@ -23,66 +23,66 @@ def setup(cfg, dir):
         # VMs will have packages installed as part of image creation
         common.append("# install necessary packages")
         common.append("apk -q update")
-        common.append("apk -q add `cat $DIR/packages`")
+        common.append("apk -q add $(cat $DIR/packages)")
         common.append("")
 
     cfg["remove_packages_str"] = " ".join(cfg["remove_packages"])
-    common.append(util.file.substitute("templates/common/common.sh", cfg))
+    common.substitute("templates/common/common.sh", cfg)
 
     if cfg["metrics"]:
-        common.append(_setup_metrics)
+        common.append(_SETUP_METRICS)
 
     if cfg["local_firewall"]:
-        common.append(util.awall.configure(cfg["interfaces"], dir))
+        common.append(util.awall.configure(cfg["interfaces"], output_dir))
 
-    common.write_file(dir)
+    common.write_file(output_dir)
 
-    util.file.write("interfaces", util.interfaces.as_etc_network(cfg["interfaces"]), dir)
+    util.file.write("interfaces", util.interfaces.as_etc_network(cfg["interfaces"]), output_dir)
 
     util.resolv.create_conf(cfg["interfaces"], cfg["primary_domain"], cfg["domain"],
-                            cfg["local_dns"], cfg["external_dns"], dir)
-    _create_chrony_conf(cfg, dir)
+                            cfg["local_dns"], cfg["external_dns"], output_dir)
+    _create_chrony_conf(cfg, output_dir)
 
     return [common.name]
 
 
 def _setup_repos(cfg):
     repos = cfg["alpine_repositories"]
-    b = []
+    buffer = []
 
     # overwrite on first, append on subsequent
-    b.append("# setup APK repos")
-    b.append(f"echo {repos[0]} > /etc/apk/repositories")
+    buffer.append("# setup APK repos")
+    buffer.append(f"echo {repos[0]} > /etc/apk/repositories")
 
     repos = repos[1:]
-    for r in repos:
-        b.append(f"echo {r} >> /etc/apk/repositories")
-    b.append("")
+    for repo in repos:
+        buffer.append(f"echo {repo} >> /etc/apk/repositories")
+    buffer.append("")
 
-    return "\n".join(b)
+    return "\n".join(buffer)
 
 
-def _create_chrony_conf(cfg, dir):
-    b = []
+def _create_chrony_conf(cfg, output_dir):
+    buffer = []
 
     # use local NTP server if there is one defined
     if "local_ntp" in cfg:
         server = cfg["local_ntp"]
-        b.append(f"server {server} iburst")
-        b.append(f"initstepslew 10 {server}")
+        buffer.append(f"server {server} iburst")
+        buffer.append(f"initstepslew 10 {server}")
     else:
         servers = cfg["ntp_pool_servers"]
         for server in servers:
-            b.append(f"server {server} iburst")
-        b.append("initstepslew 10 {}".format(" ".join(servers)))
+            buffer.append(f"server {server} iburst")
+        buffer.append("initstepslew 10 {}".format(" ".join(servers)))
 
-    b.append("driftfile /var/lib/chrony/chrony.drift")
-    b.append("rtcsync")
+    buffer.append("driftfile /var/lib/chrony/chrony.drift")
+    buffer.append("rtcsync")
 
-    util.file.write("chrony.conf", "\n".join(b), dir)
+    util.file.write("chrony.conf", "\n".join(buffer), output_dir)
 
 
-_setup_metrics = """# setup Prometheus
+_SETUP_METRICS = """# setup Prometheus
 rc-update add node-exporter default
 
 echo "ARGS=\\\"--log.level=warn\

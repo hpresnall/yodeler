@@ -1,3 +1,6 @@
+# pylint: disable=missing-module-docstring
+# pylint: disable=missing-class-docstring
+# pylint: disable=missing-function-docstring
 import unittest
 import os.path
 import copy
@@ -29,13 +32,13 @@ class TestConfig(unittest.TestCase):
     def test_minimal(self):
         cfg = self.build_cfg()
         # has all default config
-        for key in config.default_config:
+        for key in config.DEFAULT_CONFIG:
             self.assertIsNotNone(cfg[key])
-            self.assertEqual(config.default_config[key], cfg[key])
+            self.assertEqual(config.DEFAULT_CONFIG[key], cfg[key])
 
         # has all default packages
         packages = cfg["packages"]
-        for package in config.default_packages:
+        for package in config.DEFAULT_PACKAGES:
             self.assertIn(package, packages)
 
         # default metrics; default is_vm
@@ -63,9 +66,9 @@ class TestConfig(unittest.TestCase):
 
         # has all default vlan config
         vlan = vswitch["vlans_by_id"][10]
-        for key in config.default_vlan_config:
+        for key in config.DEFAULT_VLAN_CONFIG:
             self.assertIsNotNone(vlan[key])
-            self.assertEqual(config.default_vlan_config[key], vlan[key])
+            self.assertEqual(config.DEFAULT_VLAN_CONFIG[key], vlan[key])
 
         # has interface config
         iface = cfg["interfaces"][0]
@@ -264,6 +267,10 @@ class TestConfig(unittest.TestCase):
         self._cfg_dict["vswitches"][0]["vlans"][0]["access_vlans"] = 20
         self.build_error()
 
+    def test_str_access_vlans(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["access_vlans"] = "20"
+        self.build_error()
+
     def test_invalid_domain_vlan(self):
         # vlan domain not in top-level domain
         self._cfg_dict["domain"] = "example.com"
@@ -376,7 +383,7 @@ class TestConfig(unittest.TestCase):
         self._cfg_dict["interfaces"][0]["ipv6_dhcp"] = True
         self._cfg_dict["interfaces"][0]["accept_ra"] = False
         self._cfg_dict["interfaces"][0]["privext"] = 2
-        
+
         cfg = self.build_cfg()
 
         self.assertEqual(1, cfg["interfaces"][0]["ipv6_dhcp"])

@@ -1,9 +1,12 @@
+"""Utility for /etc/network/interfaces configuration.
+
+Files created by this module are usable by Debian's ifupdown package.
+It _will not_ be usable by the Alpine default BusyBox ifupdown."""
 import ipaddress
 
 
 def validate(iface, vswitches):
-    """ Validate a single interface from the config.
-    """
+    """ Validate a single interface from the config."""
     if iface is None:
         raise ValueError("interface cannot be None")
     if vswitches is None:
@@ -46,7 +49,8 @@ def validate(iface, vswitches):
     address = iface.get("ipv4_address")
     if address is None:
         raise KeyError("no ipv4_address defined for interface")
-    elif address == "dhcp":
+
+    if address == "dhcp":
         iface["ipv4_method"] = "dhcp"
     else:
         iface["ipv4_method"] = "static"
@@ -58,7 +62,8 @@ def validate(iface, vswitches):
         subnet = vlan["ipv4_subnet"]
         if iface["ipv4_address"] not in subnet:
             raise KeyError(
-                f"invalid ipv4_address {iface['ipv4_address']}; it is not in vlan {vlan_id}'s subnet {subnet}")
+                (f"invalid ipv4_address {iface['ipv4_address']};"
+                 f" it is not in vlan {vlan_id}'s subnet {subnet}"))
 
         iface["ipv4_netmask"] = subnet.netmask
         iface["ipv4_gateway"] = subnet.network_address + 1
@@ -83,18 +88,19 @@ def validate(iface, vswitches):
 
         if iface["ipv6_address"] not in subnet:
             raise KeyError(
-                f"invalid ipv6_address {iface['ipv6_address']}; it is not in vlan {vlan_id}'s subnet {subnet}")
+                (f"invalid ipv6_address {iface['ipv6_address']};"
+                 f" it is not in vlan {vlan_id}'s subnet {subnet}"))
 
         iface["ipv6_prefixlen"] = subnet.prefixlen
     else:
         iface["ipv6_address"] = None
 
     # add default values
-    for key in default_interface_config.keys():
+    for key in default_interface_config:
         if key not in iface:
             iface[key] = default_interface_config[key]
         elif iface[key]:
-            if "privext" == key:
+            if key == "privext":
                 if iface[key] > 2:
                     raise KeyError("invalid privext; it must be 0, 1 or 2")
                 else:
@@ -104,8 +110,7 @@ def validate(iface, vswitches):
         else:
             iface[key] = 0
 
-    iface["firewall_zone"] = iface.get(
-        "firewall_zone", vswitch_name.upper())
+    iface["firewall_zone"] = iface.get("firewall_zone", vswitch_name.upper())
 
 
 def create_port(name):
@@ -130,42 +135,42 @@ def create_port(name):
 def as_etc_network(interfaces):
     """Convert the interfaces to a form for use in /etc/network/interfaces.
 
-    The list of interfaces must be from a valid config."""
-    b = [_loopback]
+    The list of interfaces should have passed through validate() first."""
+    buffer = [_LOOPBACK]
 
     for iface in interfaces:
-        if iface.get("comment") is not None:
-            b.append("# " + iface["comment"])
+        if "comment" in iface:
+            buffer.append("# " + iface["comment"])
 
         if iface["ipv4_method"] == "static":
             if iface["vlan"]["routable"]:
-                template = _ipv4_static_template
+                template = _IPV4_STATIC_TEMPLATE
             else:
-                template = _ipv4_static_unroutable_template
-            b.append(template.format_map(iface))
+                template = _IPV4_STATIC_UNROUTABLE_TEMPLATE
+            buffer.append(template.format_map(iface))
         elif iface["ipv4_method"] == "dhcp":
-            b.append("auto {name}\niface {name} inet {ipv4_method}".format_map(iface))
+            buffer.append("auto {name}\niface {name} inet {ipv4_method}".format_map(iface))
         elif iface["ipv4_method"] == "vswitch":
-            b.append(_ipv4_vswitch_template.format_map(iface))
+            buffer.append(_IPV4_VSWITCH_TEMPLATE.format_map(iface))
         else:
             raise KeyError(f"invalid ipv4_method {iface['ipv4_method']} for interface {iface}")
         # use auto method for vswitches; note create_port() disables ra and dhcp
         if iface["ipv6_method"] == "manual":
             # disable IPv6; no SLAAC or DHCP
-            b.append("iface {name} inet6 {ipv6_method}".format_map(iface))
+            buffer.append("iface {name} inet6 {ipv6_method}".format_map(iface))
 
         else:
-            b.append(_ipv6_auto_template.format_map(iface))
+            buffer.append(_IPV6_AUTO_TEMPLATE.format_map(iface))
 
             if iface["ipv6_address"] is not None:
-                b.append(_ipv6_address_template.format_map(iface))
+                buffer.append(_IPV6_ADDRESS_TEMPLATE.format_map(iface))
 
-        b.append("")
+        buffer.append("")
 
-    return "\n".join(b)
+    return "\n".join(buffer)
 
 
-_loopback = """auto lo
+_LOOPBACK = """auto lo
 iface lo inet loopback
 iface lo inet6 loopback
 """
@@ -177,30 +182,30 @@ default_interface_config = {
 }
 
 # static IPv4 address with gateway
-_ipv4_static_template = """auto {name}
+_IPV4_STATIC_TEMPLATE = """auto {name}
 iface {name} inet {ipv4_method}
   address {ipv4_address}
   netmask {ipv4_netmask}
   gateway {ipv4_gateway}"""
 
 # static IPv4 with no gateway
-_ipv4_static_unroutable_template = """auto {name}
+_IPV4_STATIC_UNROUTABLE_TEMPLATE = """auto {name}
 iface {name} inet {ipv4_method}
   address {ipv4_address}
   netmask {ipv4_netmask}"""
 
 # vswitches manually set 0 IP
-_ipv4_vswitch_template = """auto {name}
+_IPV4_VSWITCH_TEMPLATE = """auto {name}
 iface {name} inet manual
   post-up ip addr add 0.0.0.0/32 dev {name}
   pre-down ip addr del 0.0.0.0/32 dev {name}"""
 
 # SLAAC IPv6 address and / or DHCP address
-_ipv6_auto_template = """iface {name} inet6 {ipv6_method}
+_IPV6_AUTO_TEMPLATE = """iface {name} inet6 {ipv6_method}
   dhcp {ipv6_dhcp}
   accept_ra {accept_ra}
   privext {privext}"""
 
 # static IPv6 addresses are added manually with the ip command
-_ipv6_address_template = """  post-up ip -6 addr add {ipv6_address}/{ipv6_prefixlen} dev {name}
+_IPV6_ADDRESS_TEMPLATE = """  post-up ip -6 addr add {ipv6_address}/{ipv6_prefixlen} dev {name}
   pre-down ip -6 addr del {ipv6_address}/{ipv6_prefixlen} dev {name}"""

@@ -1,10 +1,14 @@
+"""Utility for awall configuration."""
 import os
 import json
 
 import util.file
 
 
-def configure(interfaces, dir, before_install=True):
+def configure(interfaces, output_dir, before_install=True):
+    """Create awall configuration for the given interfaces.
+    Outputs all JSON to <output_dir>/awall.
+    Returns a shell script fragment to process the JSON files and create iptables rules."""
     # create all JSON config from template
     # see https://wiki.alpinelinux.org/wiki/Zero-To-Awall
 
@@ -14,8 +18,8 @@ def configure(interfaces, dir, before_install=True):
     # load all template services
     services = {}
     for path in os.listdir("templates/awall"):
-        with open(os.path.join("templates/awall", path)) as f:
-            service = json.load(f)
+        with open(os.path.join("templates/awall", path)) as template:
+            service = json.load(template)
         # assume service has a single filter and it is for input
         service["filter"][0]["in"] = []
         services[path] = service
@@ -36,33 +40,33 @@ def configure(interfaces, dir, before_install=True):
             service["filter"][0]["in"].append(zone)
 
     # write JSON config to awall subdirectory
-    awall = os.path.join(dir, "awall")
+    awall = os.path.join(output_dir, "awall")
     os.mkdir(awall)
 
-    b = ["# configure awall"]
-    b.append("rootinstall $DIR/awall/base.json /etc/awall/optional")
+    buffer = ["# configure awall"]
+    buffer.append("rootinstall $DIR/awall/base.json /etc/awall/optional")
 
-    # after install, only base will change due to different interfaces
+    # after install, assume enable not needed
     if before_install:
-        b.append("awall enable base")
+        buffer.append("awall enable base")
 
-    util.file.write("base.json",  json.dumps(base, indent=2), awall)
+    util.file.write("base.json", json.dumps(base, indent=2), awall)
 
     for name, service in services.items():
         util.file.write(name, json.dumps(service, indent=2), awall)
 
-        # after_intall, services are already enabled
+        # after_install, services are already enabled
         if before_install:
-            b.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
-            b.append("awall enable {}".format(name[:-5]))  # name without .json
+            buffer.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
+            buffer.append("awall enable {}".format(name[:-5]))  # name without .json
 
-    b.append("")
-    b.append("# create iptables rules and apply at boot")
-    b.append("awall translate -o /tmp")
-    b.append("rootinstall /tmp/rules-save /tmp/rules6-save /etc/iptables")
+    buffer.append("")
+    buffer.append("# create iptables rules and apply at boot")
+    buffer.append("awall translate -o /tmp")
+    buffer.append("rootinstall /tmp/rules-save /tmp/rules6-save /etc/iptables")
 
     if before_install:
-        b.append("rc-update add iptables boot")
-        b.append("rc-update add ip6tables boot")
+        buffer.append("rc-update add iptables boot")
+        buffer.append("rc-update add ip6tables boot")
 
-    return "\n".join(b)
+    return "\n".join(buffer)

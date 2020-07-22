@@ -1,3 +1,9 @@
+"""Handles parsing and validating site and host YAML configuration files.
+
+Site configuration is the base and defines defaults for each host.
+Unless otherwise stated, any function that takes a configuration will
+assume it is a dictionary returned from this module.
+"""
 import collections.abc
 import logging
 import os.path
@@ -59,18 +65,18 @@ def load_host_config(site_cfg, hostname):
 
     # manual merge of packages
     for key in ["packages", "remove_packages"]:
-        sp = site_cfg.get(key)
-        hp = host_cfg.get(key)
+        site = site_cfg.get(key)
+        host = host_cfg.get(key)
 
-        if sp is None and hp is None:
+        if site is None and host is None:
             cfg[key] = set()
-        elif sp is None:
-            cfg[key] = set(hp)
-        elif hp is None:
-            cfg[key] = set(sp)
+        elif site is None:
+            cfg[key] = set(host)
+        elif host is None:
+            cfg[key] = set(site)
         else:
-            cfg[key] = set(sp)
-            cfg[key] |= set(hp)
+            cfg[key] = set(site)
+            cfg[key] |= set(host)
 
     # if either site or host needs it, make sure the package is not removed
     cfg["remove_packages"] -= (cfg["packages"])
@@ -84,11 +90,19 @@ def load_host_config(site_cfg, hostname):
 
 
 def config_from_string(config_string):
+    """Load the configuration from the given string.
+
+    This string must include _all_ required site and host elements.
+    """
     cfg = util.file.load_yaml_string(config_string)
     return config_from_dict(cfg)
 
 
 def config_from_dict(cfg):
+    """Load the configuration from the given dictionary.
+
+    This string must include _all_ required site and host elements.
+    """
     if cfg is None:
         raise KeyError("empty config")
 
@@ -101,35 +115,35 @@ def config_from_dict(cfg):
 
 
 def _validate_config(cfg):
-    for key in required_properties:
+    for key in _REQUIRED_PROPERTIES:
         if key not in cfg:
             raise KeyError("{0} not defined".format(key))
 
-    for key in default_config.keys():
+    for key in DEFAULT_CONFIG:
         if key not in cfg:
-            cfg[key] = default_config[key]
+            cfg[key] = DEFAULT_CONFIG[key]
 
     # remove from script output if not needed
     if not cfg.get("install_private_ssh_key"):
         cfg["private_ssh_key"] = ""
 
-    for d in cfg["local_dns"]:
+    for dns in cfg["local_dns"]:
         try:
-            ipaddress.ip_address(d)
+            ipaddress.ip_address(dns)
         except:
-            raise KeyError(f"invalid local_dns IP address {d}")
-    for d in cfg["external_dns"]:
+            raise KeyError(f"invalid local_dns IP address {dns}")
+    for dns in cfg["external_dns"]:
         try:
-            ipaddress.ip_address(d)
+            ipaddress.ip_address(dns)
         except:
-            raise KeyError(f"invalid external_dns IP address {d}")
+            raise KeyError(f"invalid external_dns IP address {dns}")
 
 
 def _configure_packages(cfg):
     if "packages" in cfg:
-        cfg["packages"] |= (default_packages)
+        cfg["packages"] |= DEFAULT_PACKAGES
     else:
-        cfg["packages"] = set(default_packages)
+        cfg["packages"] = DEFAULT_PACKAGES
 
     if "remove_packages" not in cfg:
         cfg["remove_packages"] = set()
@@ -183,11 +197,11 @@ def _validate_vswitches(cfg):
                         f"uplink {uplink} reused for vswitch {vswitch_name}: {vswitch}")
                 uplinks.add(uplink)
             else:
-                for u in uplink:
-                    if u in uplinks:
+                for link in uplink:
+                    if link in uplinks:
                         # an uplink interface can only be set for a single vswitch
                         raise KeyError(
-                            f"uplink {uplink} reused for vswitch {vswitch_name}: {vswitch}")
+                            f"uplink {link} reused for vswitch {vswitch_name}: {vswitch}")
                 uplinks |= set(uplink)
         else:
             vswitch["uplink"] = None
@@ -209,135 +223,130 @@ def _validate_vlans(domain, vswitch):
     vlans_by_id = vswitch["vlans_by_id"] = {}
     vlans_by_name = vswitch["vlans_by_name"] = {}
 
-    # track which vlan is marked as the default
-    default_vlan = None
-
     for i, vlan in enumerate(vlans, start=1):
         # name is required and must be unique
-        if (vlan.get("name") is None) or (vlan["name"] == ""):
+        if not vlan.get("name") or (vlan["name"] == ""):
             raise KeyError(
-                f"no name defined for vlan {i} in vswitch {vswitch_name}: {vswitch}")
+                f"no name for vlan {i} in vswitch {vswitch_name}: {vswitch}")
 
         vlan_name = vlan["name"]
-        if vlans_by_name.get(vlan_name) is not None:
+        if vlan_name in vlans_by_name:
             raise KeyError(
-                f"duplicate vlan name {vlan_name} for vlan in vswitch {vswitch_name}: {vlan}")
+                f"duplicate name {vlan_name} for vlan in vswitch {vswitch_name}: {vlan}")
         vlans_by_name[vlan_name] = vlan
 
         # vlan id must be unique
         # None is an allowed id and implies no vlan tagging
-        if "id" not in vlan:
-            vlan["id"] = None
+        vlan_id = vlan["id"] = vlan.get("id", None)
 
-        vlan_id = vlan["id"]
-        if vlans_by_id.get(vlan_id) is not None:
+        if vlan_id in vlans_by_id:
             raise KeyError(
-                f"duplicate vlan id {vlan_id} for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
+                f"duplicate id {vlan_id} for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
         vlans_by_id[vlan_id] = vlan
 
+        # add default values
+        for key in DEFAULT_VLAN_CONFIG:
+            if key not in vlan:
+                vlan[key] = DEFAULT_VLAN_CONFIG[key]
+
+        _validate_vlan_subnet(vswitch_name, vlan, "ipv4", 2, 252)
+        _validate_vlan_subnet(vswitch_name, vlan, "ipv6", 2, 0xffff)
+
+        # domain must be a subdomain of the top-level site
+        if vlan["domain"] and (domain not in vlan["domain"]):
+            raise KeyError(
+                (f"domain for vlan {vlan_name}, {vlan['domain']} is not a subdomain of {domain}"
+                 f" in vswitch {vswitch_name}: {vlan}"))
+    # end for each vlan
+
+    _configure_default_vlan(vswitch)
+    _validate_access_vlans(vswitch)
+
+
+def _validate_vlan_subnet(vswitch_name, vlan, ip_version, dhcp_min, dhcp_max):
+    # ipv4 subnet is required
+    # ipv6 subnet is optional; this does not preclude addresses from a prefix assignment
+    subnet = vlan.get(ip_version + "_subnet")
+    vlan_name = vlan["name"]
+
+    if subnet is None:
+        if ip_version == "ipv4":
+            raise KeyError(
+                f"no {ip_version}_subnet for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
+        if ip_version == "ipv6":
+            vlan["ipv6_subnet"] = None
+            return
+        else:
+            raise ValueError("invalid ip version {ip_version}")
+
+    try:
+        vlan[ip_version + "_subnet"] = subnet = ipaddress.ip_network(subnet)
+    except:
+        raise KeyError(
+            f"invalid {ip_version}_subnet for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
+
+    # default to DHCP range over all addresses except the router
+    dhcp_min = vlan.get("dhcp_min_address_" + ip_version, dhcp_min)
+    dhcp_max = vlan.get("dhcp_max_address_" + ip_version, dhcp_max)
+
+    dhcp_min = subnet.network_address + dhcp_min
+    dhcp_max = subnet.network_address + dhcp_max
+
+    if dhcp_min not in subnet:
+        raise KeyError((f"invalid dhcp_min_address_{ip_version} for vlan {vlan_name}"
+                        f" in vswitch {vswitch_name}: {vlan}"))
+    if dhcp_max not in subnet:
+        raise KeyError((f"invalid dhcp_max_address_{ip_version} for vlan {vlan_name}"
+                        f" in vswitch {vswitch_name}: {vlan}"))
+    if dhcp_min > dhcp_max:
+        raise KeyError((f"dhcp_min_address_{ip_version} > dhcp_max_address_{ip_version}"
+                        f" for vlan {vlan_name}"
+                        f" in vswitch {vswitch_name}: {vlan}"))
+
+
+def _configure_default_vlan(vswitch):
+    # track which vlan is marked as the default
+    default_vlan = None
+
+    for vlan in vswitch["vlans"]:
         # only allow one default
-        if vlan.get("default"):
+        if "default" in vlan:
             if default_vlan is not None:
-                raise KeyError(
-                    f"multiple default vlans for vswitch {vswitch_name}: {vswitch}")
+                raise KeyError(f"multiple default vlans for vswitch {vswitch['name']}: {vswitch}")
             default_vlan = vlan
         else:
             vlan["default"] = False
 
-        # ipv4 subnet is required
-        subnet = vlan.get("ipv4_subnet")
-        if subnet is None:
-            raise KeyError(
-                f"no ipv4_subnet defined for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
-
-        try:
-            vlan["ipv4_subnet"] = subnet = ipaddress.ip_network(subnet)
-        except:
-            raise KeyError(
-                f"invalid ipv4_subnet defined for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
-
-        # default to DHCP range over all addresses except the router
-        dhcp_min = vlan.get("dhcp_min_address_ipv4", 2)
-        dhcp_max = vlan.get("dhcp_max_address_ipv4", 254)
-
-        dhcp_min = subnet.network_address + dhcp_min
-        dhcp_max = subnet.network_address + dhcp_max
-
-        if dhcp_min not in subnet:
-            raise KeyError(
-                f"invalid dhcp_min_address_ipv4 defined for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
-        if dhcp_max not in subnet:
-            raise KeyError(
-                f"invalid dhcp_max_address_ipv4 defined for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
-        if dhcp_min > dhcp_max:
-            raise KeyError(
-                f"dhcp_min_address_ipv4 > dhcp_max_address_ipv4 for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
-
-        # ipv6 subnet is optional
-        # this does not preclude addresses from a prefix assignment
-        subnet = vlan.get("ipv6_subnet")
-        if subnet is not None:
-            try:
-                vlan["ipv6_subnet"] = subnet = ipaddress.ip_network(subnet)
-            except:
-                raise KeyError(
-                    f"invalid ipv6_subnet defined for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
-
-            # default to DHCP range over all addresses in the first segment except the router
-            dhcp_min = vlan.get("dhcp_min_address_ipv6", 2)
-            dhcp_max = vlan.get("dhcp_max_address_ipv6", 0xffff)
-
-            dhcp_min = subnet.network_address + dhcp_min
-            dhcp_max = subnet.network_address + dhcp_max
-
-            if dhcp_min not in subnet:
-                raise KeyError(
-                    f"invalid dhcp_min_address_ipv6 defined for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
-            if dhcp_max not in subnet:
-                raise KeyError(
-                    f"invalid dhcp_max_address_ip6 defined for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
-            if dhcp_min > dhcp_max:
-                raise KeyError(
-                    f"dhcp_min_address_ipv6 > dhcp_max_address_ipv6 for vlan {vlan_name} in vswitch {vswitch_name}: {vlan}")
-        else:
-            vlan["ipv6_subnet"] = None
-
-        # add default values
-        for key in default_vlan_config.keys():
-            if key not in vlan:
-                vlan[key] = default_vlan_config[key]
-
-        if vlan["domain"] and (domain not in vlan["domain"]):
-            raise KeyError(
-                f"domain defined for vlan {vlan_name}, {vlan['domain']} is not a subdomain of {domain} in vswitch {vswitch_name}: {vlan}")
-    # end for each vlan
-
     if default_vlan is not None:
         vswitch["default_vlan"] = default_vlan
-    elif len(vlans_by_id) == 1:  # one vlan; make it the default
-        vlan = list(vlans_by_id.values())[0]
+    elif len(vswitch['vlans_by_id']) == 1:  # one vlan; make it the default
+        vlan = list(vswitch['vlans_by_id'].values())[0]
         vswitch["default_vlan"] = vlan
         vlan["default"] = True
     else:
         vswitch["default_vlan"] = None
 
-    # second pass to validate access_vlans
+
+def _validate_access_vlans(vswitch):
     for vlan in vswitch["vlans"]:
         vlan_name = vlan["name"]
         access_vlans = vlan.get("access_vlans")
+
         if access_vlans is None:
             continue
-        if not isinstance(access_vlans, collections.abc.Sequence):
+
+        if (not isinstance(access_vlans, collections.abc.Sequence)
+                or isinstance(access_vlans, str)):
             raise KeyError(
-                f"invalid non-array access_vlans in vlan {vlan_name} for vswitch {vswitch_name}: {vlan}")
+                f"non-array access_vlans in vlan {vlan_name} for vswitch {vswitch['name']}: {vlan}")
 
         # make unique
         vlan["access_vlans"] = set(access_vlans)
 
-        for id in access_vlans:
-            if vlans_by_id.get(id) is None:
-                raise KeyError(
-                    f"invalid access_vlan id {id} in vlan {vlan_name} for vswitch {vswitch_name}: {vlan}")
+        for vlan_id in access_vlans:
+            if vlan_id not in vswitch['vlans_by_id']:
+                raise KeyError((f"invalid access_vlan id {vlan_id} in vlan {vlan_name}"
+                                f" for vswitch {vswitch['name']}: {vlan}"))
 
 
 def _validate_interfaces(cfg):
@@ -347,12 +356,12 @@ def _validate_interfaces(cfg):
 
     vswitches = cfg["vswitches"]
     matching_domain = None
-    n = 0
+    iface_counter = 0
 
     for i, iface in enumerate(ifaces):
-        if iface.get("name") is None:
-            iface["name"] = f"eth{n}"
-            n += 1
+        if "name" not in iface:
+            iface["name"] = f"eth{iface_counter}"
+            iface_counter += 1
 
         try:
             util.interfaces.validate(iface, vswitches)
@@ -364,19 +373,19 @@ def _validate_interfaces(cfg):
         if cfg["primary_domain"] == vlan["domain"]:
             matching_domain = vlan["domain"]
 
-    if cfg["primary_domain"]:
-        if (matching_domain is None):
+    if cfg["primary_domain"] != "":
+        if matching_domain is None:
             raise KeyError(
                 f"invalid primary_domain: no vlan domain matches {cfg['primary_domain']}")
     else:
-        if (len(ifaces) == 1):
+        if len(ifaces) == 1:
             cfg["primary_domain"] = ifaces[0]["vlan"]["domain"]
 
 
 # properties that are unique and cannot be set as defaults
-required_properties = ["site", "hostname", "public_ssh_key"]
-default_packages = {"acpi", "sudo", "openssh", "chrony", "awall", "dhclient"}
-default_config = {
+_REQUIRED_PROPERTIES = ["site", "hostname", "public_ssh_key"]
+DEFAULT_PACKAGES = {"acpi", "sudo", "openssh", "chrony", "awall", "dhclient"}
+DEFAULT_CONFIG = {
     "is_vm": True,
     "vcpus": 1,
     "memory_mb": 128,
@@ -406,7 +415,7 @@ default_config = {
     "roles": []
 }
 
-default_vlan_config = {
+DEFAULT_VLAN_CONFIG = {
     "routable": True,  # vlan will have an interface assigned on the router
     "domain": "",
     "ipv6_disable": False,

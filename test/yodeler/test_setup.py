@@ -1,3 +1,6 @@
+# pylint: disable=missing-module-docstring
+# pylint: disable=missing-class-docstring
+# pylint: disable=missing-function-docstring
 import unittest
 import os.path
 import tempfile
@@ -37,6 +40,8 @@ class TestSetup(unittest.TestCase):
                              "create_vm.sh",
                              "delete_vm.sh",
                              hostname + ".xml"]:
-                    self.assertTrue(os.path.isfile(os.path.join(host_dir, path)), path + " not created")
+                    self.assertTrue(
+                        os.path.isfile(os.path.join(host_dir, path)), path + " not created")
 
-                    self.assertTrue(os.path.isdir(os.path.join(host_dir, "awall")), "awall" + " not created")
+                    self.assertTrue(
+                        os.path.isdir(os.path.join(host_dir, "awall")), "awall" + " not created")
