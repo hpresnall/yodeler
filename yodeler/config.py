@@ -412,7 +412,10 @@ DEFAULT_CONFIG = {
     "domain": "",
     # domain for the host when it has multiple interfaces
     "primary_domain": "",
-    "roles": []
+    "roles": [],
+    # for physical servers, manually specify contents of /etc/network/interfaces
+    # default blank => installer will prompt
+    "install_interfaces": ""
 }
 
 DEFAULT_VLAN_CONFIG = {

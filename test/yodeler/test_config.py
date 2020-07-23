@@ -232,7 +232,7 @@ class TestConfig(unittest.TestCase):
         self.assertTrue(vswitch["vlans_by_id"][20]["default"])
 
     def test_multiple_default_vlans(self):
-        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.1/24",
+        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
                  "ipv6_subnet": "2001:db8:0:2::/64", "default": True}
         self._cfg_dict["vswitches"][0]["vlans"].append(vlan2)
         self._cfg_dict["vswitches"][0]["vlans"][0]["default"] = True

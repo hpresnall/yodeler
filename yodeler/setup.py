@@ -57,7 +57,7 @@ def create_scripts_for_host(cfg, output_dir):
     cfg["config_dir"] = host_dir
 
     if os.path.exists(host_dir):
-        _logger.warning("removing existing host configuration at %s", {host_dir})
+        _logger.warning("removing existing host configuration at %s", host_dir)
         shutil.rmtree(host_dir)
 
     _logger.info("creating setup scripts for %s", cfg["hostname"])
@@ -87,7 +87,7 @@ def create_scripts_for_host(cfg, output_dir):
             cfg["packages"] |= set(mod.packages)
         except (TypeError, AttributeError):
             _logger.fatal(("cannot run %s; "
-                           "it should have a setup(cfg, dir) function "
+                           "it should have a setup(cfg, output_dir) function "
                            "and an iterable packages list"), mod)
             sys.exit(1)
 

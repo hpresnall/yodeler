@@ -95,12 +95,12 @@ def _configure_uplinks(shell, vswitch):
     if len(vlans_by_id) == 1:
         # single vlan with id => access port
         if None not in vlans_by_id:
-            tag = list(vlans_by_id.keys())[0]
+            tag = list(vlans_by_id)[0]
             shell.append(f"ovs-vsctl set port {uplink} tag={tag}")
             shell.append(f"ovs-vsctl set port {uplink} vlan_mode=access")
         # else no tagging needed
     elif len(vlans_by_id) > 1:  # multiple vlans => trunk port
-        trunks = [str(vlan_id) for vlan_id in vswitch["vlans_by_id"].keys()
+        trunks = [str(vlan_id) for vlan_id in vlans_by_id
                   if vlan_id != "None"]
         trunks = ",".join(trunks)
         shell.append(f"ovs-vsctl set port {uplink} trunks={trunks}")
@@ -232,6 +232,9 @@ def _configure_libvirt(cfg, output_dir):
 
 
 def _configure_initial_network(cfg, output_dir):
+    if "initial_interfaces" not in cfg:
+        return
+
     # move final config
     shutil.move(os.path.join(output_dir, "awall"),
                 os.path.join(output_dir, "awall.final"))
@@ -247,7 +250,7 @@ def _configure_initial_network(cfg, output_dir):
     for i, iface in enumerate(initial_interfaces):
         # usual configuration numbers ifaces by array order
         # initial config may not use all ifaces, so name must be specified
-        # to ignoring ordering
+        # to ignore ordering
         if "name" not in iface:
             raise KeyError(f"name not defined for initial interface {i}: {iface}")
 
