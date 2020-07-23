@@ -9,6 +9,5 @@ interfaces:
     firewall_zone: PUB
     vlan: 10
   - ipv4_address: 192.168.2.5
-    ipv6_address:
     vswitch: private
     firewall_zone: PRIV

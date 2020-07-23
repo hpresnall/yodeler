@@ -377,6 +377,7 @@ class TestConfig(unittest.TestCase):
         self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_disable"] = True
         cfg = self.build_cfg()
 
+        self.assertIsNone(cfg["vswitches"]["public"]["vlans"][0]["ipv6_subnet"])
         self.assertEqual("manual", cfg["interfaces"][0]["ipv6_method"])
 
     def test_iface_ipv6_options(self):

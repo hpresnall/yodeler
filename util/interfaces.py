@@ -71,6 +71,7 @@ def validate(iface, vswitches):
     # ipv6 disabled at vlan level
     if vlan["ipv6_disable"]:
         iface["ipv6_method"] = "manual"
+        iface["ipv6_address"] = None
     else:
         # optional ipv6 address, but always enable autoconfg
         iface["ipv6_method"] = "auto"

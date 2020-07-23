@@ -276,8 +276,12 @@ def _validate_vlan_subnet(vswitch_name, vlan, ip_version, dhcp_min, dhcp_max):
         if ip_version == "ipv6":
             vlan["ipv6_subnet"] = None
             return
-        else:
-            raise ValueError("invalid ip version {ip_version}")
+        raise ValueError("invalid ip version {ip_version}")
+
+    # remove the subnet if the vlan disables ipv6
+    if ip_version == "ipv6" and vlan["ipv6_disable"]:
+        vlan["ipv6_subnet"] = None
+        return
 
     try:
         vlan[ip_version + "_subnet"] = subnet = ipaddress.ip_network(subnet)
