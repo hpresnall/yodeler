@@ -58,6 +58,7 @@ fi
 
 # Busybox's udhcpc does not work with Debian's ifup / ifdown, so remove it
 rm /sbin/udhcpc
+rm /sbin/udhcpc6
 
 # link dhclient to a location ifup can find it
 ln -s /usr/sbin/dhclient /sbin/dhclient

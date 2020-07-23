@@ -85,19 +85,22 @@ def _create_chrony_conf(cfg, output_dir):
 _SETUP_METRICS = """# setup Prometheus
 rc-update add node-exporter default
 
-echo "ARGS=\\\"--log.level=warn\
---no-collector.cpufreq\
---no-collector.entropy\
---no-collector.hwmon\
---no-collector.ipvs\
---no-collector.nfs\
---no-collector.nfsd\
---no-collector.textfile\
---no-collector.timex\
---no-collector.xfs\
---no-collector.zfs\
---web.disable-exporter-metrics\
---collector.diskstats.ignored-devices='^(ram|loop|fd|(h|s|v|xv)d[a-z]|nbd|sr|nvme\\d+n\\d+p)\\d+$'\
---collector.filesystem.ignored-fs-types='^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs)$'\\\""\
+echo "ARGS=\\\"--log.level=warn \\
+--no-collector.bonding \\
+--no-collector.btrfs \\
+--no-collector.cpufreq \\
+--no-collector.entropy \\
+--no-collector.hwmon \\
+--no-collector.ipvs \\
+--no-collector.infiniband \\
+--no-collector.nfs \\
+--no-collector.nfsd \\
+--no-collector.textfile \\
+--no-collector.timex \\
+--no-collector.xfs \\
+--no-collector.zfs \\
+--web.disable-exporter-metrics \\
+--collector.diskstats.ignored-devices='^(ram|loop|fd|(h|s|v|xv)d[a-z]|nbd|sr|nvme\\\\d+n\\\\d+p)\\\\d+$' \\
+--collector.filesystem.ignored-fs-types='^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs|vfat)$'\\"" \\
 > /etc/conf.d/node-exporter
 """
