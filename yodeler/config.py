@@ -163,8 +163,8 @@ def _configure_packages(cfg):
         # add cpufreq and other utils to real hosts
         cfg["packages"] |= {"util-linux", "cpufreqd", "cpufrequtils"}
 
-    # remove conflicts
-    cfg["packages"] -= (cfg["remove_packages"])
+    # remove conflicts in favor of adding the package
+    cfg["remove_packages"] -= cfg["packages"]
 
 
 def _validate_vswitches(cfg):

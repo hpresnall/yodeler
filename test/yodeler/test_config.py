@@ -11,8 +11,6 @@ import util.file
 
 class TestConfig(unittest.TestCase):
     _base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    _minimal = None
-    _cfg_dict = None
 
     @classmethod
     def setUpClass(cls):
@@ -137,6 +135,17 @@ class TestConfig(unittest.TestCase):
     def test_invalid_external_dns(self):
         self._cfg_dict["external_dns"] = ["invalid"]
         self.build_error()
+
+    def test_package_conflict(self):
+        self._cfg_dict["packages"] = {"explicit_add", "add"}
+        self._cfg_dict["remove_packages"] = {"explicit_add", "remove"}
+        cfg = self.build_cfg()
+
+        self.assertIn("explicit_add", cfg["packages"])
+        self.assertIn("add", cfg["packages"])
+
+        self.assertNotIn("explicit_add", cfg["remove_packages"])
+        self.assertIn("remove", cfg["remove_packages"])
 
     def test_invalid_local_dns(self):
         self._cfg_dict["local_dns"] = ["invalid"]
