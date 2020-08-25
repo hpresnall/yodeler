@@ -4,16 +4,12 @@ It also creates the final, static set of configuration files for each host at th
 import logging
 import os
 import shutil
-import sys
-import importlib
 import xml.etree.ElementTree as xml
 
 import yodeler.config as config
 
 import util.file as file
 import util.shell as shell
-
-import roles.common as common
 
 _logger = logging.getLogger(__name__)
 
@@ -65,35 +61,6 @@ def create_scripts_for_host(cfg, output_dir):
     # copy files from config directly
     shutil.copytree("config", host_dir)
 
-    scripts = common.setup(cfg, host_dir)
-    cfg["packages"] |= common.packages
-
-    # load modules for each role
-    modules = []
-    for role in cfg["roles"]:
-        _logger.info("loading module for %s role on %s", role, cfg["hostname"])
-        try:
-            mod = importlib.import_module("roles." + role)
-            modules.append(mod)
-        except ModuleNotFoundError:
-            _logger.fatal(
-                "cannot load module for role %s; it should be in the roles directory", role)
-            raise
-
-    # create setup scripts for every role and update packages
-    for mod in modules:
-        try:
-            scripts.extend(mod.setup(cfg, host_dir))
-            cfg["packages"] |= set(mod.packages)
-        except (TypeError, AttributeError):
-            _logger.fatal(("cannot run %s; "
-                           "it should have a setup(cfg, output_dir) function "
-                           "and an iterable packages list"), mod)
-            sys.exit(1)
-
-    # all packages now known
-    file.write("packages", " ".join(cfg["packages"]), host_dir)
-
     # create a setup script that sources all the other scripts
     setup_script = shell.ShellScript("setup.sh")
     setup_script.append_self_dir()
@@ -101,12 +68,20 @@ def create_scripts_for_host(cfg, output_dir):
 
     setup_script.append(f"echo \"Setting up {cfg['hostname']}\"\n")
 
-    for script in scripts:
-        setup_script.append(". $DIR/" + script)
+    # add all scripts from each role
+    for role in cfg["roles"]:
+        try:
+            for script in role.create_scripts(cfg, host_dir):
+                setup_script.append(". $DIR/" + script)
+        except (TypeError, AttributeError):
+            _logger.fatal(("cannot run create_scripts on class %s; "
+                           "it should have a create_scripts(cfg, output_dir) function "
+                           "that returns an iterable list of scripts"), role)
+            raise
 
     setup_script.write_file(host_dir)
 
-    # final configuration known, now create installation script
+    # different installation scripts for physical vs virtual
     if cfg["is_vm"]:
         _create_vm_script(cfg, host_dir)
         _create_virsh_xml(cfg, host_dir)
@@ -118,13 +93,13 @@ def _create_bootstrap(cfg, output_dir):
     # expected flow: boot with install media; run /media/<install_dev>/bootstrap.sh
     # system reboots and runs local.d/setup.start
 
-    # create install script
+    # create Alpine install script
     install = shell.ShellScript("install_alpine.sh")
     install.append_self_dir()
     install.substitute("templates/alpine/install_alpine.sh", cfg)
     install.write_file(output_dir)
 
-    # create Alpine setup answerfile for physical servers
+    # create Alpine setup answerfile
     # use external DNS for initial Alpine setup
     cfg["external_dns_str"] = " ".join(cfg["external_dns"])
     file.write("answerfile", file.substitute("templates/alpine/answerfile", cfg), output_dir)
@@ -138,10 +113,10 @@ def _create_bootstrap(cfg, output_dir):
     # create local.d file that runs setup on first reboot after Alpine install
     setup = shell.ShellScript("setup.start")
     setup.setup_logging(cfg["hostname"])
-    setup.substitute("templates/common/locald_setup.sh", cfg)
-    # each role can add setup
+
+    # add contents of locald_setup.sh for each role
     for role in cfg["roles"]:
-        path = os.path.join("templates", role, "locald_setup.sh")
+        path = os.path.join("templates", role.name, "locald_setup.sh")
         if os.path.exists(path) and os.path.isfile(path):
             setup.substitute(path, cfg)
     setup.write_file(output_dir)

@@ -10,28 +10,40 @@ import util.interfaces
 import util.awall
 import util.resolv
 
-packages = {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
-            "libvirt", "libvirt-daemon", "libvirt-qemu", "dbus", "polkit", "git"}
+from roles.role import Role
 
 
-def setup(cfg, output_dir):
-    """Create the scripts and configuration files for the given host's configuration."""
-    scripts = []
+class VmHost(Role):
+    """VmHost defines the configuration needed to setup a KVM host using OpenVswitch."""
 
-    scripts.append(_setup_open_vswitch(cfg, output_dir))
-    scripts.append(_setup_libvirt(cfg, output_dir))
+    def __init__(self):
+        super().__init__("vmhost")
 
-    # libvirt cannot be started by locald, so create a 2nd locald script
-    # for doing the rest of the config
-    _configure_libvirt(cfg, output_dir)
+    def additional_packages(self):
+        return {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
+                "libvirt", "libvirt-daemon", "libvirt-qemu", "dbus", "polkit", "git"}
 
-    # patch alpine-make-vm-image to use apk_cache
-    shutil.copyfile("templates/vmhost/cache.patch", os.path.join(output_dir, "cache.patch"))
+    def additional_ifaces(self, cfg):
+        return []
 
-    _configure_initial_network(cfg, output_dir)
+    def create_scripts(self, cfg, output_dir):
+        """Create the scripts and configuration files for the given host's configuration."""
+        scripts = []
 
-    # note bootstrap and locald_setup are _separate_ scripts run outside of setup.sh
-    return scripts
+        scripts.append(_setup_open_vswitch(cfg, output_dir))
+        scripts.append(_setup_libvirt(cfg, output_dir))
+
+        # libvirt cannot be started by locald, so create a 2nd locald script
+        # for doing the rest of the config
+        _configure_libvirt(cfg, output_dir)
+
+        # patch alpine-make-vm-image to use apk_cache
+        shutil.copyfile("templates/vmhost/cache.patch", os.path.join(output_dir, "cache.patch"))
+
+        _configure_initial_network(cfg, output_dir)
+
+        # note bootstrap and locald_setup are _separate_ scripts run outside of setup.sh
+        return scripts
 
 
 def _setup_open_vswitch(cfg, output_dir):

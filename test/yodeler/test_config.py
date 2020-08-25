@@ -29,6 +29,11 @@ class TestConfig(unittest.TestCase):
 
     def test_minimal(self):
         cfg = self.build_cfg()
+
+        # has common role
+        self.assertEqual(1, len(cfg["roles"]))
+        self.assertEqual("common", cfg["roles"][0].name)
+
         # has all default config
         for key in config.DEFAULT_CONFIG:
             self.assertIsNotNone(cfg[key])
@@ -131,6 +136,14 @@ class TestConfig(unittest.TestCase):
         site["site_dir"] = "test/sites/empty"
         with self.assertRaises(KeyError):
             config.load_host_config(site, "empty")
+
+    def test_invalid_role(self):
+        self._cfg_dict["roles"] = ["invalid"]
+        self.build_error()
+
+    def test_invalid_role_class(self):
+        self._cfg_dict["roles"] = ["role"]
+        self.build_error()
 
     def test_invalid_external_dns(self):
         self._cfg_dict["external_dns"] = ["invalid"]

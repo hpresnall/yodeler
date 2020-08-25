@@ -8,9 +8,13 @@ import collections.abc
 import logging
 import os.path
 import ipaddress
+import importlib
+import inspect
 
 import util.file
 import util.interfaces
+
+import roles.common
 
 _logger = logging.getLogger(__name__)
 
@@ -82,6 +86,7 @@ def load_host_config(site_cfg, hostname):
     cfg["remove_packages"] -= (cfg["packages"])
 
     _validate_config(cfg)
+    _configure_roles(cfg)
     _configure_packages(cfg)
 
     _validate_interfaces(cfg)
@@ -107,6 +112,7 @@ def config_from_dict(cfg):
         raise KeyError("empty config")
 
     _validate_config(cfg)
+    _configure_roles(cfg)
     _configure_packages(cfg)
     _validate_vswitches(cfg)
     _validate_interfaces(cfg)
@@ -139,6 +145,39 @@ def _validate_config(cfg):
             raise KeyError(f"invalid external_dns IP address {dns}")
 
 
+def _configure_roles(cfg):
+    # list of role names in yaml => list of Role subclass instances
+    # Common _must_ be the first so it is configured and setup first
+    role_names = set(cfg["roles"] if cfg.get("roles") is not None else [])
+    cfg["roles"] = [roles.common.Common()]
+
+    # for each role, load the module, then the class
+    # instantiate the class and overwrite the config
+    for role in role_names:
+        _logger.info("loading module for %s role on %s", role, cfg["hostname"])
+        try:
+            mod = importlib.import_module("roles." + role.lower())
+        except ModuleNotFoundError:
+            raise KeyError(f"cannot load module for role {role} from the roles package")
+
+        # find class for role; assume only 1 class in each module
+        role_class = None
+        for clazz in inspect.getmembers(mod, inspect.isclass):
+            if clazz[0].upper() == role.upper():
+                role_class = clazz[1]
+                break
+
+        if role_class is None:
+            raise KeyError(f"cannot find class for role {role} in module {mod}")
+
+        # instantiate the class and add to the list
+        try:
+            role_instance = role_class()
+            cfg["roles"].append(role_instance)
+        except TypeError:
+            raise KeyError(f"cannot instantiate class {role_class}")
+
+
 def _configure_packages(cfg):
     if "packages" in cfg:
         cfg["packages"] |= DEFAULT_PACKAGES
@@ -147,6 +186,9 @@ def _configure_packages(cfg):
 
     if "remove_packages" not in cfg:
         cfg["remove_packages"] = set()
+
+    for role in cfg["roles"]:
+        cfg["packages"] |= role.additional_packages()
 
     # update packages based on config
     if cfg["metrics"]:
@@ -358,6 +400,9 @@ def _validate_interfaces(cfg):
     if (ifaces is None) or (len(ifaces) == 0):
         raise KeyError("no interfaces defined")
 
+    for role in cfg["roles"]:
+        ifaces.extend(role.additional_ifaces(cfg))
+
     vswitches = cfg["vswitches"]
     matching_domain = None
     iface_counter = 0
@@ -416,7 +461,6 @@ DEFAULT_CONFIG = {
     "domain": "",
     # domain for the host when it has multiple interfaces
     "primary_domain": "",
-    "roles": [],
     # for physical servers, manually specify contents of /etc/network/interfaces
     # default blank => installer will prompt
     "install_interfaces": ""
