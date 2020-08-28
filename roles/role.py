@@ -1,5 +1,8 @@
 """Module for the Role base class."""
 import typing
+import importlib
+import inspect
+
 from abc import ABC, abstractmethod
 
 
@@ -25,3 +28,27 @@ class Role(ABC):
     def create_scripts(self, cfg, output_dir) -> typing.List[str]:
         """Create the shell scripts and other configuration files that implement this role.
         Returns a list of the names of the scripts that need to be run to configure this role."""
+
+
+def load(role_name):
+    """Load an instance of the given role name."""
+    try:
+        mod = importlib.import_module("roles." + role_name)
+    except ModuleNotFoundError:
+        raise KeyError(f"cannot load module for role {role_name} from the roles package")
+
+    # find class for role; assume only 1 class in each module
+    role_class = None
+    for clazz in inspect.getmembers(mod, inspect.isclass):
+        if clazz[0].upper() == role_name.upper():
+            role_class = clazz[1]
+            break
+
+    if role_class is None:
+        raise KeyError(f"cannot find class for role {role_name} in module {mod}")
+
+    # instantiate the class and add to the list
+    try:
+        return role_class()
+    except TypeError:
+        raise KeyError(f"cannot instantiate class {role_class}")
