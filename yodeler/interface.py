@@ -1,0 +1,151 @@
+"""Handles parsing and validating interface configuration from host YAML files."""
+import logging
+import ipaddress
+
+_logger = logging.getLogger(__name__)
+
+
+def validate(cfg):
+    """Validate all the interfaces defined in the host."""
+    ifaces = cfg.get("interfaces")
+    if (ifaces is None) or (len(ifaces) == 0):
+        raise KeyError("no interfaces defined")
+
+    for role in cfg["roles"]:
+        ifaces.extend(role.additional_ifaces(cfg))
+
+    vswitches = cfg["vswitches"]
+
+    # domain used in /etc/resolv.conf
+    matching_domain = None
+    iface_counter = 0
+
+    for i, iface in enumerate(ifaces):
+        if "name" not in iface:
+            iface["name"] = f"eth{iface_counter}"
+            iface_counter += 1
+
+        try:
+            _validate_iface(iface, vswitches)
+        except KeyError as err:
+            msg = err.args[0]
+            raise KeyError(f"{msg} for interface {i}: {iface}")
+
+        # host's primary domain, if set, should match one vlan
+        vlan = iface["vlan"]
+        if cfg["primary_domain"] == vlan["domain"]:
+            matching_domain = vlan["domain"]
+
+    if cfg["primary_domain"] != "":
+        if matching_domain is None:
+            raise KeyError(
+                f"invalid primary_domain: no vlan domain matches {cfg['primary_domain']}")
+    else:
+        # single interface => set host domain to vlan domain
+        if len(ifaces) == 1:
+            cfg["primary_domain"] = ifaces[0]["vlan"]["domain"]
+        # else leave host domain blank
+
+
+def _validate_iface(iface, vswitches):
+    vswitch_name = iface.get("vswitch")
+    vswitch = vswitches.get(vswitch_name)
+
+    if vswitch is None:
+        raise KeyError(f"invalid vswitch {vswitch_name}")
+
+    iface["vswitch"] = vswitch
+
+    vlan_id = iface.get("vlan")
+    iface["vlan"] = vlan = _lookup_vlan(vlan_id, vswitch)
+
+    # required ipv4 address, but allow special 'dhcp' value
+    address = iface.get("ipv4_address")
+    if address is None:
+        raise KeyError("no ipv4_address defined for interface")
+
+    if address != "dhcp":
+        _validate_ipaddress(iface, "ipv4")
+
+    # ipv6 disabled at vlan level => ignore address
+    if vlan["ipv6_disable"]:
+        iface["ipv6_address"] = None
+        # no SLAAC or DHCP
+        iface["ipv6_dhcp"] = 0
+        iface["privext"] = 0
+        iface["accept_ra"] = 0
+    else:
+        address = iface.get("ipv6_address")
+        if address is not None:
+            _validate_ipaddress(iface, "ipv6")
+        else:
+            iface["ipv6_address"] = None
+
+        _check_value(iface, "ipv6_dhcp", 1)
+        _check_value(iface, "privext", 2)
+        _check_value(iface, "accept_ra", 1)
+
+    iface["firewall_zone"] = iface.get("firewall_zone", vswitch_name).upper()
+
+
+def _lookup_vlan(vlan_id, vswitch):
+    # allow interface vlan to be a name or id
+    if isinstance(vlan_id, str):
+        lookup = vswitch["vlans_by_name"]
+    else:
+        lookup = vswitch["vlans_by_id"]  # also handles None
+
+    # no vlan set; could be a PVID vlan on the vswitch
+    # if not, use the default vlan
+    vlan = lookup.get(vlan_id)
+    if vlan_id is None:
+        if vlan is None:
+            vlan = vswitch["default_vlan"]
+
+        if vlan is None:
+            raise KeyError(f"vlan must be set when vswitch {vswitch['name']} has no default vlan")
+    else:
+        if vlan is None:
+            raise KeyError(f"invalid vlan {vlan_id}; not defined in vswitch {vswitch['name']}")
+
+    return vlan
+
+
+def _validate_ipaddress(iface, ip_version):
+    key = ip_version + "_address"
+    try:
+        value = iface.get(key)
+        iface[key] = address = ipaddress.ip_address(value)
+    except:
+        raise KeyError(f"invalid {key} {value}")
+
+    subnet = iface['vlan'][ip_version + "_subnet"]
+
+    if subnet is None:
+        raise KeyError(
+            f"subnet for vlan {iface['vlan']['id']} cannot be None when specifying an IP address")
+
+    if address not in subnet:
+        raise KeyError(
+            (f"invalid address {address}; "
+             f"it is not in vlan {iface['vlan']['id']}'s subnet {subnet}"))
+
+    if ip_version == "ipv4":
+        iface["ipv4_netmask"] = subnet.netmask
+        iface["ipv4_gateway"] = subnet.network_address + 1
+    if ip_version == "ipv6":
+        iface["ipv6_prefixlen"] = subnet.prefixlen
+
+
+def _check_value(iface, key, max_val):
+    try:
+        value = int(iface.get(key, max_val))
+    except ValueError:
+        raise KeyError(f"invalid {key}; it must be a number")
+
+    if value < 0:
+        raise KeyError(f"invalid {key}; it must be positive")
+    if value > max_val:
+        raise KeyError(f"invalid {key}; it must be < {max_val}")
+
+    iface[key] = value

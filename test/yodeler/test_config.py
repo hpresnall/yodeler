@@ -66,11 +66,10 @@ class TestConfig(base.TestCfgBase):
         self.assertEqual("PUBLIC", iface["firewall_zone"])
         self.assertEqual("eth0", iface["name"])
 
-        self.assertEqual("static", iface["ipv4_method"])
+        self.assertEqual("192.168.1.1", str(iface["ipv4_address"]))
         self.assertEqual("192.168.1.1", str(iface["ipv4_gateway"]))
         self.assertEqual("255.255.255.0", str(iface["ipv4_netmask"]))
 
-        self.assertEqual("auto", iface["ipv6_method"])
         self.assertEqual(1, iface["ipv6_dhcp"])
         self.assertEqual(64, iface["ipv6_prefixlen"])
         self.assertEqual(1, iface["accept_ra"])

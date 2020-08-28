@@ -54,7 +54,8 @@ class Common(Role):
 
         common.write_file(output_dir)
 
-        util.file.write("interfaces", util.interfaces.as_etc_network(cfg["interfaces"]), output_dir)
+        interfaces = [util.interfaces.loopback(), util.interfaces.as_etc_network(cfg["interfaces"])]
+        util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
         util.resolv.create_conf(cfg["interfaces"], cfg["primary_domain"], cfg["domain"],
                                 cfg["local_dns"], cfg["external_dns"], output_dir)

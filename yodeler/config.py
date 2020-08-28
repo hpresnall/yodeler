@@ -15,6 +15,7 @@ import roles.role
 import roles.common
 
 import yodeler.vswitch
+import yodeler.interface
 
 
 _logger = logging.getLogger(__name__)
@@ -90,7 +91,7 @@ def load_host_config(site_cfg, hostname):
     _configure_roles(cfg)
     _configure_packages(cfg)
 
-    _validate_interfaces(cfg)
+    yodeler.interface.validate(cfg)
 
     return cfg
 
@@ -116,7 +117,7 @@ def config_from_dict(cfg):
     _configure_roles(cfg)
     _configure_packages(cfg)
     yodeler.vswitch.validate(cfg)
-    _validate_interfaces(cfg)
+    yodeler.interface.validate(cfg)
 
     return cfg
 
@@ -197,42 +198,6 @@ def _configure_packages(cfg):
         _logger.debug("adding packages %s", cfg["packages"])
         _logger.debug("removing packages %s", cfg["remove_packages"])
 
-def _validate_interfaces(cfg):
-    ifaces = cfg.get("interfaces")
-    if (ifaces is None) or (len(ifaces) == 0):
-        raise KeyError("no interfaces defined")
-
-    for role in cfg["roles"]:
-        ifaces.extend(role.additional_ifaces(cfg))
-
-    vswitches = cfg["vswitches"]
-    matching_domain = None
-    iface_counter = 0
-
-    for i, iface in enumerate(ifaces):
-        if "name" not in iface:
-            iface["name"] = f"eth{iface_counter}"
-            iface_counter += 1
-
-        try:
-            util.interfaces.validate(iface, vswitches)
-        except KeyError as err:
-            msg = err.args[0]
-            raise KeyError(f"{msg} for interface {i}: {iface}")
-
-        # host's primary domain, if set, should match one vlan
-        vlan = iface["vlan"]
-        if cfg["primary_domain"] == vlan["domain"]:
-            matching_domain = vlan["domain"]
-
-    if cfg["primary_domain"] != "":
-        if matching_domain is None:
-            raise KeyError(
-                f"invalid primary_domain: no vlan domain matches {cfg['primary_domain']}")
-    else:
-        if len(ifaces) == 1:
-            cfg["primary_domain"] = ifaces[0]["vlan"]["domain"]
-        # else leave primary domain blank
 
 # properties that are unique and cannot be set as defaults
 _REQUIRED_PROPERTIES = ["site", "hostname", "public_ssh_key"]

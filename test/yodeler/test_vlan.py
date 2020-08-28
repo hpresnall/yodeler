@@ -155,6 +155,7 @@ class TestVlan(base.TestCfgBase):
 
     def test_none_vlan_ipv6_subnet(self):
         del self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_subnet"]
+        # cannot set ip address with no subnet
         del self._cfg_dict["interfaces"][0]["ipv6_address"]
         cfg = self.build_cfg()
 
@@ -193,4 +194,3 @@ class TestVlan(base.TestCfgBase):
         cfg = self.build_cfg()
 
         self.assertIsNone(cfg["vswitches"]["public"]["vlans"][0]["ipv6_subnet"])
-        self.assertEqual("manual", cfg["interfaces"][0]["ipv6_method"])

@@ -12,6 +12,8 @@ import util.resolv
 
 from roles.role import Role
 
+import yodeler.interface
+
 
 class VmHost(Role):
     """VmHost defines the configuration needed to setup a KVM host using OpenVswitch."""
@@ -24,6 +26,7 @@ class VmHost(Role):
                 "libvirt", "libvirt-daemon", "libvirt-qemu", "dbus", "polkit", "git"}
 
     def additional_ifaces(self, cfg):
+        # return [util.interfaces.create_port("foo")]
         return []
 
     def create_scripts(self, cfg, output_dir):
@@ -63,8 +66,7 @@ def _setup_open_vswitch(cfg, output_dir):
         shell.append(f"ovs-vsctl add-br {vswitch_name}")
 
         # iface for switch itself
-        iface = util.interfaces.create_port(vswitch_name)
-        iface["comment"] = "vswitch"
+        iface = util.interfaces.create_port(vswitch_name, "vswitch")
         vswitch_interfaces.append(iface)
 
         uplink_interfaces += _configure_uplinks(shell, vswitch)
@@ -93,13 +95,11 @@ def _configure_uplinks(shell, vswitch):
         shell.append(f"ovs-vsctl add-bond {vswitch_name} {uplink} {bond_ifaces} lacp=active")
 
         for iface in uplink:
-            iface = util.interfaces.create_port(uplink)
-            iface["comment"] = "uplink for vswitch " + vswitch_name
+            iface = util.interfaces.create_port(uplink, "uplink for vswitch " + vswitch_name)
             uplink_interfaces.append(iface)
     else:
         shell.append(f"ovs-vsctl add-port {vswitch_name} {uplink}")
-        iface = util.interfaces.create_port(uplink)
-        iface["comment"] = "uplink for vswitch " + vswitch_name
+        iface = util.interfaces.create_port(uplink, "uplink for vswitch " + vswitch_name)
         uplink_interfaces.append(iface)
 
     # tag the uplink port
@@ -158,9 +158,11 @@ def _reconfigure_interfaces(shell, cfg, output_dir):
 
     # overwrite the original interfaces file from common setup
     # vswitch & uplink ifaces first so they are up before the vm host's ports
-    util.file.write("interfaces",
-                    util.interfaces.as_etc_network(cfg["vmhost_interfaces"] + cfg["interfaces"]),
-                    output_dir)
+    interfaces = [util.interfaces.loopback()]
+    interfaces.extend(cfg["vmhost_interfaces"])
+    interfaces.append(util.interfaces.as_etc_network(cfg["interfaces"]))
+
+    util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
     # overwrite the original awall base config
     if cfg["local_firewall"]:
@@ -183,14 +185,13 @@ def _configure_libvirt(cfg, output_dir):
 
     # for each vswitch, create an XML network definition
     for vswitch in cfg["vswitches"].values():
+        name = vswitch["name"]
+
         template = xml.parse("templates/vm/network.xml")
         net = template.getroot()
 
-        name = net.find("name")
-        name.text = vswitch["name"]
-
-        bridge = net.find("bridge")
-        bridge.attrib["name"] = vswitch["name"]
+        net.find("name").text = name
+        net.find("bridge").attrib["name"] = name
 
         # create a portgroup for the router that trunks all the routable vlans
         router_portgroup = xml.SubElement(net, "portgroup")
@@ -229,12 +230,12 @@ def _configure_libvirt(cfg, output_dir):
             net.remove(router_portgroup)
 
         # save the file and add the virsh commands to the script
-        network_xml = name.text + ".xml"
+        network_xml = name + ".xml"
         template.write(os.path.join(output_dir, network_xml))
 
         shell.append(f"virsh net-define $DIR/{network_xml}")
-        shell.append(f"virsh net-start {name.text}")
-        shell.append(f"virsh net-autostart {name.text}")
+        shell.append(f"virsh net-start {name}")
+        shell.append(f"virsh net-autostart {name}")
         shell.append("")
 
     shell.append("# remove from local.d so setup is only run once")
@@ -259,6 +260,12 @@ def _configure_initial_network(cfg, output_dir):
     initial_interfaces = cfg["initial_interfaces"]
     names = set()
 
+    # fake config used to validate initial interfaces
+    initial_cfg = {"interfaces": [],
+                   "vswitches": {},
+                   "roles": [],
+                   "primary_domain": ""}
+
     for i, iface in enumerate(initial_interfaces):
         # usual configuration numbers ifaces by array order
         # initial config may not use all ifaces, so name must be specified
@@ -271,16 +278,22 @@ def _configure_initial_network(cfg, output_dir):
         names.add(iface["name"])
 
         if "vswitch" in iface:
-            vswitches = cfg["vswitches"]
+            name = iface['vswitch']
+            if name not in cfg["vswitches"]:
+                raise KeyError(f"vswitch {name} not defined for initial interface {i}: {iface}")
+
+            initial_cfg["vswitches"][name] = cfg["vswitches"][name]
         else:
-            vswitches = _configure_initial_iface(i, iface)
+            vswitch = _configure_initial_iface(i, iface)
+            initial_cfg["vswitches"][vswitch["name"]] = vswitch
 
         iface["firewall_zone"] = "initial_" + iface["name"]
 
-        util.interfaces.validate(iface, vswitches)
+        initial_cfg["interfaces"].append(iface)
+
+    yodeler.interface.validate(initial_cfg)
 
     # script to switch network to final configuration
-    # run before adding to initial_interfaces since vswitches & uplinks do no need firewalling
     shell = util.shell.ShellScript("finalize_network.sh")
     shell.append_self_dir()
     shell.append_rootinstall()
@@ -295,12 +308,16 @@ def _configure_initial_network(cfg, output_dir):
 
     # also add original interface unless
     # DHCP since that will hang boot if it cannot get an IP address
-    # initial interface will be reused
-    initial_interfaces += [iface for iface in cfg["vmhost_interfaces"]
-                           if (iface["ipv4_method"] != ["dhcp"])
-                           and not iface["ipv6_dhcp"] and (iface["name"] not in names)]
+    kept_interfaces = [iface for iface in cfg["interfaces"]
+                       if (iface["ipv4_address"] != ["dhcp"])
+                       and not iface["ipv6_dhcp"] and (iface["name"] not in names)]
 
-    util.file.write("interfaces", util.interfaces.as_etc_network(initial_interfaces), output_dir)
+    interfaces = [util.interfaces.loopback()]
+    interfaces.extend(cfg["vmhost_interfaces"])
+    interfaces.append(util.interfaces.as_etc_network(kept_interfaces))
+    interfaces.append(util.interfaces.as_etc_network(initial_cfg["interfaces"]))
+
+    util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
     util.resolv.create_conf(initial_interfaces, cfg["primary_domain"], cfg["domain"],
                             cfg["local_dns"], cfg["external_dns"], output_dir)
@@ -313,10 +330,9 @@ def _configure_initial_iface(i, iface):
     1) interfaces to be defined without a vswitch or vlan
     2) static ip addresses in a subnet not on any vlan
 
-    To pass util.interfaces.validate(), create a fake vswitch and vlan.
+    To pass yodeler.interface.validate(), create a fake vswitch and vlan.
     """
-    initial_vswitch = {"name": "initial"}
-    vswitches = {"initial": initial_vswitch}
+    initial_vswitch = {"name": f"initial_{i}"}
     initial_vlan = {"name": "initial", "ipv6_disable": False}
 
     # no vlan => cannot lookup subnet so it must be defined explicitly
@@ -329,7 +345,7 @@ def _configure_initial_iface(i, iface):
                 initial_vlan["ipv4_subnet"] = ipaddress.ip_network(iface["ipv4_subnet"])
             except:
                 raise KeyError(f"invalid ipv4_subnet defined for interface {i}: {iface}")
-    # else util.interface.validate() handles None
+    # else yodeler.interface.validate() handles None
 
     if "ipv6_address" in iface:
         if "ipv6_subnet" not in iface:
@@ -340,17 +356,18 @@ def _configure_initial_iface(i, iface):
             initial_vlan["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
         except:
             raise KeyError(f"invalid ipv6_subnet defined for interface {i}: {iface}")
-    # else util.interface.validate() handles None
+    # else yodeler.interface.validate() handles None
 
-    initial_vlan["id"] = iface.get("vlan")  # None case handled in util.interfaces.validate()
+    initial_vlan["id"] = iface.get("vlan")  # None case handled in yodeler.interfaces.validate()
     initial_vlan["default"] = True
+    initial_vlan["domain"] = ""
     initial_vswitch["vlans_by_id"] = {initial_vlan["id"]: initial_vlan}
     initial_vswitch["vlans_by_name"] = {initial_vlan["name"]: initial_vlan}
     initial_vswitch["default_vlan"] = initial_vlan
 
     iface["vswitch"] = initial_vswitch["name"]
 
-    return vswitches
+    return initial_vswitch
 
 
 _SETUP_OVS = """echo "Configuring OpenVSwitch"

@@ -92,7 +92,6 @@ class TestInterface(base.TestCfgBase):
         cfg = self.build_cfg()
 
         self.assertEqual("dhcp", cfg["interfaces"][0]["ipv4_address"])
-        self.assertEqual("dhcp", cfg["interfaces"][0]["ipv4_method"])
 
     def test_invalid_interface_vswitch(self):
         self._cfg_dict["interfaces"][0]["vswitch"] = "unknown"
@@ -131,5 +130,16 @@ class TestInterface(base.TestCfgBase):
 
     def test_none_subnet_interface_ipv6_address(self):
         del self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_subnet"]
-        self._cfg_dict["interfaces"][0]["ipv6_address"] = "2001:db8:0:2::1"
+        # ip address set without a subnet should error
         self.build_error()
+
+
+    def test_vlan_ipv6_disabled(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_disable"] = True
+        cfg = self.build_cfg()
+
+        self.assertIsNone(cfg["vswitches"]["public"]["vlans"][0]["ipv6_subnet"])
+        self.assertIsNone(cfg["interfaces"][0]["ipv6_address"])
+        self.assertEqual(0, cfg["interfaces"][0]["ipv6_dhcp"])
+        self.assertEqual(0, cfg["interfaces"][0]["privext"])
+        self.assertEqual(0, cfg["interfaces"][0]["accept_ra"])
