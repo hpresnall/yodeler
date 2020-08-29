@@ -18,9 +18,6 @@ class Common(Role):
         # use Debian's better ifupdown and the Linux ip command, instead of Busybox's built-ins
         return {"ifupdown", "iproute2"}
 
-    def additional_ifaces(self, cfg):
-        return []
-
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
         common = util.shell.ShellScript("common.sh")

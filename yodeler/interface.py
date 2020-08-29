@@ -11,9 +11,6 @@ def validate(cfg):
     if (ifaces is None) or (len(ifaces) == 0):
         raise KeyError("no interfaces defined")
 
-    for role in cfg["roles"]:
-        ifaces.extend(role.additional_ifaces(cfg))
-
     vswitches = cfg["vswitches"]
 
     # domain used in /etc/resolv.conf

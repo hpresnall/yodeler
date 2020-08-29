@@ -25,10 +25,6 @@ class VmHost(Role):
         return {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
                 "libvirt", "libvirt-daemon", "libvirt-qemu", "dbus", "polkit", "git"}
 
-    def additional_ifaces(self, cfg):
-        # return [util.interfaces.create_port("foo")]
-        return []
-
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
         scripts = []
