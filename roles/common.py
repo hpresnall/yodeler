@@ -1,4 +1,7 @@
 """Common configuration & setup for all Alpine hosts."""
+import os.path
+import xml.etree.ElementTree as xml
+
 import util.shell
 import util.file
 import util.interfaces
@@ -58,6 +61,13 @@ class Common(Role):
                                 cfg["local_dns"], cfg["external_dns"], output_dir)
         _create_chrony_conf(cfg, output_dir)
 
+        # different installation scripts for physical vs virtual
+        if cfg["is_vm"]:
+            _create_vm_script(cfg, output_dir)
+            _create_virsh_xml(cfg, output_dir)
+        else:
+            _create_bootstrap(cfg, output_dir)
+
         return [common.name]
 
 
@@ -95,6 +105,78 @@ def _create_chrony_conf(cfg, output_dir):
     buffer.append("rtcsync")
 
     util.file.write("chrony.conf", "\n".join(buffer), output_dir)
+
+
+def _create_bootstrap(cfg, output_dir):
+    # expected flow: boot with install media; run /media/<install_dev>/bootstrap.sh
+    # system reboots and runs local.d/setup.start
+
+    # create Alpine install script
+    install = util.shell.ShellScript("install_alpine.sh")
+    install.append_self_dir()
+    install.substitute("templates/alpine/install_alpine.sh", cfg)
+    install.write_file(output_dir)
+
+    # create Alpine setup answerfile
+    # use external DNS for initial Alpine setup
+    cfg["external_dns_str"] = " ".join(cfg["external_dns"])
+    util.file.write("answerfile",
+                    util.file.substitute("templates/alpine/answerfile", cfg), output_dir)
+
+    # create bootstrap wrapper script
+    bootstrap = util.shell.ShellScript("bootstrap.sh")
+    bootstrap.append_self_dir()
+    bootstrap.substitute("templates/common/bootstrap.sh", cfg)
+    bootstrap.write_file(output_dir)
+
+    # create local.d file that runs setup on first reboot after Alpine install
+    setup = util.shell.ShellScript("setup.start")
+    setup.setup_logging(cfg["hostname"])
+
+    # add contents of locald_setup.sh for each role
+    for role in cfg["roles"]:
+        path = os.path.join("templates", role.name, "locald_setup.sh")
+        if os.path.exists(path) and os.path.isfile(path):
+            setup.substitute(path, cfg)
+    setup.write_file(output_dir)
+
+
+def _create_vm_script(cfg, output_dir):
+    # note not adding create_vm to setup script
+    # for VMs, create_vm.sh will run setup _inside_ a chroot for the vm
+    create_vm = util.shell.ShellScript("create_vm.sh")
+    create_vm.append_self_dir()
+    create_vm.substitute("templates/vm/create_vm.sh", cfg)
+    create_vm.write_file(output_dir)
+
+    # helper script to delete & remove VM
+    delete_vm = util.shell.ShellScript("delete_vm.sh")
+    delete_vm.substitute("templates/vm/delete_vm.sh", cfg)
+    delete_vm.write_file(output_dir)
+
+
+def _create_virsh_xml(cfg, output_dir):
+    template = xml.parse("templates/vm/server.xml")
+    domain = template.getroot()
+
+    domain.find("name").text = cfg["hostname"]
+    domain.find("memory").text = str(cfg["memory_mb"])
+    domain.find("vcpu").text = str(cfg["vcpus"])
+
+    devices = domain.find("devices")
+
+    devices.find("disk/source").attrib["file"] = f"{cfg['vm_images_path']}/{cfg['hostname']}.img"
+
+    for iface in cfg["interfaces"]:
+        vlan_name = iface["vlan"]["name"]
+        interface = xml.SubElement(devices, "interface")
+        interface.attrib["type"] = "network"
+        xml.SubElement(interface, "source",
+                       {"network": iface["vswitch"]["name"], "portgroup": vlan_name})
+        xml.SubElement(interface, "target", {"dev": f"{cfg['hostname']}-{vlan_name}"})
+        xml.SubElement(interface, "model", {"type": "virtio"})
+
+    template.write(os.path.join(output_dir, cfg["hostname"] + ".xml"))
 
 
 _SETUP_METRICS = """# setup Prometheus
