@@ -152,6 +152,7 @@ def _configure_roles(cfg):
     # Common _must_ be the first so it is configured and setup first
     role_names = set(cfg["roles"] if cfg.get("roles") is not None else [])
     cfg["roles"] = [roles.common.Common()]
+    cfg["roles"][0].additional_configuration(cfg)
 
     # for each role, load the module, then the class
     # instantiate the class and overwrite the config
@@ -162,6 +163,7 @@ def _configure_roles(cfg):
 
         if role != "common":
             cfg["roles"].append(roles.role.load(role))
+            cfg["roles"][-1].additional_configuration(cfg)
 
 
 def _configure_packages(cfg):
@@ -183,6 +185,7 @@ def _configure_packages(cfg):
      # remove iptables if there is no local firewall
     if not cfg["local_firewall"]:
         cfg["remove_packages"] |= {"iptables", "ip6tables"}
+        cfg["packages"].remove("awall")
 
     # VMs are setup without USB, so remove the library
     if cfg["is_vm"]:

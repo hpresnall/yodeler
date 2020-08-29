@@ -9,7 +9,7 @@
     <acpi />
     <apic />
   </features>
-  pcon<cpu mode="host-passthrough" check="none" />
+  <cpu mode="host-passthrough" check="none" />
   <devices>
     <disk type="file" device="disk">
       <driver name="qemu" type="raw" />

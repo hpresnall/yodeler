@@ -1,4 +1,6 @@
 """Handles parsing and validating interface configuration from host YAML files."""
+import xml.etree.ElementTree as xml
+
 import logging
 import ipaddress
 
@@ -54,7 +56,7 @@ def _validate_iface(iface, vswitches):
     iface["vswitch"] = vswitch
 
     vlan_id = iface.get("vlan")
-    iface["vlan"] = vlan = _lookup_vlan(vlan_id, vswitch)
+    iface["vlan"] = vlan = lookup_vlan(vlan_id, vswitch)
 
     # required ipv4 address, but allow special 'dhcp' value
     address = iface.get("ipv4_address")
@@ -85,8 +87,8 @@ def _validate_iface(iface, vswitches):
     iface["firewall_zone"] = iface.get("firewall_zone", vswitch_name).upper()
 
 
-def _lookup_vlan(vlan_id, vswitch):
-    # allow interface vlan to be a name or id
+def lookup_vlan(vlan_id, vswitch):
+    """Get the vlan object from the given vswitch. vlan_id can be either an id or a name."""
     if isinstance(vlan_id, str):
         lookup = vswitch["vlans_by_name"]
     else:
@@ -146,3 +148,16 @@ def _check_value(iface, key, max_val):
         raise KeyError(f"invalid {key}; it must be < {max_val}")
 
     iface[key] = value
+
+
+def virsh_xml(hostname, iface):
+    """Create an the <interface> virsh XML element for the given iface configuration."""
+    vlan_name = iface["vlan"]["name"]
+    interface = xml.Element("interface")
+    interface.attrib["type"] = "network"
+    xml.SubElement(interface, "source",
+                   {"network": iface["vswitch"]["name"], "portgroup": vlan_name})
+    xml.SubElement(interface, "target", {"dev": f"{hostname}-{vlan_name}"})
+    xml.SubElement(interface, "model", {"type": "virtio"})
+
+    return interface

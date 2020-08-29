@@ -8,6 +8,8 @@ import util.interfaces
 import util.awall
 import util.resolv
 
+import yodeler.interface
+
 from roles.role import Role
 
 
@@ -168,13 +170,7 @@ def _create_virsh_xml(cfg, output_dir):
     devices.find("disk/source").attrib["file"] = f"{cfg['vm_images_path']}/{cfg['hostname']}.img"
 
     for iface in cfg["interfaces"]:
-        vlan_name = iface["vlan"]["name"]
-        interface = xml.SubElement(devices, "interface")
-        interface.attrib["type"] = "network"
-        xml.SubElement(interface, "source",
-                       {"network": iface["vswitch"]["name"], "portgroup": vlan_name})
-        xml.SubElement(interface, "target", {"dev": f"{cfg['hostname']}-{vlan_name}"})
-        xml.SubElement(interface, "model", {"type": "virtio"})
+        devices.append(yodeler.interface.virsh_xml(cfg["hostname"], iface))
 
     template.write(os.path.join(output_dir, cfg["hostname"] + ".xml"))
 
