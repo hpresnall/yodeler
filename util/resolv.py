@@ -14,35 +14,37 @@ def create_conf(interfaces, host_domain, site_domain, local_dns, external_dns, o
 
     if interfaces is not None:
         for iface in interfaces:
-            dhcp |= iface["ipv4_method"] == "dhcp"
+            dhcp |= iface["ipv4_address"] == "dhcp"
+
             # search all vlan domains
-            domain = iface["vlan"].get("domain")
+            domain = iface["vlan"].get("domain") if "vlan" in iface else None
             if (domain is not None) and (domain != ""):
                 search_domains.append(domain)
 
+    if dhcp:
+        # do not write resolv.conf; assume DHCP will setup resolv.conf
+        return
+
+    # manually set DNS servers
     buffer = []
 
-    if not dhcp:  # manually set DNS servers
-        if local_dns:
-            if host_domain and host_domain != "":
-                buffer.append(f"domain {host_domain}")
+    if local_dns:
+        if host_domain and host_domain != "":
+            buffer.append(f"domain {host_domain}")
 
-            # can search local domains if there is local dns
-            if search_domains and search_domains != "":
-                search_domains.append(site_domain)
+        # can search local domains if there is local dns
+        if search_domains and search_domains != "":
+            search_domains.append(site_domain)
 
-            if len(search_domains) > 0:
-                buffer.append("search {}".format(" ".join(search_domains)))
+        if len(search_domains) > 0:
+            buffer.append("search {}".format(" ".join(search_domains)))
 
-            nameservers = local_dns
-        else:
-            nameservers = external_dns
+        nameservers = local_dns
+    else:
+        nameservers = external_dns
 
-        for server in nameservers:
-            buffer.append("nameserver " + server)
-        buffer.append("")
-    # else leave empty & assume DHCP will setup resolv.conf
+    for server in nameservers:
+        buffer.append("nameserver " + server)
+    buffer.append("")
 
-    # do not write out empty file
-    if len(buffer) > 0:
-        util.file.write("resolv.conf", "\n".join(buffer), output_dir)
+    util.file.write("resolv.conf", "\n".join(buffer), output_dir)

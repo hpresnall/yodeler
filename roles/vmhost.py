@@ -2,7 +2,6 @@
 import os.path
 import xml.etree.ElementTree as xml
 import shutil
-import ipaddress
 
 import util.shell
 import util.file
@@ -256,12 +255,6 @@ def _configure_initial_network(cfg, output_dir):
     initial_interfaces = cfg["initial_interfaces"]
     names = set()
 
-    # fake config used to validate initial interfaces
-    initial_cfg = {"interfaces": [],
-                   "vswitches": {},
-                   "roles": [],
-                   "primary_domain": ""}
-
     for i, iface in enumerate(initial_interfaces):
         # usual configuration numbers ifaces by array order
         # initial config may not use all ifaces, so name must be specified
@@ -273,21 +266,15 @@ def _configure_initial_network(cfg, output_dir):
             raise KeyError(f"duplicate name defined for initial interface {i}: {iface}")
         names.add(iface["name"])
 
-        if "vswitch" in iface:
-            name = iface['vswitch']
-            if name not in cfg["vswitches"]:
-                raise KeyError(f"vswitch {name} not defined for initial interface {i}: {iface}")
-
-            initial_cfg["vswitches"][name] = cfg["vswitches"][name]
-        else:
-            vswitch = _configure_initial_iface(i, iface)
-            initial_cfg["vswitches"][vswitch["name"]] = vswitch
+        try:
+            if "vswitch" in iface:
+                yodeler.interface.validate_network(iface, cfg["vswitches"])
+            yodeler.interface.validate_iface(iface)
+        except KeyError as err:
+            msg = err.args[0]
+            raise KeyError(f"{msg} for initial_interface {i}: {iface}")
 
         iface["firewall_zone"] = "initial_" + iface["name"]
-
-        initial_cfg["interfaces"].append(iface)
-
-    yodeler.interface.validate(initial_cfg)
 
     # script to switch network to final configuration
     shell = util.shell.ShellScript("finalize_network.sh")
@@ -311,59 +298,12 @@ def _configure_initial_network(cfg, output_dir):
     interfaces = [util.interfaces.loopback()]
     interfaces.extend(cfg["vmhost_interfaces"])
     interfaces.append(util.interfaces.as_etc_network(kept_interfaces))
-    interfaces.append(util.interfaces.as_etc_network(initial_cfg["interfaces"]))
+    interfaces.append(util.interfaces.as_etc_network(cfg["initial_interfaces"]))
 
     util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
     util.resolv.create_conf(initial_interfaces, cfg["primary_domain"], cfg["domain"],
                             cfg["local_dns"], cfg["external_dns"], output_dir)
-
-
-def _configure_initial_iface(i, iface):
-    """Finalize configuration so validation will pass.
-
-    For initial_interfaces, allow:
-    1) interfaces to be defined without a vswitch or vlan
-    2) static ip addresses in a subnet not on any vlan
-
-    To pass yodeler.interface.validate(), create a fake vswitch and vlan.
-    """
-    initial_vswitch = {"name": f"initial_{i}"}
-    initial_vlan = {"name": "initial", "ipv6_disable": False}
-
-    # no vlan => cannot lookup subnet so it must be defined explicitly
-    if "ipv4_address" in iface:
-        if iface["ipv4_address"] != 'dhcp':
-            if "ipv4_subnet" not in iface:
-                raise KeyError(("ipv4_subnet must be set "
-                                f"when using static ipv4_address on interface {i}: {iface}"))
-            try:
-                initial_vlan["ipv4_subnet"] = ipaddress.ip_network(iface["ipv4_subnet"])
-            except:
-                raise KeyError(f"invalid ipv4_subnet defined for interface {i}: {iface}")
-    # else yodeler.interface.validate() handles None
-
-    if "ipv6_address" in iface:
-        if "ipv6_subnet" not in iface:
-            raise KeyError(("ipv6_subnet must be set "
-                            f"when using static ipv6_address on interface {i}: {iface}"))
-
-        try:
-            initial_vlan["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
-        except:
-            raise KeyError(f"invalid ipv6_subnet defined for interface {i}: {iface}")
-    # else yodeler.interface.validate() handles None
-
-    initial_vlan["id"] = iface.get("vlan")  # None case handled in yodeler.interfaces.validate()
-    initial_vlan["default"] = True
-    initial_vlan["domain"] = ""
-    initial_vswitch["vlans_by_id"] = {initial_vlan["id"]: initial_vlan}
-    initial_vswitch["vlans_by_name"] = {initial_vlan["name"]: initial_vlan}
-    initial_vswitch["default_vlan"] = initial_vlan
-
-    iface["vswitch"] = initial_vswitch["name"]
-
-    return initial_vswitch
 
 
 _SETUP_OVS = """echo "Configuring OpenVSwitch"

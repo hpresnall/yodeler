@@ -33,16 +33,24 @@ class Router(Role):
         if uplink is None:
             raise KeyError("router must define an uplink")
 
-        if "iface" in uplink:
-            uplink = _macvtap_uplink(cfg, uplink["iface"])
-        elif "vswitch" in uplink:
-            uplink = _vswitch_uplink(cfg, uplink["vswitch"], uplink.get("vlan"))
+        if "vswitch" in uplink:
+            uplink_xml = _vswitch_uplink(cfg, uplink["vswitch"], uplink.get("vlan"))
+            yodeler.interface.validate_network(uplink, cfg["vswitches"])
+        elif "macvtap" in uplink:
+            uplink_xml = _macvtap_uplink(cfg, uplink["macvtap"])
         else:
-            raise KeyError("invalid uplink type in router; it must be 'iface' or 'vswitch'")
-        comment = "internet uplink"
-        # TODO refactor out logic from vmhost for creating non-vswitch interface
-        interfaces = [util.interfaces.create_port("eth0", comment)]
-        interface_elements = [uplink]
+            raise KeyError(("invald uplink in router; "
+                            "it must define a vswitch+vlan or a macvtap host interface"))
+
+        uplink["comment"] = "internet uplink"
+        uplink["name"] = "eth0"
+        # IPv6 dhcp managed by udhcpd not ifupdown
+        uplink["ipv6_dhcp"] = False
+
+        yodeler.interface.validate_iface(uplink)
+
+        interfaces = [util.interfaces.loopback(), util.interfaces.as_etc_network([uplink])]
+        interface_elements = [uplink_xml]
 
         iface_counter = 1
 
@@ -63,6 +71,7 @@ class Router(Role):
                 interfaces.append(util.interfaces.create_port(iface_name, comment))
                 interfaces.extend(vlan_interfaces)
 
+                # add an interface to the VM
                 interface = xml.Element("interface")
                 interface.attrib["type"] = "network"
                 xml.SubElement(interface, "source",
@@ -75,10 +84,12 @@ class Router(Role):
                 iface_counter += 1
             # else no routable interfaces => do not create anything
 
+        # re-number defined interfaces
         for iface in cfg["interfaces"]:
             iface["name"] = f"eth{iface_counter}"
             iface_counter += 1
 
+        # rewrite interfaces with uplink and vswitches / vlans first
         interfaces.append(util.interfaces.as_etc_network(cfg["interfaces"]))
         util.file.write("interfaces", "\n".join(interfaces), output_dir)
 

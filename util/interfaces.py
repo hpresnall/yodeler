@@ -27,7 +27,9 @@ def as_etc_network(interfaces):
         else:
             buffer.append(_IPV4_STATIC_TEMPLATE.format_map(iface))
 
-        if iface["vlan"]["ipv6_disable"]:
+        ipv6_disable = (iface["vlan"]["ipv6_disable"] or iface.get("ipv6_disable")
+                        if "vlan" in iface else iface.get("ipv6_disable"))
+        if ipv6_disable:
             iface["ipv6_method"] = "manual"
         else:
             iface["ipv6_method"] = "auto"

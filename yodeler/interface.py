@@ -25,7 +25,8 @@ def validate(cfg):
             iface_counter += 1
 
         try:
-            _validate_iface(iface, vswitches)
+            validate_network(iface, vswitches)
+            validate_iface(iface)
         except KeyError as err:
             msg = err.args[0]
             raise KeyError(f"{msg} for interface {i}: {iface}")
@@ -46,7 +47,8 @@ def validate(cfg):
         # else leave host domain blank
 
 
-def _validate_iface(iface, vswitches):
+def validate_network(iface, vswitches):
+    """Validate the interface's vswitch and vlan."""
     vswitch_name = iface.get("vswitch")
     vswitch = vswitches.get(vswitch_name)
 
@@ -56,7 +58,15 @@ def _validate_iface(iface, vswitches):
     iface["vswitch"] = vswitch
 
     vlan_id = iface.get("vlan")
-    iface["vlan"] = vlan = lookup_vlan(vlan_id, vswitch)
+    iface["vlan"] = lookup_vlan(vlan_id, vswitch)
+    iface["firewall_zone"] = iface.get("firewall_zone", vswitch_name).upper()
+
+
+def validate_iface(iface):
+    """Validate a single interface."""
+    # vlan set by _validate_network in default cause
+    # some Roles need interfaces on undefined networks, e.g. a router's public iface
+    vlan = iface.get("vlan")
 
     # required ipv4 address, but allow special 'dhcp' value
     address = iface.get("ipv4_address")
@@ -66,8 +76,20 @@ def _validate_iface(iface, vswitches):
     if address != "dhcp":
         _validate_ipaddress(iface, "ipv4")
 
-    # ipv6 disabled at vlan level => ignore address
-    if vlan["ipv6_disable"]:
+        if vlan is None:
+            # no vlan => cannot lookup subnet so it must be defined explicitly
+            if "ipv4_subnet" not in iface:
+                raise KeyError("ipv4_subnet must be set when using static ipv4_address")
+            try:
+                ipaddress.ip_network(iface["ipv4_subnet"])
+            except:
+                raise KeyError("invalid ipv4_subnet")
+
+    # ipv6 disabled at vlan level of interface level => ignore address
+    ipv6_disable = (vlan["ipv6_disable"] or iface.get("ipv6_disable")
+                    if vlan is not None else iface.get("ipv6_disable"))
+
+    if ipv6_disable:
         iface["ipv6_address"] = None
         # no SLAAC or DHCP
         iface["ipv6_dhcp"] = 0
@@ -77,14 +99,22 @@ def _validate_iface(iface, vswitches):
         address = iface.get("ipv6_address")
         if address is not None:
             _validate_ipaddress(iface, "ipv6")
+
+            if vlan is None:
+                # no vlan => cannot lookup subnet so it must be defined explicitly
+                if "ipv6_subnet" not in iface:
+                    raise KeyError("ipv6_subnet must be set when using static ipv6_address")
+
+                try:
+                    ipaddress.ip_network(iface["ipv6_subnet"])
+                except:
+                    raise KeyError("invalid ipv6_subnet defined")
         else:
             iface["ipv6_address"] = None
 
         _check_value(iface, "ipv6_dhcp", 1)
         _check_value(iface, "privext", 2)
         _check_value(iface, "accept_ra", 1)
-
-    iface["firewall_zone"] = iface.get("firewall_zone", vswitch_name).upper()
 
 
 def lookup_vlan(vlan_id, vswitch):
