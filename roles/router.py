@@ -33,6 +33,7 @@ class Router(Role):
         if uplink is None:
             raise KeyError("router must define an uplink")
 
+        # uplink can be an existing vswitch or a physical iface on the host via macvtap
         if "vswitch" in uplink:
             uplink_xml = _vswitch_uplink(cfg, uplink["vswitch"], uplink.get("vlan"))
             yodeler.interface.validate_network(uplink, cfg["vswitches"])
@@ -53,6 +54,7 @@ class Router(Role):
         interface_elements = [uplink_xml]
 
         iface_counter = 1
+        untagged = False
 
         for vswitch in cfg["vswitches"].values():
             vlan_interfaces = []
@@ -62,13 +64,19 @@ class Router(Role):
                 if not vlan["routable"]:
                     continue
 
-                vlan_interfaces.append(util.interfaces.create_router_for_vlan(vlan, iface_name))
+                if vlan["id"] is None:
+                    untagged = True
+
+                vlan_interfaces.append(util.interfaces.create_for_vlan(vlan, iface_name))
 
             if len(vlan_interfaces) > 0:
-                # any routable interfaces
-                # create parent interface first
                 comment = f"vlans on {vswitch['name']} vswitch"
-                interfaces.append(util.interfaces.create_port(iface_name, comment))
+
+                if untagged:  # parent interface already created; just output the comment
+                    interfaces.append("# " + comment)
+                else:  # create parent interface with the comment
+                    interfaces.append(util.interfaces.create_port(iface_name, comment))
+
                 interfaces.extend(vlan_interfaces)
 
                 # add an interface to the VM
@@ -93,7 +101,7 @@ class Router(Role):
         interfaces.append(util.interfaces.as_etc_network(cfg["interfaces"]))
         util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
-        _recreate_virsh_xml(cfg, interface_elements, output_dir)
+        _recreate_network_xml(cfg, interface_elements, output_dir)
         return []
 
 
@@ -122,10 +130,10 @@ def _vswitch_uplink(cfg, vswitch, vlan):
         msg = err.args[0]
         raise KeyError(f"invalid router uplink; {msg}")
 
-    return yodeler.interface.virsh_xml(cfg["hostname"], {"vswitch": vswitch, "vlan": vlan})
+    return yodeler.interface.libvirt_xml(cfg["hostname"], {"vswitch": vswitch, "vlan": vlan})
 
 
-def _recreate_virsh_xml(cfg, interface_elements, output_dir):
+def _recreate_network_xml(cfg, interface_elements, output_dir):
     file_name = os.path.join(output_dir, cfg["hostname"] + ".xml")
     template = xml.parse(file_name)
     devices = template.getroot().find("devices")

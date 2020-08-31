@@ -1,6 +1,5 @@
 motd: "hello, I am a minimal Alpine router VM"
 memory_mb: 256
-#primary_domain: infra.example.com
 interfaces:
   # router config will automatically add eth0 for uplink and eth1 for routing the public vswitch
   - ipv4_address: 172.16.251.6

@@ -61,10 +61,14 @@ iface public inet6 auto
 """
 
 
-def create_router_for_vlan(vlan, iface_name):
-    """ Create an interface configuration for "port" interfaces like vswitches and vlan parents."""
+def create_for_vlan(vlan, iface_name):
+    """ Create a router interface for the given vlan."""
+    if vlan["id"] is None:
+        name = iface_name
+    else:
+        name = f"{iface_name}.{vlan['id']}"
+
     comment = "# " + vlan["name"] + " vlan\n"
-    name = f"{iface_name}.{vlan['id']}"
     ipv4_address = vlan["ipv4_subnet"].network_address + 1
     ipv4_netmask = vlan["ipv4_subnet"].netmask
 
@@ -74,12 +78,12 @@ iface {name} inet manual
   address {ipv4_address}
   netmask {ipv4_netmask}"""
 
-    # always listen for router advertisements
+    # disable autoconf
     if not vlan["ipv6_disable"]:
         interface += f"""
 iface {name} inet6 auto
   dhcp 0
-  accept_ra 1
+  accept_ra 0
   privext 0
 """
         # add IPv6 address for subnet
@@ -91,9 +95,8 @@ iface {name} inet6 auto
                 "ipv6_prefixlen": vlan["ipv6_subnet"].prefixlen
             }
             interface += _IPV6_ADDRESS_TEMPLATE.format_map(fmt)
-            interface += "\n"
-        else:
-            interface += "\n"
+
+        interface += "\n"
 
     return interface
 

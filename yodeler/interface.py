@@ -180,7 +180,7 @@ def _check_value(iface, key, max_val):
     iface[key] = value
 
 
-def virsh_xml(hostname, iface):
+def libvirt_xml(hostname, iface):
     """Create an the <interface> virsh XML element for the given iface configuration."""
     vlan_name = iface["vlan"]["name"]
     interface = xml.Element("interface")

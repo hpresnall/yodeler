@@ -66,7 +66,7 @@ class Common(Role):
         # different installation scripts for physical vs virtual
         if cfg["is_vm"]:
             _create_vm_script(cfg, output_dir)
-            _create_virsh_xml(cfg, output_dir)
+            _create_libvirt_xml(cfg, output_dir)
         else:
             _create_bootstrap(cfg, output_dir)
 
@@ -157,7 +157,7 @@ def _create_vm_script(cfg, output_dir):
     delete_vm.write_file(output_dir)
 
 
-def _create_virsh_xml(cfg, output_dir):
+def _create_libvirt_xml(cfg, output_dir):
     template = xml.parse("templates/vm/server.xml")
     domain = template.getroot()
 
@@ -170,7 +170,7 @@ def _create_virsh_xml(cfg, output_dir):
     devices.find("disk/source").attrib["file"] = f"{cfg['vm_images_path']}/{cfg['hostname']}.img"
 
     for iface in cfg["interfaces"]:
-        devices.append(yodeler.interface.virsh_xml(cfg["hostname"], iface))
+        devices.append(yodeler.interface.libvirt_xml(cfg["hostname"], iface))
 
     template.write(os.path.join(output_dir, cfg["hostname"] + ".xml"))
 
