@@ -61,7 +61,7 @@ def _setup_open_vswitch(cfg, output_dir):
         shell.append(f"ovs-vsctl add-br {vswitch_name}")
 
         # iface for switch itself
-        iface = util.interfaces.create_port(vswitch_name, "vswitch")
+        iface = util.interfaces.port(vswitch_name, "vswitch")
         vswitch_interfaces.append(iface)
 
         uplink_interfaces += _configure_uplinks(shell, vswitch)
@@ -90,11 +90,11 @@ def _configure_uplinks(shell, vswitch):
         shell.append(f"ovs-vsctl add-bond {vswitch_name} {uplink} {bond_ifaces} lacp=active")
 
         for iface in uplink:
-            iface = util.interfaces.create_port(uplink, "uplink for vswitch " + vswitch_name)
+            iface = util.interfaces.port(uplink, "uplink for vswitch " + vswitch_name)
             uplink_interfaces.append(iface)
     else:
         shell.append(f"ovs-vsctl add-port {vswitch_name} {uplink}")
-        iface = util.interfaces.create_port(uplink, "uplink for vswitch " + vswitch_name)
+        iface = util.interfaces.port(uplink, "uplink for vswitch " + vswitch_name)
         uplink_interfaces.append(iface)
 
     # tag the uplink port
@@ -155,7 +155,7 @@ def _reconfigure_interfaces(shell, cfg, output_dir):
     # vswitch & uplink ifaces first so they are up before the vm host's ports
     interfaces = [util.interfaces.loopback()]
     interfaces.extend(cfg["vmhost_interfaces"])
-    interfaces.append(util.interfaces.as_etc_network(cfg["interfaces"]))
+    interfaces.append(util.interfaces.from_config(cfg["interfaces"]))
 
     util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
@@ -297,8 +297,8 @@ def _configure_initial_network(cfg, output_dir):
 
     interfaces = [util.interfaces.loopback()]
     interfaces.extend(cfg["vmhost_interfaces"])
-    interfaces.append(util.interfaces.as_etc_network(kept_interfaces))
-    interfaces.append(util.interfaces.as_etc_network(cfg["initial_interfaces"]))
+    interfaces.append(util.interfaces.from_config(kept_interfaces))
+    interfaces.append(util.interfaces.from_config(cfg["initial_interfaces"]))
 
     util.file.write("interfaces", "\n".join(interfaces), output_dir)
 

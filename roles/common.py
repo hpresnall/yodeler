@@ -1,14 +1,12 @@
 """Common configuration & setup for all Alpine hosts."""
 import os.path
-import xml.etree.ElementTree as xml
 
 import util.shell
 import util.file
 import util.interfaces
+import util.libvirt
 import util.awall
 import util.resolv
-
-import yodeler.interface
 
 from roles.role import Role
 
@@ -56,7 +54,7 @@ class Common(Role):
 
         common.write_file(output_dir)
 
-        interfaces = [util.interfaces.loopback(), util.interfaces.as_etc_network(cfg["interfaces"])]
+        interfaces = [util.interfaces.loopback(), util.interfaces.from_config(cfg["interfaces"])]
         util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
         util.resolv.create_conf(cfg["interfaces"], cfg["primary_domain"], cfg["domain"],
@@ -66,7 +64,7 @@ class Common(Role):
         # different installation scripts for physical vs virtual
         if cfg["is_vm"]:
             _create_vm_script(cfg, output_dir)
-            _create_libvirt_xml(cfg, output_dir)
+            util.libvirt.write_vm_xml(cfg, output_dir)
         else:
             _create_bootstrap(cfg, output_dir)
 
@@ -155,24 +153,6 @@ def _create_vm_script(cfg, output_dir):
     delete_vm = util.shell.ShellScript("delete_vm.sh")
     delete_vm.substitute("templates/vm/delete_vm.sh", cfg)
     delete_vm.write_file(output_dir)
-
-
-def _create_libvirt_xml(cfg, output_dir):
-    template = xml.parse("templates/vm/server.xml")
-    domain = template.getroot()
-
-    domain.find("name").text = cfg["hostname"]
-    domain.find("memory").text = str(cfg["memory_mb"])
-    domain.find("vcpu").text = str(cfg["vcpus"])
-
-    devices = domain.find("devices")
-
-    devices.find("disk/source").attrib["file"] = f"{cfg['vm_images_path']}/{cfg['hostname']}.img"
-
-    for iface in cfg["interfaces"]:
-        devices.append(yodeler.interface.libvirt_xml(cfg["hostname"], iface))
-
-    template.write(os.path.join(output_dir, cfg["hostname"] + ".xml"))
 
 
 _SETUP_METRICS = """# setup Prometheus

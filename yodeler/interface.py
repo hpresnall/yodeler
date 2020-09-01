@@ -1,6 +1,4 @@
 """Handles parsing and validating interface configuration from host YAML files."""
-import xml.etree.ElementTree as xml
-
 import logging
 import ipaddress
 
@@ -11,6 +9,10 @@ def validate(cfg):
     """Validate all the interfaces defined in the host."""
     ifaces = cfg.get("interfaces")
     if (ifaces is None) or (len(ifaces) == 0):
+        for role in cfg["roles"]:
+            if role.name == "router":
+                cfg["interfaces"] = []
+                return # router role defines all required interfaces
         raise KeyError("no interfaces defined")
 
     vswitches = cfg["vswitches"]
@@ -178,16 +180,3 @@ def _check_value(iface, key, max_val):
         raise KeyError(f"invalid {key}; it must be < {max_val}")
 
     iface[key] = value
-
-
-def libvirt_xml(hostname, iface):
-    """Create an the <interface> virsh XML element for the given iface configuration."""
-    vlan_name = iface["vlan"]["name"]
-    interface = xml.Element("interface")
-    interface.attrib["type"] = "network"
-    xml.SubElement(interface, "source",
-                   {"network": iface["vswitch"]["name"], "portgroup": vlan_name})
-    xml.SubElement(interface, "target", {"dev": f"{hostname}-{vlan_name}"})
-    xml.SubElement(interface, "model", {"type": "virtio"})
-
-    return interface

@@ -1,4 +1,4 @@
-"""Utility for creating /etc/network/interfaces.
+"""Utility functions for creating /etc/network/interfaces.
 
 Files created by this module are usable by Debian's ifupdown package.
 It _will not_ be usable by the Alpine default BusyBox ifupdown."""
@@ -12,7 +12,7 @@ iface lo inet6 loopback
 """
 
 
-def as_etc_network(interfaces):
+def from_config(interfaces):
     """Convert the interfaces to a form for use in /etc/network/interfaces.
 
     The interfaces must be from a validated host configuration."""
@@ -46,7 +46,7 @@ def as_etc_network(interfaces):
     return "\n".join(buffer)
 
 
-def create_port(name, comment):
+def port(name, comment):
     """ Create an interface configuration for "port" interfaces like vswitches and vlan parents."""
     if comment != "":
         comment = "# " + comment + "\n"
@@ -61,7 +61,7 @@ iface public inet6 auto
 """
 
 
-def create_for_vlan(vlan, iface_name):
+def for_vlan(vlan, iface_name):
     """ Create a router interface for the given vlan."""
     if vlan["id"] is None:
         name = iface_name
