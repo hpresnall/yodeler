@@ -1,7 +1,6 @@
 """Handles parsing and validating vlan configuration from site YAML files."""
 import logging
 import ipaddress
-import collections.abc
 
 _logger = logging.getLogger(__name__)
 
@@ -132,23 +131,52 @@ def _configure_default_vlan(vswitch):
 def _validate_access_vlans(vswitch):
     for vlan in vswitch["vlans"]:
         vlan_name = vlan["name"]
-        access_vlans = vlan.get("access_vlans")
+        access_vlans = vlan["access_vlans"]
 
-        if access_vlans is None:
-            continue
+        if not isinstance(access_vlans, list):
+            if isinstance(access_vlans, str):
+                access_vlans = [access_vlans]
+            else:
+                raise KeyError(
+                    f"non-array access_vlans in vlan {vlan_name} for vswitch {vswitch['name']}")
 
-        if (not isinstance(access_vlans, collections.abc.Sequence)
-                or isinstance(access_vlans, str)):
-            raise KeyError(
-                f"non-array access_vlans in vlan {vlan_name} for vswitch {vswitch['name']}: {vlan}")
+        vlan["access_vlans"] = []
 
-        # make unique
-        vlan["access_vlans"] = set(access_vlans)
+        # set() to make unique
+        for vlan_id in set(access_vlans):
+            if vlan_id == "all":
+                vlan["access_vlans"] = ["all"]
+                break
 
-        for vlan_id in access_vlans:
-            if vlan_id not in vswitch['vlans_by_id']:
-                raise KeyError((f"invalid access_vlan id {vlan_id} in vlan {vlan_name}"
-                                f" for vswitch {vswitch['name']}: {vlan}"))
+            try:
+                access = lookup(vlan_id, vswitch)
+                vlan["access_vlans"].append(access["name"])
+            except KeyError as err:
+                msg = err.args[0]
+                raise KeyError(f"access_vlan {msg}")
+
+
+def lookup(vlan_id, vswitch):
+    """Get the vlan object from the given vswitch. vlan_id can be either an id or a name."""
+    if isinstance(vlan_id, str):
+        lookup_dict = vswitch["vlans_by_name"]
+    else:
+        lookup_dict = vswitch["vlans_by_id"]  # also handles None
+
+    # no vlan set; could be a PVID vlan on the vswitch
+    # if not, use the default vlan
+    vlan = lookup_dict.get(vlan_id)
+    if vlan_id is None:
+        if vlan is None:
+            vlan = vswitch["default_vlan"]
+
+        if vlan is None:
+            raise KeyError(f"vlan must be set when vswitch {vswitch['name']} has no default vlan")
+    else:
+        if vlan is None:
+            raise KeyError(f"invalid vlan {vlan_id}; not defined in vswitch {vswitch['name']}")
+
+    return vlan
 
 
 # accessible for testing
@@ -161,6 +189,7 @@ DEFAULT_VLAN_CONFIG = {
     # do not allow internet access when firewall is stopped
     "allow_access_stopped_firewall": False,
     "allow_dns_update": False,  # do not allow this subnet to make DDNS updates
+    "access_vlans": [],
     "dhcp_min_address_ipv4": 2,
     "dhcp_max_address_ipv4": 252,
     "dhcp_min_address_ipv6": 2,

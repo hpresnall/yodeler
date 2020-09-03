@@ -2,6 +2,8 @@
 import logging
 import ipaddress
 
+import yodeler.vlan
+
 _logger = logging.getLogger(__name__)
 
 
@@ -60,7 +62,7 @@ def validate_network(iface, vswitches):
     iface["vswitch"] = vswitch
 
     vlan_id = iface.get("vlan")
-    iface["vlan"] = lookup_vlan(vlan_id, vswitch)
+    iface["vlan"] = yodeler.vlan.lookup(vlan_id, vswitch)
     iface["firewall_zone"] = iface.get("firewall_zone", vswitch_name).upper()
 
 
@@ -117,30 +119,6 @@ def validate_iface(iface):
         _check_value(iface, "ipv6_dhcp", 1)
         _check_value(iface, "privext", 2)
         _check_value(iface, "accept_ra", 1)
-
-
-def lookup_vlan(vlan_id, vswitch):
-    """Get the vlan object from the given vswitch. vlan_id can be either an id or a name."""
-    if isinstance(vlan_id, str):
-        lookup = vswitch["vlans_by_name"]
-    else:
-        lookup = vswitch["vlans_by_id"]  # also handles None
-
-    # no vlan set; could be a PVID vlan on the vswitch
-    # if not, use the default vlan
-    vlan = lookup.get(vlan_id)
-    if vlan_id is None:
-        if vlan is None:
-            vlan = vswitch["default_vlan"]
-
-        if vlan is None:
-            raise KeyError(f"vlan must be set when vswitch {vswitch['name']} has no default vlan")
-    else:
-        if vlan is None:
-            raise KeyError(f"invalid vlan {vlan_id}; not defined in vswitch {vswitch['name']}")
-
-    return vlan
-
 
 def _validate_ipaddress(iface, ip_version):
     key = ip_version + "_address"
