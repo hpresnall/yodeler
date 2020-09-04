@@ -1,0 +1,32 @@
+?SECTION ALL
+?SECTION ESTABLISHED
+?SECTION RELATED
+?SECTION INVALID
+?SECTION UNTRACKED
+?SECTION NEW
+
+# by policy, infra can access everything so no rules are needed
+
+# drop invalid TCP connections and pings from the internet
+# pings dropped by policy but rule here allows metrics tracking via comment
+Invalid(DROP)	inet	$FW	tcp
+Ping(DROP)	inet	all
+
+# allow all IPv6 functions except incoming ping
+ACCEPT	all	$FW	ipv6-icmp
+ACCEPT	$FW	all	ipv6-icmp
+ACCEPT	$FW	all	udp	546:547
+ACCEPT	all	$FW	udp	546:547
+
+# firewall can send DNS out so it does not depend on local DNS being up
+DNS(ACCEPT)	$FW	inet
+
+# allow SSH in, but at a limited rate and log connections
+SSH(ACCEPT):NFLOG(6)	inet	$FW	-	-	-	-	s:6/min:15
+
+# allow web, ping and NTP to internet
+Web(ACCEPT)	all	inet
+Ping(ACCEPT)    all	inet
+NTP(ACCEPT)	all	inet
+# Google QUIC protocol
+ACCEPT	all	inet	udp	443

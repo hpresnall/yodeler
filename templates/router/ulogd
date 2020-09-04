@@ -1,0 +1,12 @@
+/var/log/firewall/*.log {
+  compress
+  daily
+  rotate 32
+  missingok
+  notifempty
+  create 0640 root root
+  sharedscripts
+  postrotate
+  /bin/killall -HUP ulogd 2> /dev/null || true
+  endscript
+}

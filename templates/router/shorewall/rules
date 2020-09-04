@@ -1,0 +1,27 @@
+?SECTION ALL
+# drop traffic from banned list
+DROP:NFLOG(4)	inet:+banned	$FW
+
+?SECTION ESTABLISHED
+?SECTION RELATED
+?SECTION INVALID
+?SECTION UNTRACKED
+?SECTION NEW
+
+# drop invalid TCP connections and pings from the internet
+# pings dropped by policy but rule here allows metrics tracking via comment
+Invalid(DROP)	inet	$FW	tcp
+Ping(DROP)	inet	$FW
+
+# firewall can send DNS out so it does not depend on local DNS being up
+DNS(ACCEPT)	$FW inet
+
+# allow SSH in, but at a limited rate and log connections
+SSH(ACCEPT):NFLOG(4)	inet	$FW	-	-	-	-	s:6/min:15
+
+# allow web, ping and NTP to internet
+Web(ACCEPT)	all	inet
+Ping(ACCEPT)	all	inet
+NTP(ACCEPT)	all	inet
+# Google QUIC protocol
+ACCEPT	all	inet	udp	443
