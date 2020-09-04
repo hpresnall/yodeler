@@ -55,14 +55,16 @@ def configure(interfaces, output_dir, before_install=True):
     for name, service in services.items():
         util.file.write(name, json.dumps(service, indent=2), awall)
 
+        buffer.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
+
         # after_install, services are already enabled
         if before_install:
-            buffer.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
             buffer.append("awall enable {}".format(name[:-5]))  # name without .json
 
     buffer.append("")
     buffer.append("# create iptables rules and apply at boot")
     buffer.append("awall translate -o /tmp")
+    buffer.append("rm /etc/iptables/*")
     buffer.append("rootinstall /tmp/rules-save /tmp/rules6-save /etc/iptables")
 
     if before_install:

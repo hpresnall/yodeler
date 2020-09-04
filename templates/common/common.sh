@@ -24,6 +24,7 @@ fi
 adduser -D $USER
 addgroup $USER wheel
 echo "$USER:$PASSWORD" | chpasswd
+echo "sudo su -" > /home/$USER/.ash_history
 
 # setup ssh
 mkdir /home/$USER/.ssh

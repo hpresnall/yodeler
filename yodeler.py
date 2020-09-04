@@ -9,7 +9,7 @@ import yodeler.setup as setup
 
 def yodeler():
     """Create all configuration files for the site."""
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s: %(levelname)s %(message)s")
 
     if len(sys.argv) < 2:
         print("usage: yodeler.py <site_name> <output_dir>")
@@ -18,18 +18,18 @@ def yodeler():
     site = sys.argv[1]
     config_dir = sys.argv[2]
 
-    host_cfgs = setup.load_all_configs("sites", site)
-
     try:
         os.makedirs(config_dir)
     except OSError as exc:
         if exc.errno == errno.EEXIST and os.path.isdir(config_dir):
             pass
 
+    host_cfgs = setup.load_all_configs("sites", site)
+
     for host_cfg in host_cfgs.values():
         # print(util.output_yaml(host_cfg))
         setup.create_scripts_for_host(host_cfg, config_dir)
-        preview_dir(host_cfg["config_dir"])
+        #preview_dir(host_cfg["config_dir"])
 
 
 def preview_dir(output_dir, limit=sys.maxsize):

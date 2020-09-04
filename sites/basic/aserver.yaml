@@ -6,7 +6,7 @@ interfaces:
     ipv6_address: fd24:87e8:06c7:10::5
     vswitch: public
     firewall_zone: PUB
-    vlan: 10
+    vlan: infra
   - ipv4_address: 172.16.251.5
     vswitch: private
     firewall_zone: PRIV
@@ -26,5 +26,5 @@ install_interfaces: |
   iface eth0 inet dhcp
 # private key will be put on this server and it can be used as a jump box
 install_private_ssh_key: true
-packages: [ ndisc6 tcpdump ]
-roles: ["vmhost"]
+packages: [ndisc6 tcpdump]
+roles: [vmhost]
