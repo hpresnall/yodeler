@@ -41,7 +41,7 @@ vswitches:
         ipv4_subnet: 192.168.210.0/24
         ipv6_subnet: fd24:87e8:06c7:10::/64
         allow_dhcp: false # DHCP server will not be configured
-        access_vlans: all # firewall will not restrict access to all vlans, including the internet
+        access_vlans: all # firewall will allow any access to all vlans, including the internet
         allow_access_stopped_firewall: true # allow internet access when firewall is stopped
         allow_dns_update: true # allow this subnet to make DDNS updates
       - name: user

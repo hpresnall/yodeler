@@ -67,7 +67,7 @@ def for_vlan(vlan, iface_name):
              "ipv4_address": vlan["ipv4_subnet"].network_address + 1,
              "ipv4_netmask": vlan["ipv4_subnet"].netmask}
 
-    # this interface is the gateway, so gateway is not needed
+    # this interface _is_ the gateway, so gateway is not needed
     interface = comment
     interface += _IPV4_STATIC_TEMPLATE.format_map(iface)
 

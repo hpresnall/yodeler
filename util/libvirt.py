@@ -2,6 +2,7 @@
 import xml.etree.ElementTree as xml
 import os.path
 
+
 def write_vm_xml(cfg, output_dir):
     """Create the libvirt XML for the given virtual machine."""
     template = xml.parse("templates/vm/server.xml")

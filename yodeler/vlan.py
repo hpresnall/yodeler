@@ -171,7 +171,8 @@ def lookup(vlan_id, vswitch):
             vlan = vswitch["default_vlan"]
 
         if vlan is None:
-            raise KeyError(f"vlan must be set when vswitch {vswitch['name']} has no default vlan")
+            raise KeyError(
+                f"vlan id must be specified when vswitch {vswitch['name']} has no default vlan")
     else:
         if vlan is None:
             raise KeyError(f"invalid vlan {vlan_id}; not defined in vswitch {vswitch['name']}")
