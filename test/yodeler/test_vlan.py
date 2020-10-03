@@ -125,7 +125,7 @@ class TestVlan(base.TestCfgBase):
 
         cfg = self.build_cfg()
 
-        # multiple ifaces, primary_domain should unset
+        # multiple ifaces, primary_domain should be unset
         self.assertEqual("", cfg["primary_domain"])
 
     def test_no_primary_domain(self):

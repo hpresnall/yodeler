@@ -130,6 +130,8 @@ def _validate_config(cfg):
     for key in DEFAULT_CONFIG:
         if key not in cfg:
             cfg[key] = DEFAULT_CONFIG[key]
+    if "local_dns" not in cfg:
+        cfg["local_dns"] = []
 
     # remove from script output if not needed
     if not cfg.get("install_private_ssh_key"):
@@ -228,7 +230,6 @@ DEFAULT_CONFIG = {
     "keymap": "us us",
     "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main"],
     "ntp_pool_servers": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
-    "local_dns": [],
     "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
     # top-level domain for the site
     "domain": "",

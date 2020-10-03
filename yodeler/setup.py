@@ -28,6 +28,23 @@ def load_all_configs(sites_dir, site_name):
         host_cfg = _load_host_config(site_cfg, path)
         host_cfgs[host_cfg["hostname"]] = host_cfg
 
+    # collect all the host information for DNS
+    # assume site config and vswitch & vlan objects are shared by all configs
+    for cfg in host_cfgs.values():
+        for iface in cfg["interfaces"]:
+            vlan = iface["vlan"]
+
+            # no domain name => no DNS
+            if vlan["domain"] == "":
+                continue
+
+            vlan["hosts"].append({
+                "hostname": cfg["hostname"],
+                "ipv4_address": iface["ipv4_address"],
+                "ipv6_address": iface["ipv6_address"],
+                "mac_address": None,
+                "aliases": [role.name for role in cfg["roles"] if role.name != "common"]})
+
     return host_cfgs
 
 
