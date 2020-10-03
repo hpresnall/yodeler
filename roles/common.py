@@ -50,7 +50,7 @@ class Common(Role):
             common.append(_SETUP_METRICS)
 
         if cfg["local_firewall"]:
-            common.append(util.awall.configure(cfg["interfaces"], output_dir))
+            common.append(util.awall.configure(cfg["interfaces"], cfg["roles"], output_dir))
 
         common.write_file(output_dir)
 

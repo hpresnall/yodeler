@@ -5,7 +5,7 @@ import json
 import util.file
 
 
-def configure(interfaces, output_dir, before_install=True):
+def configure(interfaces, roles, output_dir, before_install=True):
     """Create awall configuration for the given interfaces.
     Outputs all JSON to <output_dir>/awall.
     Returns a shell script fragment to process the JSON files and create iptables rules."""
@@ -17,12 +17,9 @@ def configure(interfaces, output_dir, before_install=True):
 
     # load all template services
     services = {}
-    for path in os.listdir("templates/awall"):
-        with open(os.path.join("templates/awall", path)) as template:
-            service = json.load(template)
-        # assume service has a single filter and it is for input
-        service["filter"][0]["in"] = []
-        services[path] = service
+    _load_dir(services, "templates/awall")
+    for role in roles:
+        _load_dir(services, "templates/" + role.name + "/awall")
 
     for iface in interfaces:
         zone = iface["firewall_zone"]
@@ -35,7 +32,7 @@ def configure(interfaces, output_dir, before_install=True):
         base["policy"].append({"out": zone, "action": "accept"})
         base["policy"].append({"in": zone, "action": "drop"})
 
-        # all zones can retrieve traffic for all services
+        # all zones can recieve traffic for all services
         for service in services.values():
             service["filter"][0]["in"].append(zone)
 
@@ -72,3 +69,15 @@ def configure(interfaces, output_dir, before_install=True):
         buffer.append("rc-update add ip6tables boot")
 
     return "\n".join(buffer)
+
+
+def _load_dir(services, template_dir):
+    if not os.path.exists(template_dir):
+        return
+
+    for path in os.listdir(template_dir):
+        with open(os.path.join(template_dir, path)) as template:
+            service = json.load(template)
+        # assume service has a single filter and it is for input
+        service["filter"][0]["in"] = []
+        services[path] = service
