@@ -52,7 +52,7 @@ def load_host_config(site_cfg, hostname):
     Rreturns a new configuration without modifying the site configuration.
     The site config _must_ be a valid configuration from load_site_config().
     The values from the host will override the site values."""
-    if site_cfg is None:
+    if (site_cfg is None) or (len(site_cfg) == 0):
         raise KeyError("empty site config")
 
     host_dir = os.path.abspath(os.path.join(

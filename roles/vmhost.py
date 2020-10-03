@@ -282,7 +282,9 @@ def _configure_initial_network(cfg, output_dir):
     shell.append_rootinstall()
     shell.setup_logging(cfg["hostname"])
     shell.substitute("templates/vmhost/finalize_network.sh", cfg)
-    shell.append(util.awall.configure(initial_interfaces, output_dir, False))
+    # create initial awall config, but write to final network config
+    # the commands should be the same, so double duty is ok here
+    shell.append(util.awall.configure(initial_interfaces, cfg["roles"], output_dir, False))
     shell.append("")
     shell.append("rc-service iptables start")
     shell.append("rc-service ip6tables start")

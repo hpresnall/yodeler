@@ -77,7 +77,8 @@ class Router(Role):
         interfaces.append(util.interfaces.from_config(cfg["interfaces"]))
         util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
-        util.libvirt.update_interfaces(cfg['hostname'], libvirt_interfaces, output_dir)
+        if cfg["is_vm"]:
+            util.libvirt.update_interfaces(cfg['hostname'], libvirt_interfaces, output_dir)
 
         return [_configure_shorewall(cfg, shorewall, output_dir)]
 

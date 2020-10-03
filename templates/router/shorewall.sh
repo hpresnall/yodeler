@@ -41,7 +41,7 @@ sed -e "s/-i/-l/g" -e "s/dhcrelay/dhcrelay6/g" -e "s|sbin/dhcrelay6|sbin/dhcrela
 chmod 755 /etc/init.d/dhcrelay6
 
 # TODO add all vlan interfaces
-echo 'IFACE="eth0.10 eth0.20"' >> /etc/conf.d/dhcrelay
+echo 'IFACE="eth1.10 eth1.20"' >> /etc/conf.d/dhcrelay
 
 cp /etc/conf.d/dhcrelay /etc/conf.d/dhcrelay6
 echo 'DHCRELAY_OPTS="-6"' >> /etc/conf.d/dhcrelay6
