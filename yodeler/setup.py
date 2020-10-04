@@ -28,6 +28,27 @@ def load_all_configs(sites_dir, site_name):
         host_cfg = _load_host_config(site_cfg, path)
         host_cfgs[host_cfg["hostname"]] = host_cfg
 
+    _configure_hosts(host_cfgs)
+    _confgure_role_mapping(host_cfgs)
+    _confgure_router_hosts(host_cfgs)
+
+    return host_cfgs
+
+
+def _load_site_config(sites_dir):
+    site_cfg = config.load_site_config(sites_dir)
+    _logger.info("loaded config for site '%s' from %s", site_cfg["site"], sites_dir)
+    return site_cfg
+
+
+def _load_host_config(site_cfg, host_path):
+    host_cfg = config.load_host_config(site_cfg, host_path[:-5])  # remove .yaml
+    _logger.info("loaded config for '%s' from %s",
+                 host_cfg["hostname"], os.path.basename(host_path))
+    return host_cfg
+
+
+def _configure_hosts(host_cfgs):
     # collect all the host information for DNS
     # assume site config and vswitch & vlan objects are shared by all configs
     for cfg in host_cfgs.values():
@@ -45,20 +66,44 @@ def load_all_configs(sites_dir, site_name):
                 "mac_address": None,
                 "aliases": [role.name for role in cfg["roles"] if role.name != "common"]})
 
-    return host_cfgs
+
+def _confgure_role_mapping(host_cfgs):
+    # map roles to fully qualified domain names
+    # used by DNS to configure the top-level domain
+    roles = {}
+    for cfg in host_cfgs.values():
+        if cfg["primary_domain"] == "":
+            continue
+
+        fqdn = cfg["hostname"] + "." + cfg["primary_domain"]
+
+        for role in cfg["roles"]:
+            if role.name == "common":
+                continue
+            if role.name == "dns":
+                # only set on the DNS server
+                cfg["roles_to_hostnames"] = roles
+
+            roles[role.name] = fqdn
 
 
-def _load_site_config(sites_dir):
-    site_cfg = config.load_site_config(sites_dir)
-    _logger.info("loaded config for site '%s' from %s", site_cfg["site"], sites_dir)
-    return site_cfg
-
-
-def _load_host_config(site_cfg, host_path):
-    host_cfg = config.load_host_config(site_cfg, host_path[:-5])  # remove .yaml
-    _logger.info("loaded config for '%s' from %s",
-                 host_cfg["hostname"], os.path.basename(host_path))
-    return host_cfg
+def _confgure_router_hosts(host_cfgs):
+    # manually add host entries for router interfaces since they are defined automatically
+    # assume site config and vswitch & vlan objects are shared by all configs
+    for cfg in host_cfgs.values():
+        for role in cfg["roles"]:
+            if role.name != "router":
+                continue
+            for vswitch in cfg["vswitches"].values():
+                for vlan in vswitch["vlans"]:
+                    if vlan["routable"]:
+                        vlan["hosts"].append({
+                            "hostname": cfg["hostname"],
+                            "ipv4_address": vlan["ipv4_subnet"].network_address + 1,
+                            "ipv6_address": vlan["ipv6_subnet"].network_address + 1,
+                            "mac_address": None,
+                            "aliases": ["router"]})
+            return
 
 
 def create_scripts_for_host(cfg, output_dir):

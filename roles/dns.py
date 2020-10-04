@@ -1,7 +1,6 @@
 """Configuration & setup for a BIND9 DNS server."""
 import os
 import os.path
-import ipaddress
 
 import util.shell
 import util.file
@@ -20,24 +19,30 @@ class Dns(Role):
 
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
-        # TODO require primary domain; use this for the dns server name in all zone files
-        # TODO better zone functions
-        # site domain first - needs to be special and mostly contain cname records based on roles
-        # vlan zones should be a single function that takes the named conf and the vlan
-        # then separate functions for forward and reverse zone config and zone file
         if len(cfg["external_dns"]) == 0:
             raise KeyError("cannot configure DNS server with no external_dns addresses defined")
 
+        domain = cfg["domain"]
+        if domain == "":
+            domain = cfg["primary_domain"]
+            if domain == "":
+                raise KeyError(("cannot configure DNS server; "
+                                "with no primary_domain or top-level site domain"))
+        cfg["dns_domain"] = domain
+
+        # force resolution to local nameserver
+        # add all vlan domains to search
         resolv = ["nameserver 127.0.0.1", "nameserver ::1"]
         domains = []
 
         named = _init_named(cfg)
+
         zone_dir = os.path.join(output_dir, "zones")
         os.mkdir(zone_dir)
 
-        # note walking interfaces then vlans in the interface's vswitch
+        # note walking interfaces, then vlans in the interface's vswitch
         # if an interface is not defined for a vswitch, its vlans
-        #  _will not_ be able to resolve DNS queries unless the router allows DNS
+        #  _will not_ be able to resolve DNS queries unless the router routes DNS queries correctly
         for iface in cfg["interfaces"]:
             if iface["ipv4_address"] == "dhcp":
                 raise KeyError("cannot configure DNS server with a DHCP ipv4 address")
@@ -47,18 +52,15 @@ class Dns(Role):
                 named["listen6"].append(str(iface["ipv6_address"]))
 
             for vlan in iface["vswitch"]["vlans"]:
-                if vlan["domain"] != "":
-                    domains.append(vlan["domain"])
+                # no domain => no dns
+                if vlan["domain"] == "":
+                    continue
 
-                    named["zones"].append(_create_zone(vlan["domain"], vlan, zone_dir))
-                    named["reverse_zones"].append(
-                        _create_reverse_zone(vlan["domain"], vlan["ipv4_subnet"], zone_dir))
-                    if vlan["ipv6_subnet"] is not None:
-                        named["reverse_zones6"].append(
-                            _create_reverse_zone(vlan["domain"], vlan["ipv6_subnet"], zone_dir))
+                domains.append(vlan["domain"])
 
-                named["internal_acl"].append(str(vlan["ipv4_subnet"]))
-                named["internal_acl6"].append(str(vlan["ipv6_subnet"]))
+                named["query_acl"].append(str(vlan["ipv4_subnet"]))
+                if vlan["ipv6_subnet"] is not None:
+                    named["query_acl6"].append(str(vlan["ipv6_subnet"]))
 
                 if vlan["allow_dns_update"]:
                     named["update_acl"].append(str(vlan["ipv4_subnet"]))
@@ -66,16 +68,14 @@ class Dns(Role):
                     if vlan["ipv6_subnet"] is not None:
                         named["update_acl6"].append(str(vlan["ipv6_subnet"]))
 
+                _configure_zones(cfg, vlan, named, zone_dir)
+
         if cfg["domain"] != "":
             # top level domain last in search order
             domains.append(cfg["domain"])
-
-            # allow forwarding of top level DNS queries; assume are configured by the registrar
-            named["zones"].insert(0, _create_zone(cfg["domain"], None, zone_dir, True))
-            # no reverse zone needed since requests will be forwarded
+            _configure_tld(cfg, named, zone_dir)
 
         _format_named(named)
-
         util.file.write("named.conf",
                         util.file.substitute("templates/dns/named.conf", named), output_dir)
 
@@ -98,8 +98,8 @@ def _init_named(cfg):
     named["zones"] = []
     named["reverse_zones"] = []
     named["reverse_zones6"] = []
-    named["internal_acl"] = ["127.0.0.1/32"]
-    named["internal_acl6"] = ["::1/128"]
+    named["query_acl"] = ["127.0.0.1/32"]
+    named["query_acl6"] = ["::1/128"]
     named["update_acl"] = ["127.0.0.1/32"]
     named["update_acl6"] = ["::1/128"]
     named["cache_size"] = "{:0.0f}".format(cfg["memory_mb"] / 4)
@@ -115,61 +115,128 @@ def _format_named(named):
     named["zones"] = "\n".join(named["zones"])
     named["reverse_zones"] = "\n".join(named["reverse_zones"])
     named["reverse_zones6"] = "\n".join(named["reverse_zones6"])
-    named["internal_acl"] = "\n".join(["\t" + val + ";" for val in named["internal_acl"]])
-    named["internal_acl6"] = "\n".join(["\t" + val + ";" for val in named["internal_acl6"]])
+    named["query_acl"] = "\n".join(["\t" + val + ";" for val in named["query_acl"]])
+    named["query_acl6"] = "\n".join(["\t" + val + ";" for val in named["query_acl6"]])
     named["update_acl"] = "\n".join(["\t" + val + ";" for val in named["update_acl"]])
     named["update_acl6"] = "\n".join(["\t" + val + ";" for val in named["update_acl6"]])
 
 
-def _create_zone(name, vlan, zone_dir, forward=False):
+def _configure_zones(cfg, vlan, named, zone_dir):
+    address = vlan["ipv4_subnet"].network_address
+    reverse = address.reverse_pointer
+
+    zone_name = vlan["domain"]
+    zone_file_name = zone_name + ".zone"
+    named["zones"].append(_zone_config(zone_name, zone_file_name))
+
+    # note one forward zone
+    # but, separate reverse zones for ipv4 and ipv6
+    _forward_zone_file(zone_name, cfg["dns_domain"], vlan, zone_file_name, zone_dir)
+
+    idx = _ipv4_reverse_idx(vlan)
+    reverse_zone_name = reverse[idx:]
+    reverse_zone_file_name = reverse_zone_name + ".zone"
+    named["reverse_zones"].append(_zone_config(reverse_zone_name, reverse_zone_file_name))
+
+    zone_file = [_ZONE_TEMPLATE.format(reverse_zone_name, cfg["dns_domain"])]
+
+    data = {"domain": vlan["domain"]}
+    for host in vlan["hosts"]:
+        if host["ipv4_address"] is None:
+            continue
+        data["hostname"] = host["hostname"]
+        data["reverse"] = host["ipv4_address"].reverse_pointer[:idx-1]
+        zone_file.append(_PTR.format_map(data))
+    zone_file.append("")  # ensure file ends with blank line
+
+    util.file.write(reverse_zone_file_name, "\n".join(zone_file), zone_dir)
+
+    if vlan["ipv6_subnet"] is not None:
+        address = vlan["ipv6_subnet"].network_address
+        reverse = address.reverse_pointer
+
+        idx = _ipv6_reverse_idx(vlan)
+        reverse_zone_name = reverse[idx:]
+        # use _ instead of : for filenames; remove trailing ::
+        reverse_zone_file_name = str(address).replace(":", "_").rstrip("_") + ".zone"
+        named["reverse_zones6"].append(_zone_config(reverse_zone_name, reverse_zone_file_name))
+
+        zone_file = [_ZONE_TEMPLATE.format(reverse_zone_name, cfg["dns_domain"])]
+
+        for host in vlan["hosts"]:
+            if host["ipv6_address"] is None:
+                continue
+            data["hostname"] = host["hostname"]
+            data["reverse"] = host["ipv6_address"].reverse_pointer[:idx-1]
+            zone_file.append(_PTR.format_map(data))
+        zone_file.append("")  # ensure file ends with blank line
+
+        util.file.write(reverse_zone_file_name, "\n".join(zone_file), zone_dir)
+
+
+def _zone_config(zone_name, zone_file, forward=False):
     zone = """zone "{0}" IN {{
 	type master;
-	file "{0}.zone";
+	file "{1}";
 """
-    # by default, do not forward internal names
+
+    # by default, do not forward internal names by removing all forwarders
     if not forward:
         zone += "\tforwarders {{}};\n"
 
-    zone += "}};"
+    zone += "}};\n"
 
-    zone_file = [_ZONE_TEMPLATE.format(name, name)]
-    # zone_file.append()
-    util.file.write(name + ".zone", "\n".join(zone_file), zone_dir)
-
-    return zone.format(name)
+    return zone.format(zone_name, zone_file)
 
 
-def _create_reverse_zone(domain, subnet, zone_dir):
-    zone = """zone "{0}" IN {{
-	type master;
-	file "{1}.zone";
-}};"""
+def _forward_zone_file(zone_name, dns_domain, vlan, zone_file_name, zone_dir):
+    zone_file = [_ZONE_TEMPLATE.format(zone_name, dns_domain)]
+    cnames = [""]
 
-    reverse = subnet.network_address.reverse_pointer
+    for host in vlan["hosts"]:
+        if host["ipv4_address"] is not None:
+            zone_file.append(_A.format_map(host))
+        if host["ipv6_address"] is not None:
+            zone_file.append(_AAAA.format_map(host))
 
-    if isinstance(subnet, ipaddress.IPv6Network):
-        # remove leading 0. from reverse, one for each hex digit
-        # note this _breaks_ for subnets not divisible by 4
-        reverse = reverse[int(subnet.prefixlen / 4) * 2:]
-        # use _ instead of : for filenames; remove trailing ::
-        filename = str(subnet.network_address).replace(":", "_").rstrip("_")
-    elif isinstance(subnet, ipaddress.IPv4Network):
-        # remove leading 0. from reverse and trailing .0 from filename, one for each octet
-        # note this _breaks_ for subnets other than 32, 24, 16 and 8
-        idx = int((32 - subnet.prefixlen) / 8) * 2
-        reverse = reverse[idx:]
-        filename = str(subnet.network_address)[:-idx]
-    else:
-        raise KeyError("invalid IP address type {}".format(type(subnet)))
+        data = {"fqdn": host["hostname"] + "." + vlan["domain"]}
+        for alias in host["aliases"]:
+            if alias == host["hostname"]:
+                continue  # no need for a CNAME if the hostname already matches
+            data["alias"] = alias
+            cnames.append(_CNAME.format_map(data))
 
-    util.file.write(filename + ".zone", _ZONE_TEMPLATE.format(reverse, domain), zone_dir)
+    zone_file.extend(cnames)
+    zone_file.append("")  # ensure file ends with blank line
 
-    # note, only creating a single zone
-    # make no effort to carve up fractional subnets (i.e. ipv4 /26 or ipv6 /62)
-    # into multiple zones as required by BIND given reverse arpa naming conventions
-    z = zone.format(reverse, filename)
-    print(z)
-    return z
+    util.file.write(zone_file_name, "\n".join(zone_file), zone_dir)
+
+
+def _configure_tld(cfg, named, zone_dir):
+    # forward top level DNS queries; assume these are configured by the registrar
+    # this is the first zone
+    named["zones"].insert(0, _zone_config(cfg["domain"], cfg["domain"] + ".zone", True))
+
+    zone_file = [_ZONE_TEMPLATE.format(cfg["domain"], cfg["dns_domain"])]
+    for role, fqdn in cfg["roles_to_hostnames"].items():
+        zone_file.append(_CNAME.format_map({"alias": role, "fqdn": fqdn}))
+    zone_file.append("")  # ensure file ends with blank line
+
+    util.file.write(cfg["domain"] + ".zone", "\n".join(zone_file), zone_dir)
+    # no reverse zone needed since requests will be forwarded
+
+
+def _ipv4_reverse_idx(vlan):
+    # remove leading 0. from reverse, one for each octet
+    # note this _breaks_ for subnets other than 32, 24, 16 and 8, but
+    # bind would need subzones for that anyway
+    return int((32 - vlan["ipv4_subnet"].prefixlen) / 8) * 2
+
+
+def _ipv6_reverse_idx(vlan):
+    # remove leading 0.'s from reverse, one for each hex digit
+    # note this _breaks_ for subnets not divisible by 4
+    return int(vlan["ipv6_subnet"].prefixlen / 4) * 2
 
 
 _ZONE_TEMPLATE = """$ORIGIN {0}.
@@ -185,3 +252,8 @@ $TTL 1D
 
 	IN	NS	dns.{1}.
 """
+
+_A = "{hostname}\tIN\tA\t{ipv4_address}"
+_AAAA = "{hostname}\tIN\tAAAA\t{ipv6_address}"
+_CNAME = "{alias}\tIN\tCNAME\t{fqdn}."
+_PTR = "{reverse}\tIN\tPTR\t{hostname}.{domain}."

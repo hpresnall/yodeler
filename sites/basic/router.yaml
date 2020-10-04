@@ -1,4 +1,5 @@
 motd: "hello, I am a minimal Alpine router VM"
+primary_domain: infra.example.com
 memory_mb: 256
 uplink:
   ipv4_address: dhcp
