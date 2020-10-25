@@ -21,6 +21,10 @@ def load_all_configs(sites_dir, site_name):
     _logger.info("processing hosts for site '%s'", site_name)
 
     host_cfgs = {}
+    role_fqdn = {}  # map roles to fully qualified domain names
+
+    roles = set()
+
     for path in os.listdir(sites_dir):
         if path == "site.yaml":
             continue
@@ -28,9 +32,21 @@ def load_all_configs(sites_dir, site_name):
         host_cfg = _load_host_config(site_cfg, path)
         host_cfgs[host_cfg["hostname"]] = host_cfg
 
-    _configure_hosts(host_cfgs)
-    _confgure_role_mapping(host_cfgs)
-    _confgure_router_hosts(host_cfgs)
+        _configure_dns(host_cfg)
+        _map_role_to_fqdn(host_cfg, role_fqdn)
+
+        for role in host_cfg["roles"]:
+            if (role.name != "common") and (role.name in roles):
+                raise Exception(f"cannot redefine role {role.name} in {host_cfg['hostname']}")
+            roles.add(role.name)
+
+            if role.name == "router":
+                _confgure_router_hosts(host_cfg)
+
+    required_roles = {"vmhost", "dns", "router"}
+    for role in required_roles:
+        if role not in roles:
+            raise Exception(f"required role {role} not defined for site {site_cfg['site']}")
 
     return host_cfgs
 
@@ -48,62 +64,53 @@ def _load_host_config(site_cfg, host_path):
     return host_cfg
 
 
-def _configure_hosts(host_cfgs):
-    # collect all the host information for DNS
+def _configure_dns(cfg):
+    # add hostname information for DNS
     # assume site config and vswitch & vlan objects are shared by all configs
-    for cfg in host_cfgs.values():
-        for iface in cfg["interfaces"]:
-            vlan = iface["vlan"]
+    for iface in cfg["interfaces"]:
+        vlan = iface["vlan"]
 
-            # no domain name => no DNS
-            if vlan["domain"] == "":
-                continue
-
-            vlan["hosts"].append({
-                "hostname": cfg["hostname"],
-                "ipv4_address": iface["ipv4_address"],
-                "ipv6_address": iface["ipv6_address"],
-                "mac_address": None,
-                "aliases": [role.name for role in cfg["roles"] if role.name != "common"]})
-
-
-def _confgure_role_mapping(host_cfgs):
-    # map roles to fully qualified domain names
-    # used by DNS to configure the top-level domain
-    roles = {}
-    for cfg in host_cfgs.values():
-        if cfg["primary_domain"] == "":
+        # no domain name => no DNS
+        if vlan["domain"] == "":
             continue
 
-        fqdn = cfg["hostname"] + "." + cfg["primary_domain"]
-
-        for role in cfg["roles"]:
-            if role.name == "common":
-                continue
-            if role.name == "dns":
-                # only set on the DNS server
-                cfg["roles_to_hostnames"] = roles
-
-            roles[role.name] = fqdn
+        vlan["hosts"].append({
+            "hostname": cfg["hostname"],
+            "ipv4_address": iface["ipv4_address"],
+            "ipv6_address": iface["ipv6_address"],
+            "mac_address": None,
+            "aliases": [role.name for role in cfg["roles"] if role.name != "common"]})
 
 
-def _confgure_router_hosts(host_cfgs):
+def _map_role_to_fqdn(cfg, role_fqdn):
+    # map roles to fully qualified domain names
+    # used by DNS to configure the top-level domain
+    cfg["roles_to_hostnames"] = role_fqdn
+
+    if cfg["primary_domain"] == "":
+        return
+
+    fqdn = cfg["hostname"] + "." + cfg["primary_domain"]
+
+    for role in cfg["roles"]:
+        if role.name == "common":
+            continue
+
+        role_fqdn[role.name] = fqdn
+
+
+def _confgure_router_hosts(cfg):
     # manually add host entries for router interfaces since they are defined automatically
     # assume site config and vswitch & vlan objects are shared by all configs
-    for cfg in host_cfgs.values():
-        for role in cfg["roles"]:
-            if role.name != "router":
-                continue
-            for vswitch in cfg["vswitches"].values():
-                for vlan in vswitch["vlans"]:
-                    if vlan["routable"]:
-                        vlan["hosts"].append({
-                            "hostname": cfg["hostname"],
-                            "ipv4_address": vlan["ipv4_subnet"].network_address + 1,
-                            "ipv6_address": vlan["ipv6_subnet"].network_address + 1,
-                            "mac_address": None,
-                            "aliases": ["router"]})
-            return
+    for vswitch in cfg["vswitches"].values():
+        for vlan in vswitch["vlans"]:
+            if vlan["routable"]:
+                vlan["hosts"].append({
+                    "hostname": cfg["hostname"],
+                    "ipv4_address": vlan["ipv4_subnet"].network_address + 1,
+                    "ipv6_address": vlan["ipv6_subnet"].network_address + 1,
+                    "mac_address": None,
+                    "aliases": ["router"]})
 
 
 def create_scripts_for_host(cfg, output_dir):
