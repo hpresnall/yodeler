@@ -22,11 +22,11 @@ class Dns(Role):
         if len(cfg["external_dns"]) == 0:
             raise KeyError("cannot configure DNS server with no external_dns addresses defined")
 
-        domain = cfg["domain"]
+        domain = cfg["primary_domain"]
         if domain == "":
-            domain = cfg["primary_domain"]
+            domain = cfg["domain"]
             if domain == "":
-                raise KeyError(("cannot configure DNS server; "
+                raise KeyError(("cannot configure DNS server "
                                 "with no primary_domain or top-level site domain"))
         cfg["dns_domain"] = domain
 
@@ -133,9 +133,9 @@ def _configure_zones(cfg, vlan, named, zone_dir):
     # but, separate reverse zones for ipv4 and ipv6
     _forward_zone_file(zone_name, cfg["dns_domain"], vlan, zone_file_name, zone_dir)
 
-    idx = _ipv4_reverse_idx(vlan)
-    reverse_zone_name = reverse[idx:]
-    reverse_zone_file_name = reverse_zone_name + ".zone"
+    reverse_zone_name = _ipv4_reverse_zone_name(vlan)
+    # drop in-addr.arpa from end
+    reverse_zone_file_name = reverse_zone_name[:-13] + ".zone"
     named["reverse_zones"].append(_zone_config(reverse_zone_name, reverse_zone_file_name))
 
     zone_file = [_ZONE_TEMPLATE.format(reverse_zone_name, cfg["dns_domain"])]
@@ -145,8 +145,10 @@ def _configure_zones(cfg, vlan, named, zone_dir):
         if host["ipv4_address"] is None:
             continue
         data["hostname"] = host["hostname"]
-        data["reverse"] = host["ipv4_address"].reverse_pointer[:idx-1]
+        rptr = host["ipv4_address"].reverse_pointer
+        data["reverse"] = rptr[:rptr.index(".")]
         zone_file.append(_PTR.format_map(data))
+
     zone_file.append("")  # ensure file ends with blank line
 
     util.file.write(reverse_zone_file_name, "\n".join(zone_file), zone_dir)
@@ -155,10 +157,13 @@ def _configure_zones(cfg, vlan, named, zone_dir):
         address = vlan["ipv6_subnet"].network_address
         reverse = address.reverse_pointer
 
-        idx = _ipv6_reverse_idx(vlan)
+        # remove leading 0:'s from reverse, one for each hex digit
+        # note this _breaks_ for subnets not divisible by 4
+        idx = int(vlan["ipv6_subnet"].prefixlen / 4) * 2
         reverse_zone_name = reverse[idx:]
         # use _ instead of : for filenames; remove trailing ::
-        reverse_zone_file_name = str(address).replace(":", "_").rstrip("_") + ".zone"
+        # [::-1] to reverse string
+        reverse_zone_file_name = str(address).replace(":", "_").rstrip("_")[::-1] + ".zone"
         named["reverse_zones6"].append(_zone_config(reverse_zone_name, reverse_zone_file_name))
 
         zone_file = [_ZONE_TEMPLATE.format(reverse_zone_name, cfg["dns_domain"])]
@@ -226,17 +231,24 @@ def _configure_tld(cfg, named, zone_dir):
     # no reverse zone needed since requests will be forwarded
 
 
-def _ipv4_reverse_idx(vlan):
+def _ipv4_reverse_zone_name(vlan):
+    parts = vlan["ipv4_subnet"].network_address.reverse_pointer.split(".")
+    length = vlan["ipv4_subnet"].prefixlen
+
+    # drop leading 0s based on prefixlen
+    if length == 8:
+        return ".".join(parts[3:])
+    elif length == 16:
+        return ".".join(parts[2:])
+    elif length == 24:
+        return ".".join(parts[1:])
+    else:
+        raise Exception(f"invalid subnet {vlan['ipv4_subnet']} for vlan {vlan['id']}")
+
     # remove leading 0. from reverse, one for each octet
     # note this _breaks_ for subnets other than 32, 24, 16 and 8, but
     # bind would need subzones for that anyway
     return int((32 - vlan["ipv4_subnet"].prefixlen) / 8) * 2
-
-
-def _ipv6_reverse_idx(vlan):
-    # remove leading 0.'s from reverse, one for each hex digit
-    # note this _breaks_ for subnets not divisible by 4
-    return int(vlan["ipv6_subnet"].prefixlen / 4) * 2
 
 
 _ZONE_TEMPLATE = """$ORIGIN {0}.
