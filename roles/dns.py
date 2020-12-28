@@ -9,7 +9,7 @@ from roles.role import Role
 
 
 class Dns(Role):
-    """Dns defines the configuration needed to setup BUND9 DNS."""
+    """Dns defines the configuration needed to setup BIND9 DNS."""
 
     def __init__(self):
         super().__init__("dns")

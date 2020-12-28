@@ -14,9 +14,11 @@ class TestSetup(unittest.TestCase):
     def test_load_all_configs(self):
         host_cfgs = setup.load_all_configs(os.path.join(self._base_path, "sites"), "test")
 
-        self.assertEqual(2, len(host_cfgs))
+        self.assertEqual(4, len(host_cfgs))
         self.assertIn("server", host_cfgs.keys())
         self.assertIn("vmhost", host_cfgs.keys())
+        self.assertIn("dns", host_cfgs.keys())
+        self.assertIn("router", host_cfgs.keys())
 
     def test_create_scripts_for_host(self):
         with tempfile.TemporaryDirectory() as config_dir:
@@ -28,11 +30,13 @@ class TestSetup(unittest.TestCase):
 
                 host_dir = os.path.join(config_dir, hostname)
                 self.assertTrue(os.path.isdir(host_dir))
-                self.assertTrue(os.path.isdir(os.path.join(host_dir, "awall")))
 
                 required_files = ["setup.sh", "common.sh", "hosts", "interfaces", "dhclient.conf",
                                   "chrony.conf", "packages"]
-                required_dirs = ["awall"]
+                required_dirs = []
+
+                if host_cfg["local_firewall"]:
+                    required_dirs.append("awall")
 
                 if host_cfg["is_vm"]:
                     required_files.extend(["create_vm.sh",

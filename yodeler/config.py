@@ -141,12 +141,12 @@ def _validate_config(cfg):
         try:
             ipaddress.ip_address(dns)
         except:
-            raise KeyError(f"invalid local_dns IP address {dns}")
+            raise KeyError(f"invalid local_dns IP address {dns}") from None
     for dns in cfg["external_dns"]:
         try:
             ipaddress.ip_address(dns)
         except:
-            raise KeyError(f"invalid external_dns IP address {dns}")
+            raise KeyError(f"invalid external_dns IP address {dns}") from None
 
 
 def _configure_roles(cfg):
@@ -187,7 +187,7 @@ def _configure_packages(cfg):
      # remove iptables if there is no local firewall
     if not cfg["local_firewall"]:
         cfg["remove_packages"] |= {"iptables", "ip6tables"}
-        cfg["packages"].remove("awall")
+        cfg["packages"].discard("awall")
 
     # VMs are setup without USB, so remove the library
     if cfg["is_vm"]:

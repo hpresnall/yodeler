@@ -14,7 +14,7 @@ def validate(cfg):
         for role in cfg["roles"]:
             if role.name == "router":
                 cfg["interfaces"] = []
-                return # router role defines all required interfaces
+                return  # router role defines all required interfaces
         raise KeyError("no interfaces defined")
 
     vswitches = cfg["vswitches"]
@@ -33,7 +33,7 @@ def validate(cfg):
             validate_iface(iface)
         except KeyError as err:
             msg = err.args[0]
-            raise KeyError(f"{msg} for interface {i}: {iface}")
+            raise KeyError(f"{msg} for interface {i}: {iface['name']}") from err
 
         # host's primary domain, if set, should match one vlan
         vlan = iface["vlan"]
@@ -86,8 +86,8 @@ def validate_iface(iface):
                 raise KeyError("ipv4_subnet must be set when using static ipv4_address")
             try:
                 ipaddress.ip_network(iface["ipv4_subnet"])
-            except:
-                raise KeyError("invalid ipv4_subnet")
+            except Exception as exp:
+                raise KeyError("invalid ipv4_subnet") from exp
 
     # ipv6 disabled at vlan level of interface level => ignore address
     ipv6_disable = (vlan["ipv6_disable"] or iface.get("ipv6_disable")
@@ -112,7 +112,7 @@ def validate_iface(iface):
                 try:
                     ipaddress.ip_network(iface["ipv6_subnet"])
                 except:
-                    raise KeyError("invalid ipv6_subnet defined")
+                    raise KeyError("invalid ipv6_subnet defined") from None
         else:
             iface["ipv6_address"] = None
 
@@ -120,13 +120,14 @@ def validate_iface(iface):
         _check_value(iface, "privext", 2)
         _check_value(iface, "accept_ra", 1)
 
+
 def _validate_ipaddress(iface, ip_version):
     key = ip_version + "_address"
     try:
         value = iface.get(key)
         iface[key] = address = ipaddress.ip_address(value)
-    except:
-        raise KeyError(f"invalid {key} {value}")
+    except Exception as exp:
+        raise KeyError(f"invalid {key} {value}") from exp
 
     subnet = iface['vlan'][ip_version + "_subnet"]
 
@@ -150,11 +151,11 @@ def _check_value(iface, key, max_val):
     try:
         value = int(iface.get(key, max_val))
     except ValueError:
-        raise KeyError(f"invalid {key}; it must be a number")
+        raise KeyError(f"invalid {key}; it must be a number") from None
 
     if value < 0:
-        raise KeyError(f"invalid {key}; it must be positive")
+        raise KeyError(f"invalid {key}; it must be positive") from None
     if value > max_val:
-        raise KeyError(f"invalid {key}; it must be < {max_val}")
+        raise KeyError(f"invalid {key}; it must be < {max_val}") from None
 
     iface[key] = value

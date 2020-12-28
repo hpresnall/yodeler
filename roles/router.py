@@ -48,7 +48,8 @@ class Router(Role):
         # uplink can be an existing vswitch or a physical iface on the host via macvtap
         if "vswitch" in uplink:
             yodeler.interface.validate_network(uplink, cfg["vswitches"])
-            uplink_xml = _vswitch_uplink(cfg, uplink["vswitch"], uplink.get("vlan"))
+            iface = {"vswitch": uplink["vswitch"], "vlan": uplink["vlan"]}
+            uplink_xml = util.libvirt.interface_from_config(cfg["hostname"], iface)
         elif "macvtap" in uplink:
             uplink_xml = util.libvirt.macvtap_interface(cfg, uplink["macvtap"])
         else:
@@ -81,21 +82,6 @@ class Router(Role):
             util.libvirt.update_interfaces(cfg['hostname'], libvirt_interfaces, output_dir)
 
         return [_configure_shorewall(cfg, shorewall, output_dir)]
-
-
-def _vswitch_uplink(cfg, vswitch, vlan):
-    if vswitch not in cfg["vswitches"]:
-        raise KeyError(f"invalid router uplink; vswitch {vswitch} does not exist")
-
-    vswitch = cfg["vswitches"][vswitch]
-
-    try:
-        vlan = yodeler.vlan.lookup(vlan, vswitch)
-    except KeyError as err:
-        msg = err.args[0]
-        raise KeyError(f"invalid router uplink; {msg}")
-
-    return util.libvirt.interface_from_config(cfg["hostname"], {"vswitch": vswitch, "vlan": vlan})
 
 
 def _configure_vlans(vswitch, iface_name, shorewall):

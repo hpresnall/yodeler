@@ -1,17 +1,14 @@
-hostname: server
+hostname: vmhost
 is_vm: False
-motd: server
+motd: vmhost
 interfaces:
   - ipv4_address: 192.168.1.2
     ipv6_address: 2001:db8:0:1::5
     vswitch: public
-    firewall_zone: PUB
-    vlan: 10
   - ipv4_address: 192.168.2.2
     ipv6_address:
     vswitch: private
-    firewall_zone: PRIV
-roles: [ vmhost ]
+roles: [vmhost]
 initial_interfaces:
   - name: eth0
     ipv4_address: dhcp

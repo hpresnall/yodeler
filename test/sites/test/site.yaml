@@ -2,6 +2,7 @@ site: test_site
 public_ssh_key: ssh
 packages: [ "both_need", "site_needs"]
 remove_packages: ["both_remove", "server_needs"]
+domain: site.example
 vswitches:
   - name: public
     uplink: eth0
