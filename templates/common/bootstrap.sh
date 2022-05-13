@@ -16,9 +16,9 @@ ln -s /root/apk_cache $$INSTALL/etc/apk/cache
 
 # place contents of apk_cache from previous install parallel to yodeler dir
 # to avoid extra networking traffic on re-setup
-if [ -d "$$DIR/../../../apk_cache" ]; then
+if [ -d "$$DIR/../../apk_cache" ]; then
   echo "Copying existing APK cache dir to installed system"
-  cp -R $$DIR/../../../apk_cache $$INSTALL/root/apk_cache
+  cp -R $$DIR/../../apk_cache/* $$INSTALL/root/apk_cache
 fi
 
 # run setup after reboot

@@ -35,9 +35,6 @@ class VmHost(Role):
         # for doing the rest of the config
         _configure_libvirt(cfg, output_dir)
 
-        # patch alpine-make-vm-image to use apk_cache
-        shutil.copyfile("templates/vmhost/cache.patch", os.path.join(output_dir, "cache.patch"))
-
         _configure_initial_network(cfg, output_dir)
 
         # note bootstrap and locald_setup are _separate_ scripts run outside of setup.sh

@@ -24,5 +24,3 @@ rc-update add dbus
 cd /home/$USER
 git clone https://github.com/alpinelinux/alpine-make-vm-image.git
 chown -R $USER:$USER alpine-make-vm-image
-cd alpine-make-vm-image
-git apply $$DIR/cache.patch

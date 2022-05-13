@@ -5,7 +5,7 @@ apk -q del $REMOVE_PACKAGES_STR
 echo "$MOTD" > /etc/motd
 setup-timezone -z $TIMEZONE
 setup-keymap $KEYMAP
-mv /etc/profile.d/color_prompt /etc/profile.d/color_prompt.sh
+mv /etc/profile.d/color_prompt.sh.disabled /etc/profile.d/color_prompt.sh
 echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/wheel
 rootinstall $$DIR/chrony.conf /etc/chrony
 sed -i -e "s/umask 022/umask 027/g" /etc/profile
@@ -60,6 +60,9 @@ fi
 # Busybox's udhcpc does not work with Debian's ifup / ifdown, so remove it
 rm /sbin/udhcpc
 rm /sbin/udhcpc6
+
+# fix options for the ifquery call in the networking service
+sed -i -e "s/--auto//g" /etc/init.d/networking
 
 # link dhclient to a location ifup can find it
 ln -s /usr/sbin/dhclient /sbin/dhclient

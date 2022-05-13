@@ -11,7 +11,7 @@ interfaces:
     vswitch: private
     firewall_zone: PRIV
 # before the router is configured, the final interfaces config will not work
-# use this instead for inital intallation and configuration
+# use this instead for inital installation and configuration
 initial_interfaces:
   - name: eth0
     ipv4_address: dhcp

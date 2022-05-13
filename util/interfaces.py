@@ -1,7 +1,7 @@
 """Utility functions for creating /etc/network/interfaces.
 
 Files created by this module are usable by Debian's ifupdown package.
-It _will not_ be usable by the Alpine default BusyBox ifupdown."""
+It _will not_ be usable by the Alpine's default BusyBox ifupdown."""
 
 
 def loopback():
