@@ -18,7 +18,7 @@ class ShellScript():
 
         self.name = name
 
-        shell_header = """#!/bin/sh\n"""
+        shell_header = """#!/bin/sh\nset -o errexit\n"""
 
         self._script_fragments = [shell_header]
 

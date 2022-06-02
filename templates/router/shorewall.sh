@@ -31,10 +31,6 @@ chown root:wheel /var/log/firewall
 chmod 640 /var/log/firewall
 
 # configure dhcrelay and add IPv6 service
-# user and group needed for pid files
-addgroup -S dhcp
-adduser -h /var/lib/dhcp -s /sbin/nologin -S -D -G dhcp dhcp
-
 cp /etc/conf.d/dhcrelay /etc/conf.d/dhcrelay6
 echo 'DHCRELAY_OPTS="-6"' >> /etc/conf.d/dhcrelay6
 sed -e "s/-i/-l/g" -e "s/dhcrelay/dhcrelay6/g" -e "s|sbin/dhcrelay6|sbin/dhcrelay|g" /etc/init.d/dhcrelay > /etc/init.d/dhcrelay6
@@ -53,7 +49,5 @@ rc-update add shorewall boot
 rc-update add shorewall6 boot
 rc-update add ulogd boot
 
-rc-update del dhcrelay sysinit
-rc-update del dhcrelay6 sysinit
 rc-update add dhcrelay default
 rc-update add dhcrelay6 default

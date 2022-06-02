@@ -28,11 +28,10 @@ class Common(Role):
         common.append("echo \"Running common config\"")
         common.append("")
 
-        common.append(_setup_repos(cfg))
-
         if not cfg["is_vm"]:
             # for physical servers, add packages manually
             # VMs will have packages installed as part of image creation
+            common.append(_setup_repos(cfg))
             common.append("# install necessary packages")
             common.append("apk -q update")
             common.append("apk -q add $(cat $DIR/packages)")
@@ -72,6 +71,7 @@ class Common(Role):
 
 
 def _setup_repos(cfg):
+    # TODO create repos file for VM outside of VM and pass into alpine-make-vm-image
     repos = cfg["alpine_repositories"]
     buffer = []
 
@@ -128,17 +128,6 @@ def _create_bootstrap(cfg, output_dir):
     bootstrap.append_self_dir()
     bootstrap.substitute("templates/common/bootstrap.sh", cfg)
     bootstrap.write_file(output_dir)
-
-    # create local.d file that runs setup on first reboot after Alpine install
-    setup = util.shell.ShellScript("setup.start")
-    setup.setup_logging(cfg["hostname"])
-
-    # add contents of locald_setup.sh for each role
-    for role in cfg["roles"]:
-        path = os.path.join("templates", role.name, "locald_setup.sh")
-        if os.path.exists(path) and os.path.isfile(path):
-            setup.substitute(path, cfg)
-    setup.write_file(output_dir)
 
 
 def _create_vm_script(cfg, output_dir):

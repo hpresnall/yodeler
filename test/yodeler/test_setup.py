@@ -47,12 +47,7 @@ class TestSetup(unittest.TestCase):
                 else:
                     required_files.extend(["bootstrap.sh",
                                            "install_alpine.sh",
-                                           "answerfile",
-                                           "setup.start",
-                                           "finalize_network.sh",
-                                           "interfaces.final",
-                                           "resolv.conf.final"])
-                    required_dirs.append("awall.final")
+                                           "answerfile"])
 
                 for path in required_files:
                     self.assertTrue(

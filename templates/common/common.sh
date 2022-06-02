@@ -1,3 +1,6 @@
+# configure new repos
+apk update
+
 # delete unneeded packages
 apk -q del $REMOVE_PACKAGES_STR
 

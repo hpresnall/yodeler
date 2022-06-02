@@ -31,19 +31,13 @@ class VmHost(Role):
         scripts.append(_setup_open_vswitch(cfg, output_dir))
         scripts.append(_setup_libvirt(cfg, output_dir))
 
-        # libvirt cannot be started by locald, so create a 2nd locald script
-        # for doing the rest of the config
-        _configure_libvirt(cfg, output_dir)
-
-        _configure_initial_network(cfg, output_dir)
-
-        # note bootstrap and locald_setup are _separate_ scripts run outside of setup.sh
+#        _configure_initial_network(cfg, output_dir)
         return scripts
 
 
 def _setup_open_vswitch(cfg, output_dir):
     shell = util.shell.ShellScript("openvswitch.sh")
-    shell.append(_SETUP_OVS)
+    shell.substitute("templates/vmhost/openvswitch.sh", cfg)
 
     # create new entries in /etc/network/interfaces for each switch
     vswitch_interfaces = []
@@ -163,17 +157,8 @@ def _reconfigure_interfaces(shell, cfg, output_dir):
 
 def _setup_libvirt(cfg, output_dir):
     shell = util.shell.ShellScript("libvirt.sh")
+    #shell.setup_logging(cfg["hostname"])
     shell.substitute("templates/vmhost/libvirt.sh", cfg)
-    shell.write_file(output_dir)
-
-    return shell.name
-
-
-# actions to run _after_ libvirtd is started
-def _configure_libvirt(cfg, output_dir):
-    shell = util.shell.ShellScript("libvirt.start")
-    shell.setup_logging(cfg["hostname"])
-    shell.substitute("templates/vmhost/locald_libvirt.sh", cfg)
 
     # for each vswitch, create an XML network definition
     for vswitch in cfg["vswitches"].values():
@@ -230,90 +215,6 @@ def _configure_libvirt(cfg, output_dir):
         shell.append(f"virsh net-autostart {name}")
         shell.append("")
 
-    shell.append("# remove from local.d so setup is only run once")
-
     shell.write_file(output_dir)
 
-
-def _configure_initial_network(cfg, output_dir):
-    if "initial_interfaces" not in cfg:
-        return
-
-    # move final config
-    shutil.move(os.path.join(output_dir, "awall"),
-                os.path.join(output_dir, "awall.final"))
-    shutil.move(os.path.join(output_dir, "interfaces"),
-                os.path.join(output_dir, "interfaces.final"))
-    shutil.move(os.path.join(output_dir, "resolv.conf"),
-                os.path.join(output_dir, "resolv.conf.final"))
-
-    # create interfaces for initial setup
-    initial_interfaces = cfg["initial_interfaces"]
-    names = set()
-
-    for i, iface in enumerate(initial_interfaces):
-        # usual configuration numbers ifaces by array order
-        # initial config may not use all ifaces, so name must be specified
-        # to ignore ordering
-        if "name" not in iface:
-            raise KeyError(f"name not defined for initial interface {i}: {iface}")
-
-        if iface["name"] in names:
-            raise KeyError(f"duplicate name defined for initial interface {i}: {iface}")
-        names.add(iface["name"])
-
-        try:
-            if "vswitch" in iface:
-                yodeler.interface.validate_network(iface, cfg["vswitches"])
-            yodeler.interface.validate_iface(iface)
-        except KeyError as err:
-            msg = err.args[0]
-            raise KeyError(f"{msg} for initial_interface {i}: {iface}")
-
-        iface["firewall_zone"] = "initial_" + iface["name"]
-
-    # script to switch network to final configuration
-    shell = util.shell.ShellScript("finalize_network.sh")
-    shell.append_self_dir()
-    shell.append_rootinstall()
-    shell.setup_logging(cfg["hostname"])
-    shell.substitute("templates/vmhost/finalize_network.sh", cfg)
-    # create initial awall config, but write to final network config
-    # the commands should be the same, so double duty is ok here
-    shell.append(util.awall.configure(initial_interfaces, cfg["roles"], output_dir, False))
-    shell.append("")
-    shell.append("rc-service iptables start")
-    shell.append("rc-service ip6tables start")
-    shell.append("rc-service networking start")
-    shell.write_file(output_dir)
-
-    # also add original interface unless
-    # DHCP since that will hang boot if it cannot get an IP address
-    kept_interfaces = [iface for iface in cfg["interfaces"]
-                       if (iface["ipv4_address"] != ["dhcp"])
-                       and not iface["ipv6_dhcp"] and (iface["name"] not in names)]
-
-    interfaces = [util.interfaces.loopback()]
-    interfaces.extend(cfg["vmhost_interfaces"])
-    interfaces.append(util.interfaces.from_config(kept_interfaces))
-    interfaces.append(util.interfaces.from_config(cfg["initial_interfaces"]))
-
-    util.file.write("interfaces", "\n".join(interfaces), output_dir)
-
-    util.resolv.create_conf(initial_interfaces, cfg["primary_domain"], cfg["domain"],
-                            cfg["local_dns"], cfg["external_dns"], output_dir)
-
-
-_SETUP_OVS = """echo "Configuring OpenVSwitch"
-
-rc-update add ovs-modules boot
-rc-update add ovsdb-server boot
-rc-update add ovs-vswitchd boot
-
-echo tun >> /etc/modules
-
-# run now
-rc-service ovs-modules start
-rc-service ovsdb-server start
-rc-service ovs-vswitchd start
-"""
+    return shell.name

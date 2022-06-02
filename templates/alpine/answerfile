@@ -12,8 +12,8 @@ HOSTNAMEOPTS="-n $HOSTNAME"
 INTERFACESOPTS="$INSTALL_INTERFACES"
 DNSOPTS="-n $EXTERNAL_DNS_STR"
 
-# add user to wheel and install SSH key in setup-user
-USEROPTS="-a -k \"$PUBLIC_SSH_KEY\" $USER"
+# add user to wheel and setup doas
+USEROPTS="-a $USER"
 
 # install system to $ROOT_DEV
 export DISKLABEL=gpt
