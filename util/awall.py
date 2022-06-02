@@ -61,7 +61,7 @@ def configure(interfaces, roles, output_dir, before_install=True):
     buffer.append("")
     buffer.append("# create iptables rules and apply at boot")
     buffer.append("awall translate -o /tmp")
-    buffer.append("rm /etc/iptables/*")
+    buffer.append("rm -f /etc/iptables/*")
     buffer.append("rootinstall /tmp/rules-save /tmp/rules6-save /etc/iptables")
 
     if before_install:

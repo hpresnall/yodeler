@@ -6,11 +6,14 @@ PROXYOPTS=none
 
 KEYMAPOPTS="$KEYMAP"
 TIMEZONEOPTS="-z $TIMEZONE"
-SSHDOPTS="-c openssh"
+SSHDOPTS="-k none openssh"
 NTPOPTS="-c chrony"
 HOSTNAMEOPTS="-n $HOSTNAME"
 INTERFACESOPTS="$INSTALL_INTERFACES"
 DNSOPTS="-n $EXTERNAL_DNS_STR"
+
+# add user to wheel and install SSH key in setup-user
+USEROPTS="-a -k \"$PUBLIC_SSH_KEY\" $USER"
 
 # install system to $ROOT_DEV
 export DISKLABEL=gpt

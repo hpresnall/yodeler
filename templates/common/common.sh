@@ -6,33 +6,28 @@ echo "$MOTD" > /etc/motd
 setup-timezone -z $TIMEZONE
 setup-keymap $KEYMAP
 mv /etc/profile.d/color_prompt.sh.disabled /etc/profile.d/color_prompt.sh
-echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/wheel
 rootinstall $$DIR/chrony.conf /etc/chrony
 sed -i -e "s/umask 022/umask 027/g" /etc/profile
 
-# add basic services
-rc-update add networking boot
-rc-update add sshd default
-rc-update add chronyd default
-rc-update add acpid default
-
 if [ "$IS_VM" = "False" ]; then
   rc-update add cpufreqd default
+  # user will be configured by Alpine setup
+else
+  # create user and allow doas
+  adduser -D $USER
+  addgroup $USER wheel
+  echo "permit persist :wheel" >> /etc/doas.d/doas.conf
+  echo "doas su -" > /home/$USER/.ash_history
 fi
 
-# create user and allow sudo
-adduser -D $USER
-addgroup $USER wheel
 echo "$USER:$PASSWORD" | chpasswd
-echo "sudo su -" > /home/$USER/.ash_history
 
-# setup ssh
-mkdir /home/$USER/.ssh
+# setup SSH
+mkdir -p /home/$USER/.ssh
 chmod 700 /home/$USER/.ssh
-chown $USER:$USER /home/$USER/.ssh
 echo "$PUBLIC_SSH_KEY" > /home/$USER/.ssh/authorized_keys
 chmod 600 /home/$USER/.ssh/authorized_keys
-chown $USER:$USER /home/$USER/.ssh/authorized_keys
+chown -R $USER:$USER /home/$USER/.ssh
 
 if [ "$INSTALL_PRIVATE_SSH_KEY" = "True" ]; then
     echo "Host=*
@@ -40,6 +35,7 @@ User=$USER
 IdentityFile=~/.ssh/$USER" > /home/$USER/.ssh/config
 
     echo "$PRIVATE_SSH_KEY" > /home/$USER/.ssh/$USER
+    chmod 600 /home/$USER/.ssh/$USER
 fi
 
 # remove root password and SSH access
@@ -57,12 +53,9 @@ if [ -f $$DIR/resolv.conf ]; then
   rootinstall $$DIR/resolv.conf /etc
 fi
 
-# Busybox's udhcpc does not work with Debian's ifup / ifdown, so remove it
-rm /sbin/udhcpc
-rm /sbin/udhcpc6
-
-# fix options for the ifquery call in the networking service
-sed -i -e "s/--auto//g" /etc/init.d/networking
+# Busybox's udhcpc does not work with ifupdown-ng, so remove it
+rm -f /sbin/udhcpc
+rm -f /usr/bin/udhcpc6
 
 # link dhclient to a location ifup can find it
 ln -s /usr/sbin/dhclient /sbin/dhclient
@@ -76,7 +69,7 @@ chmod +x /etc/profile.d/aliases.sh
 
 # cleanup TTYs
 if [ "$IS_VM" = "True" ]; then
-  # all TTYs on VMs; faster boot
+  # no TTYs on VMs; faster boot
   sed -i -E "s/^tty([1-6])/\#tty\1/g" /etc/inittab
   sed -i -e "s/TIMEOUT 30/TIMEOUT 10/g" /boot/extlinux.conf
 else

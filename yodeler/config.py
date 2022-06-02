@@ -208,7 +208,7 @@ def _configure_packages(cfg):
 _REQUIRED_PROPERTIES = ["site", "hostname", "public_ssh_key"]
 
 # accessible for testing
-DEFAULT_PACKAGES = {"acpi", "sudo", "openssh", "chrony", "awall", "dhclient"}
+DEFAULT_PACKAGES = {"acpi", "doas", "openssh", "chrony", "awall", "dhclient"}
 DEFAULT_CONFIG = {
     "is_vm": True,
     "vcpus": 1,

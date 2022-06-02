@@ -18,8 +18,8 @@ class Common(Role):
         super().__init__("common")
 
     def additional_packages(self):
-        # use Debian's better ifupdown and the Linux ip command, instead of Busybox's built-ins
-        return {"ifupdown", "iproute2"}
+        # use better ifupdown-ng  and the Linux ip command, instead of Busybox's built-ins
+        return {"ifupdown-ng", "iproute2"}
 
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""

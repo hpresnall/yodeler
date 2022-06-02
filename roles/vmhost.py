@@ -317,8 +317,4 @@ echo tun >> /etc/modules
 rc-service ovs-modules start
 rc-service ovsdb-server start
 rc-service ovs-vswitchd start
-
-modprobe tun
-
-# rc-service networking stop
 """
