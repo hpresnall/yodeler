@@ -1,6 +1,7 @@
 motd: "hello, I am a KVM host"
 primary_domain: infra.example.com
 is_vm: false
+root_dev: /dev/vda
 interfaces:
   - ipv4_address: 192.168.210.5
     ipv6_address: fd24:87e8:06c7:10::5

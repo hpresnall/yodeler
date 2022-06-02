@@ -231,7 +231,6 @@ def _configure_libvirt(cfg, output_dir):
         shell.append("")
 
     shell.append("# remove from local.d so setup is only run once")
-    shell.append("rm $0")
 
     shell.write_file(output_dir)
 

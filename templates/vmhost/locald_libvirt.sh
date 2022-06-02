@@ -1,3 +1,7 @@
+rc-service dbus start
+rc-service polkit start
+rc-service libvirtd start
+
 echo "Configuring libvirt storage"
 mkdir $VM_IMAGES_PATH
 chown nobody:libvirt $VM_IMAGES_PATH
@@ -12,4 +16,4 @@ echo "Configuring libvirt networks"
 virsh net-destroy default
 virsh net-undefine default
 
-DIR=/root/yodeler/$HOSTNAME
+DIR=/root/yodeler/$SITE/$HOSTNAME
