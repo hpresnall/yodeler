@@ -45,8 +45,7 @@ class TestSetup(unittest.TestCase):
                                            "resolv.conf"])
                 # resolv.conf not in vmhost because initial interface is dhcp
                 else:
-                    required_files.extend(["bootstrap.sh",
-                                           "install_alpine.sh",
+                    required_files.extend(["create_physical.sh",
                                            "answerfile"])
 
                 for path in required_files:

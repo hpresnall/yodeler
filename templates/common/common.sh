@@ -2,7 +2,9 @@
 apk update
 
 # delete unneeded packages
-apk -q del $REMOVE_PACKAGES_STR
+if [ -n "$REMOVE_PACKAGES_STR" ]; then
+  apk -q del $REMOVE_PACKAGES_STR
+fi
 
 # basic config
 echo "$MOTD" > /etc/motd
@@ -12,6 +14,24 @@ mv /etc/profile.d/color_prompt.sh.disabled /etc/profile.d/color_prompt.sh
 rootinstall $$DIR/chrony.conf /etc/chrony
 sed -i -e "s/umask 022/umask 027/g" /etc/profile
 
+# colorize ls and ip commands
+echo 'export COLORFGBG=";0"' > /etc/profile.d/aliases.sh
+echo 'alias la="ls --color -la"' >> /etc/profile.d/aliases.sh
+echo 'alias ls="ls --color"' >> /etc/profile.d/aliases.sh
+echo 'alias ip="ip -c"' >> /etc/profile.d/aliases.sh
+chmod +x /etc/profile.d/aliases.sh
+
+# cleanup TTYs
+if [ "$IS_VM" = "True" ]; then
+  # no TTYs on VMs; faster boot
+  sed -i -E "s/^tty([1-6])/\#tty\1/g" /etc/inittab
+  sed -i -e "s/TIMEOUT 30/TIMEOUT 10/g" /boot/extlinux.conf
+else
+  # keep 2 TTYs on physical
+  sed -i -E "s/^tty([3-6])/\#tty\1/g" /etc/inittab
+fi
+
+# non-root user config
 if [ "$IS_VM" = "False" ]; then
   rc-update add cpufreqd default
   # user will be configured by Alpine setup
@@ -20,9 +40,8 @@ else
   adduser -D $USER
   addgroup $USER wheel
   echo "permit persist :wheel" >> /etc/doas.d/doas.conf
-  echo "doas su -" > /home/$USER/.ash_history
 fi
-
+echo "doas su -" > /home/$USER/.ash_history
 echo "$USER:$PASSWORD" | chpasswd
 
 # setup SSH
@@ -47,7 +66,7 @@ echo "PermitRootLogin no" >> /etc/ssh/sshd_config
 # only allow private key access
 echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
 
-# configure network
+# network confing
 echo "$HOSTNAME" > /etc/hostname
 rootinstall $$DIR/hosts /etc
 rootinstall $$DIR/interfaces /etc/network
@@ -62,20 +81,3 @@ rm -f /usr/bin/udhcpc6
 
 # link dhclient to a location ifup can find it
 ln -s /usr/sbin/dhclient /sbin/dhclient
-
-# colorize ls and ip commands
-echo 'export COLORFGBG=";0"' > /etc/profile.d/aliases.sh
-echo 'alias la="ls --color -la"' >> /etc/profile.d/aliases.sh
-echo 'alias ls="ls --color"' >> /etc/profile.d/aliases.sh
-echo 'alias ip="ip -c"' >> /etc/profile.d/aliases.sh
-chmod +x /etc/profile.d/aliases.sh
-
-# cleanup TTYs
-if [ "$IS_VM" = "True" ]; then
-  # no TTYs on VMs; faster boot
-  sed -i -E "s/^tty([1-6])/\#tty\1/g" /etc/inittab
-  sed -i -e "s/TIMEOUT 30/TIMEOUT 10/g" /boot/extlinux.conf
-else
-  # keep 2 TTYs on physical
-  sed -i -E "s/^tty([3-6])/\#tty\1/g" /etc/inittab
-fi

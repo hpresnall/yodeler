@@ -62,10 +62,10 @@ class Common(Role):
 
         # different installation scripts for physical vs virtual
         if cfg["is_vm"]:
-            _create_vm_script(cfg, output_dir)
+            _create_vm(cfg, output_dir)
             util.libvirt.write_vm_xml(cfg, output_dir)
         else:
-            _create_bootstrap(cfg, output_dir)
+            _create_physical(cfg, output_dir)
 
         return [common.name]
 
@@ -107,15 +107,9 @@ def _create_chrony_conf(cfg, output_dir):
     util.file.write("chrony.conf", "\n".join(buffer), output_dir)
 
 
-def _create_bootstrap(cfg, output_dir):
-    # expected flow: boot with install media; run /media/<install_dev>/bootstrap.sh
-    # system reboots and runs local.d/setup.start
-
-    # create Alpine install script
-    install = util.shell.ShellScript("install_alpine.sh")
-    install.append_self_dir()
-    install.substitute("templates/alpine/install_alpine.sh", cfg)
-    install.write_file(output_dir)
+def _create_physical(cfg, output_dir):
+    # boot with install media; run /media/<install_dev>/<site>/<host>/create_physical.sh
+    # setup.sh will run in the installed host via chroot
 
     # create Alpine setup answerfile
     # use external DNS for initial Alpine setup
@@ -124,15 +118,14 @@ def _create_bootstrap(cfg, output_dir):
                     util.file.substitute("templates/alpine/answerfile", cfg), output_dir)
 
     # create bootstrap wrapper script
-    bootstrap = util.shell.ShellScript("bootstrap.sh")
+    bootstrap = util.shell.ShellScript("create_physical.sh")
     bootstrap.append_self_dir()
-    bootstrap.substitute("templates/common/bootstrap.sh", cfg)
+    bootstrap.substitute("templates/common/create_physical.sh", cfg)
     bootstrap.write_file(output_dir)
 
 
-def _create_vm_script(cfg, output_dir):
-    # note not adding create_vm to setup script
-    # for VMs, create_vm.sh will run setup _inside_ a chroot for the vm
+def _create_vm(cfg, output_dir):
+    # setup.sh will run in the installed vm via
     create_vm = util.shell.ShellScript("create_vm.sh")
     create_vm.append_self_dir()
     create_vm.substitute("templates/vm/create_vm.sh", cfg)

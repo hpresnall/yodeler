@@ -26,10 +26,8 @@ rc-update add libvirtd
 
 # add alpine-make-vm-images for creating new VMs
 cd /home/$USER
-rootinstall $$DIR/resolv.orig /etc/resolv.conf
 git clone https://github.com/alpinelinux/alpine-make-vm-image.git
 chown -R $USER:$USER alpine-make-vm-image
-rootinstall $$DIR/resolv.orig /etc
 
 echo "Starting libvirt services"
 # libvirt needs networking, but do not start the openvswitch configured networking
