@@ -3,10 +3,7 @@
   "filter": [
     {
       "in": [],
-      "service": {
-        "proto": "tcp",
-        "port": 9100
-      },
+      "service": "node-exporter",
       "action": "accept"
     }
   ]

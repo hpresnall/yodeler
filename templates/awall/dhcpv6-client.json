@@ -3,10 +3,7 @@
   "filter": [
     {
       "in": [],
-      "service": {
-        "proto": "udp",
-        "port": 546
-      },
+      "service": "dhcpv6-client",
       "action": "accept"
     }
   ]

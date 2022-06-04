@@ -1,0 +1,12 @@
+{
+  "service": {
+    "dhcpv6-client": {
+      "proto": "udp",
+      "port": 546
+    },
+    "node-exporter": {
+      "proto": "tcp",
+      "port": 9100
+    }
+  }
+}
