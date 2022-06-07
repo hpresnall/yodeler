@@ -25,7 +25,7 @@ def write_vm_xml(cfg, output_dir):
 
 def interface_from_config(hostname, iface):
     """Create an <interface>  XML element for the given iface configuration.
-    
+
     <interface type="network">
       <source network="<vswitch>" portgroup="<vlan>" />
       <target dev="<hostname>-<vlan>" />
@@ -46,7 +46,7 @@ def interface_from_config(hostname, iface):
 def macvtap_interface(cfg, iface_name):
     """Create an <interface> XML element that uses macvtap to connect the host's iface to the VM.
     The given iface_name is the name of the interface _on the host_.
-    
+
     <interface type="direct">
       <source dev="<host_iface>" mode="private" />
       <model type="virtio" />
@@ -67,7 +67,7 @@ def macvtap_interface(cfg, iface_name):
 
 def router_interface(hostname, vswitch):
     """Create an <interface> XML element that trunks all routable vlans on the given vwitch.
-    
+
     <interface type="network">
       <source network="<vswitch>" portgroup="router" />
       <target dev="<hostname>-<vswitch>" />

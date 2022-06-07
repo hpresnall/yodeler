@@ -75,12 +75,12 @@ def _configure_uplinks(shell, vswitch):
 
     if not isinstance(uplink, str):
         # multiple uplink interfaces; create a bond named 'uplink'
-        uplink = "uplink"
         bond_ifaces = " ".join(uplink)
-        shell.append(f"ovs-vsctl add-bond {vswitch_name} {uplink} {bond_ifaces} lacp=active")
+        bond_name = "uplink"
+        shell.append(f"ovs-vsctl add-bond {vswitch_name} {bond_name} {bond_ifaces} lacp=active")
 
-        for iface in uplink:
-            iface = util.interfaces.port(uplink, "uplink for vswitch " + vswitch_name)
+        for n, iface in enumerate(uplink):
+            iface = util.interfaces.port(iface, f"uplink {n+1} of {len(uplink)} for vswitch {vswitch_name}")
             uplink_interfaces.append(iface)
     else:
         shell.append(f"ovs-vsctl add-port {vswitch_name} {uplink}")
