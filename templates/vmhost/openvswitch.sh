@@ -6,7 +6,6 @@ rc-update add ovs-vswitchd boot
 
 echo tun >> /etc/modules
 
-
 # directories must exist for OpenRC to start services
 mkdir -p /run/openrc/started
 mkdir -p /run/openrc/exclusive

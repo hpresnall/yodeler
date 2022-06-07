@@ -2,7 +2,7 @@
 # pylint: disable=missing-class-docstring
 # pylint: disable=missing-function-docstring
 
-import test.yodeler.base as base
+import test.config.base as base
 
 
 class TestVswitch(base.TestCfgBase):

@@ -152,12 +152,12 @@ def _validate_ip_address(ip_version, index, vlan, vswitch_name):
         address = ipaddress.ip_address(vlan["hosts"][index][key])
     except Exception as exp:
         raise KeyError((f"invalid {ip_version}_address for host {index} "
-                        f"in vlan {vlan['name']} in vswitch {vswitch_name}")) from exp
+                        f"in vlan {vlan['name']} for vswitch {vswitch_name}")) from exp
 
     if address not in vlan[ip_version + "_subnet"]:
         raise KeyError((f"invalid {ip_version}_address {address} for host{index}; "
                         f"it is not in vlan {vlan['name']}'s subnet "
-                        f"in vswitch {vswitch_name}")) from exp
+                        f"for vswitch {vswitch_name}"))
 
     vlan["hosts"][index][key] = address
 
@@ -176,7 +176,8 @@ def _configure_default_vlan(vswitch):
         # only allow one default
         if "default" in vlan:
             if default_vlan is not None:
-                raise KeyError(f"multiple default vlans for vswitch {vswitch['name']}")
+                raise KeyError(
+                    f"multiple default vlans for vswitch {vswitch['name']}")
             default_vlan = vlan
         else:
             vlan["default"] = False
@@ -238,7 +239,8 @@ def lookup(vlan_id, vswitch):
                 f"vlan id must be specified when vswitch {vswitch['name']} has no default vlan")
     else:
         if vlan is None:
-            raise KeyError(f"invalid vlan {vlan_id}; not defined in vswitch {vswitch['name']}")
+            raise KeyError(
+                f"invalid vlan {vlan_id}; not defined in vswitch {vswitch['name']}")
 
     return vlan
 

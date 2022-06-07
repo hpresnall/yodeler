@@ -8,7 +8,7 @@ import util.interfaces
 import util.libvirt
 import util.shell
 
-import yodeler.vlan
+import config.vlan
 
 from roles.role import Role
 
@@ -42,12 +42,12 @@ class Router(Role):
         # IPv6 dhcp managed by udhcpd not ifupdown
         uplink["ipv6_dhcp"] = False
 
-        yodeler.interface.validate_iface(uplink)
+        config.interface.validate_iface(uplink)
         interfaces = [util.interfaces.loopback(), util.interfaces.from_config([uplink])]
 
         # uplink can be an existing vswitch or a physical iface on the host via macvtap
         if "vswitch" in uplink:
-            yodeler.interface.validate_network(uplink, cfg["vswitches"])
+            config.interface.validate_network(uplink, cfg["vswitches"])
             iface = {"vswitch": uplink["vswitch"], "vlan": uplink["vlan"]}
             uplink_xml = util.libvirt.interface_from_config(cfg["hostname"], iface)
         elif "macvtap" in uplink:

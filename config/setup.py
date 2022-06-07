@@ -5,7 +5,7 @@ import logging
 import os
 import shutil
 
-import yodeler.config as config
+import config.yaml as yaml
 
 import util.shell as shell
 
@@ -37,7 +37,8 @@ def load_all_configs(sites_dir, site_name):
 
         for role in host_cfg["roles"]:
             if (role.name != "common") and (role.name in roles):
-                raise Exception(f"cannot redefine role {role.name} in {host_cfg['hostname']}")
+                raise Exception(
+                    f"cannot redefine role {role.name} in {host_cfg['hostname']}")
             roles.add(role.name)
 
             if role.name == "router":
@@ -46,19 +47,22 @@ def load_all_configs(sites_dir, site_name):
     required_roles = {"vmhost", "dns", "router"}
     for role in required_roles:
         if role not in roles:
-            raise Exception(f"required role {role} not defined for site {site_cfg['site']}")
+            raise Exception(
+                f"required role {role} not defined for site {site_cfg['site']}")
 
     return host_cfgs
 
 
 def _load_site_config(sites_dir):
-    site_cfg = config.load_site_config(sites_dir)
-    _logger.info("loaded config for site '%s' from %s", site_cfg["site"], sites_dir)
+    site_cfg = yaml.load_site_config(sites_dir)
+    _logger.info("loaded config for site '%s' from %s",
+                 site_cfg["site"], sites_dir)
     return site_cfg
 
 
 def _load_host_config(site_cfg, host_path):
-    host_cfg = config.load_host_config(site_cfg, host_path[:-5])  # remove .yaml
+    host_cfg = yaml.load_host_config(
+        site_cfg, host_path[:-5])  # remove .yaml
     _logger.info("loaded config for '%s' from %s",
                  host_cfg["hostname"], os.path.basename(host_path))
     return host_cfg
@@ -122,11 +126,9 @@ def create_scripts_for_host(cfg, output_dir):
     if os.path.exists(host_dir):
         _logger.warning("removing existing host configuration at %s", host_dir)
         shutil.rmtree(host_dir)
+    os.mkdir(host_dir)
 
     _logger.info("creating setup scripts for %s", cfg["hostname"])
-
-    # copy files from config directly
-    shutil.copytree("config", host_dir)
 
     # create a setup script that sources all the other scripts
     setup_script = shell.ShellScript("setup.sh")

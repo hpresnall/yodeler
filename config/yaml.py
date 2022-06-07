@@ -14,8 +14,8 @@ import util.interfaces
 import roles.role
 import roles.common
 
-import yodeler.vswitch
-import yodeler.interface
+import config.vswitch
+import config.interface
 
 
 _logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ def load_site_config(site_dir):
     # config is loaded and the defaults can be checked
     site_cfg["domain"] = site_cfg.get("domain", "")
 
-    yodeler.vswitch.validate(site_cfg)
+    config.vswitch.validate(site_cfg)
 
     return site_cfg
 
@@ -91,7 +91,7 @@ def load_host_config(site_cfg, hostname):
     _configure_roles(cfg)
     _configure_packages(cfg)
 
-    yodeler.interface.validate(cfg)
+    config.interface.validate(cfg)
 
     return cfg
 
@@ -116,8 +116,8 @@ def config_from_dict(cfg):
     _validate_config(cfg)
     _configure_roles(cfg)
     _configure_packages(cfg)
-    yodeler.vswitch.validate(cfg)
-    yodeler.interface.validate(cfg)
+    config.vswitch.validate(cfg)
+    config.interface.validate(cfg)
 
     return cfg
 

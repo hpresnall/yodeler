@@ -2,7 +2,7 @@
 # pylint: disable=missing-class-docstring
 # pylint: disable=missing-function-docstring
 
-import test.yodeler.base as base
+import test.config.base as base
 
 
 class TestInterface(base.TestCfgBase):
@@ -132,7 +132,6 @@ class TestInterface(base.TestCfgBase):
         del self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_subnet"]
         # ip address set without a subnet should error
         self.build_error()
-
 
     def test_vlan_ipv6_disabled(self):
         self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_disable"] = True

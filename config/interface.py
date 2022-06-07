@@ -2,7 +2,7 @@
 import logging
 import ipaddress
 
-import yodeler.vlan
+import config.vlan
 
 _logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def validate_network(iface, vswitches):
     iface["vswitch"] = vswitch
 
     vlan_id = iface.get("vlan")
-    iface["vlan"] = yodeler.vlan.lookup(vlan_id, vswitch)
+    iface["vlan"] = config.vlan.lookup(vlan_id, vswitch)
     iface["firewall_zone"] = iface.get("firewall_zone", vswitch_name).upper()
 
 

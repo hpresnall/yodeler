@@ -5,7 +5,7 @@ import unittest
 import os.path
 import tempfile
 
-import yodeler.setup as setup
+import config.setup as setup
 
 
 class TestSetup(unittest.TestCase):

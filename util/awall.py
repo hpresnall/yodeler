@@ -18,7 +18,7 @@ def configure(interfaces, roles, output_dir):
     # load all template services
     # roles can add or overwrite common templates
     services = {'custom': {}}
-    _load_templates(services, "templates/awall")
+    _load_templates(services, "templates/common/awall")
     for role in roles:
         _load_templates(services, "templates/" + role.name + "/awall")
 

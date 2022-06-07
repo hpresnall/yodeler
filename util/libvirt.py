@@ -19,11 +19,19 @@ def write_vm_xml(cfg, output_dir):
     for iface in cfg["interfaces"]:
         devices.append(interface_from_config(cfg["hostname"], iface))
 
+    xml.indent(template, space="  ")
     template.write(os.path.join(output_dir, cfg["hostname"] + ".xml"))
 
 
 def interface_from_config(hostname, iface):
-    """Create an <interface>  XML element for the given iface configuration."""
+    """Create an <interface>  XML element for the given iface configuration.
+    
+    <interface type="network">
+      <source network="<vswitch>" portgroup="<vlan>" />
+      <target dev="<hostname>-<vlan>" />
+      <model type="virtio" />
+    </interface>
+    """
     vlan_name = iface["vlan"]["name"]
     interface = xml.Element("interface")
     interface.attrib["type"] = "network"
@@ -37,8 +45,13 @@ def interface_from_config(hostname, iface):
 
 def macvtap_interface(cfg, iface_name):
     """Create an <interface> XML element that uses macvtap to connect the host's iface to the VM.
-
-    The given iface_name is the name of the interface _on the host_."""
+    The given iface_name is the name of the interface _on the host_.
+    
+    <interface type="direct">
+      <source dev="<host_iface>" mode="private" />
+      <model type="virtio" />
+    </interface>
+    """
     for vswitch in cfg["vswitches"].values():
         if "uplink" in vswitch and vswitch["uplink"] == iface_name:
             raise KeyError((f"invalid router uplink; "
@@ -53,7 +66,14 @@ def macvtap_interface(cfg, iface_name):
 
 
 def router_interface(hostname, vswitch):
-    """Create an <interface> XML element that trunks all routable vlans on the given vwitch."""
+    """Create an <interface> XML element that trunks all routable vlans on the given vwitch.
+    
+    <interface type="network">
+      <source network="<vswitch>" portgroup="router" />
+      <target dev="<hostname>-<vswitch>" />
+      <model type="virtio" />
+    </interface>
+    """
     interface = xml.Element("interface")
     interface.attrib["type"] = "network"
     xml.SubElement(interface, "source",
@@ -80,4 +100,5 @@ def update_interfaces(hostname, new_interfaces, output_dir):
     devices.extend(new_interfaces)
     devices.extend(original_interfaces)
 
+    xml.indent(template, space="  ")
     template.write(file_name)

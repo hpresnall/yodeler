@@ -3,16 +3,16 @@
 # pylint: disable=missing-function-docstring
 import os.path
 
-import test.yodeler.base as base
+import test.config.base as base
 
-import yodeler.config as config
-import yodeler.vlan
+import config.yaml as yaml
+import config.vlan
 
 
 class TestConfig(base.TestCfgBase):
     def test_empty_string(self):
         with self.assertRaises(KeyError):
-            config.config_from_string("")
+            yaml.config_from_string("")
 
     def test_minimal(self):
         cfg = self.build_cfg()
@@ -22,13 +22,13 @@ class TestConfig(base.TestCfgBase):
         self.assertEqual("common", cfg["roles"][0].name)
 
         # has all default config
-        for key in config.DEFAULT_CONFIG:
+        for key in yaml.DEFAULT_CONFIG:
             self.assertIsNotNone(cfg[key])
-            self.assertEqual(config.DEFAULT_CONFIG[key], cfg[key])
+            self.assertEqual(yaml.DEFAULT_CONFIG[key], cfg[key])
 
         # has all default packages
         packages = cfg["packages"]
-        for package in config.DEFAULT_PACKAGES:
+        for package in yaml.DEFAULT_PACKAGES:
             self.assertIn(package, packages)
 
         # default metrics; default is_vm
@@ -56,9 +56,9 @@ class TestConfig(base.TestCfgBase):
 
         # has all default vlan config
         vlan = vswitch["vlans_by_id"][10]
-        for key in yodeler.vlan.DEFAULT_VLAN_CONFIG:
+        for key in config.vlan.DEFAULT_VLAN_CONFIG:
             self.assertIsNotNone(vlan[key])
-            self.assertEqual(yodeler.vlan.DEFAULT_VLAN_CONFIG[key], vlan[key])
+            self.assertEqual(config.vlan.DEFAULT_VLAN_CONFIG[key], vlan[key])
 
         # has interface config
         iface = cfg["interfaces"][0]
@@ -76,9 +76,9 @@ class TestConfig(base.TestCfgBase):
         self.assertEqual(2, iface["privext"])
 
     def test_site_and_host(self):
-        site = config.load_site_config(
+        site = yaml.load_site_config(
             os.path.join(self._base_path, "sites/test"))
-        host = config.load_host_config(site, "server")
+        host = yaml.load_host_config(site, "server")
 
         # host overwrites site
         self.assertEqual("server", host["motd"])
@@ -103,25 +103,25 @@ class TestConfig(base.TestCfgBase):
 
     def test_none_site_(self):
         with self.assertRaises(KeyError):
-            config.load_host_config(None, "server")
+            yaml.load_host_config(None, "server")
 
     def test_empty_site(self):
         with self.assertRaises(KeyError):
-            config.load_site_config(os.path.join(
+            yaml.load_site_config(os.path.join(
                 self._base_path, "sites/empty"))
 
     def test_empty_site_for_host(self):
         site = {}
         with self.assertRaises(KeyError):
-            config.load_host_config(site, "server")
+            yaml.load_host_config(site, "server")
 
     def test_empty_host(self):
-        site = config.load_site_config(
+        site = yaml.load_site_config(
             os.path.join(self._base_path, "sites/test"))
         # keep empty host YAML out of working test site
         site["site_dir"] = "test/sites/empty"
         with self.assertRaises(KeyError):
-            config.load_host_config(site, "empty")
+            yaml.load_host_config(site, "empty")
 
     def test_invalid_role(self):
         self._cfg_dict["roles"] = ["invalid"]

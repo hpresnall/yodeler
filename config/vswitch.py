@@ -1,7 +1,7 @@
 """Handles parsing and validating vswitch configuration from site YAML files."""
 import logging
 
-import yodeler.vlan
+import config.vlan
 
 _logger = logging.getLogger(__name__)
 
@@ -46,4 +46,4 @@ def validate(cfg):
         else:
             vswitch["uplink"] = None
 
-        yodeler.vlan.validate(cfg["domain"], vswitch)
+        config.vlan.validate(cfg["domain"], vswitch)

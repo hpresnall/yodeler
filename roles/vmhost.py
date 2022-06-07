@@ -11,7 +11,7 @@ import util.resolv
 
 from roles.role import Role
 
-import yodeler.interface
+import config.interface
 
 
 class VmHost(Role):
@@ -31,7 +31,6 @@ class VmHost(Role):
         scripts.append(_setup_open_vswitch(cfg, output_dir))
         scripts.append(_setup_libvirt(cfg, output_dir))
 
-#        _configure_initial_network(cfg, output_dir)
         return scripts
 
 
@@ -157,7 +156,7 @@ def _reconfigure_interfaces(shell, cfg, output_dir):
 
 def _setup_libvirt(cfg, output_dir):
     shell = util.shell.ShellScript("libvirt.sh")
-    #shell.setup_logging(cfg["hostname"])
+    # shell.setup_logging(cfg["hostname"])
     shell.substitute("templates/vmhost/libvirt.sh", cfg)
 
     # for each vswitch, create an XML network definition
@@ -208,6 +207,7 @@ def _setup_libvirt(cfg, output_dir):
 
         # save the file and add the virsh commands to the script
         network_xml = name + ".xml"
+        xml.indent(template, space="  ")
         template.write(os.path.join(output_dir, network_xml))
 
         shell.append(f"virsh net-define $DIR/{network_xml}")

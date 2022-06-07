@@ -4,7 +4,7 @@ import sys
 import logging
 import errno
 
-import yodeler.setup as setup
+import config.setup as setup
 
 
 def yodeler():
@@ -29,7 +29,7 @@ def yodeler():
     for host_cfg in host_cfgs.values():
         # print(util.output_yaml(host_cfg))
         setup.create_scripts_for_host(host_cfg, config_dir)
-        #preview_dir(host_cfg["config_dir"])
+        # preview_dir(host_cfg["config_dir"])
 
 
 def preview_dir(output_dir, limit=sys.maxsize):

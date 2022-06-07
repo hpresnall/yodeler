@@ -6,7 +6,7 @@ import copy
 
 import util.file
 
-import yodeler.config as config
+import config.yaml as yaml
 
 
 class TestCfgBase(unittest.TestCase):
@@ -26,7 +26,7 @@ class TestCfgBase(unittest.TestCase):
 
     def build_cfg(self):
         """Build the current configuration. This should not error."""
-        return config.config_from_dict(self._cfg_dict)
+        return yaml.config_from_dict(self._cfg_dict)
 
     def build_error(self):
         """Build the current configuration, assuming it will error."""

@@ -1,5 +1,6 @@
 """Common configuration & setup for all Alpine hosts."""
 import os.path
+import shutil
 
 import util.shell
 import util.file
@@ -45,15 +46,21 @@ class Common(Role):
 
         common.substitute("templates/common/common.sh", cfg)
 
+        # directly copy hosts and dhclient config
+        shutil.copyfile("templates/common/hosts", os.path.join(output_dir, "hosts"))
+        shutil.copyfile("templates/common/dhclient.conf", os.path.join(output_dir, "dhclient.conf"))
+
         if cfg["metrics"]:
             common.append(_SETUP_METRICS)
 
         if cfg["local_firewall"]:
-            common.append(util.awall.configure(cfg["interfaces"], cfg["roles"], output_dir))
+            common.append(util.awall.configure(
+                cfg["interfaces"], cfg["roles"], output_dir))
 
         common.write_file(output_dir)
 
-        interfaces = [util.interfaces.loopback(), util.interfaces.from_config(cfg["interfaces"])]
+        interfaces = [util.interfaces.loopback(
+        ), util.interfaces.from_config(cfg["interfaces"])]
         util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
         util.resolv.create_conf(cfg["interfaces"], cfg["primary_domain"], cfg["domain"],
@@ -115,12 +122,12 @@ def _create_physical(cfg, output_dir):
     # use external DNS for initial Alpine setup
     cfg["external_dns_str"] = " ".join(cfg["external_dns"])
     util.file.write("answerfile",
-                    util.file.substitute("templates/alpine/answerfile", cfg), output_dir)
+                    util.file.substitute("templates/physical/answerfile", cfg), output_dir)
 
     # create bootstrap wrapper script
     bootstrap = util.shell.ShellScript("create_physical.sh")
     bootstrap.append_self_dir()
-    bootstrap.substitute("templates/common/create_physical.sh", cfg)
+    bootstrap.substitute("templates/physical/create_physical.sh", cfg)
     bootstrap.write_file(output_dir)
 
 
