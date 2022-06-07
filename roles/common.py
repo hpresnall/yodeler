@@ -63,8 +63,7 @@ class Common(Role):
         ), util.interfaces.from_config(cfg["interfaces"])]
         util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
-        util.resolv.create_conf(cfg["interfaces"], cfg["primary_domain"], cfg["domain"],
-                                cfg["local_dns"], cfg["external_dns"], output_dir)
+        util.resolv.create_conf(cfg, output_dir)
         _create_chrony_conf(cfg, output_dir)
 
         # different installation scripts for physical vs virtual

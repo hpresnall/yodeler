@@ -7,15 +7,12 @@ rm -f /etc/apk/cache
 mkdir -p $$DIR/../apk_cache
 ln -s $$(realpath $$DIR/../apk_cache) /etc/apk/cache
 
-#echo iptables >> /etc/apk/world
-#apk add
-
 # alpine install will setup the network
 # block all incoming traffic until awall is configured
 echo "Blocking incoming traffic before installation"
-#apk -q add iptables
-#iptables -P INPUT DROP
-#iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+apk -q add iptables
+iptables -P INPUT DROP
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
 # install Alpine with answerfile
 echo -n "Installing Alpine to $ROOT_DEV ... "

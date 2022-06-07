@@ -1,0 +1,5 @@
+motd: "hello, I am a minimal Alpine VM"
+interfaces:
+  - ipv4_address: dhcp
+    vswitch: public
+    vlan: 20 # vlan can be name or id

@@ -61,7 +61,7 @@ vswitches:
             ipv6_address: fd24:87e8:06c7:20::3
             mac_address: 34:8c:56:5f:1e:02 # will add static DHCP assignment
   - name: private
-    # uplink: eth1
+    uplink: eth1
     vlans:
       - name: mgmt
         id: # default and only vlan; vswitch will not vlan tag

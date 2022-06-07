@@ -142,7 +142,7 @@ def _configure_zones(cfg, vlan, named, zone_dir):
 
     data = {"domain": vlan["domain"]}
     for host in vlan["hosts"]:
-        if host["ipv4_address"] is None:
+        if host["ipv4_address"] == "dhcp":
             continue
         data["hostname"] = host["hostname"]
         rptr = host["ipv4_address"].reverse_pointer

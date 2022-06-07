@@ -2,7 +2,7 @@
 import util.file
 
 
-def create_conf(interfaces, host_domain, site_domain, local_dns, external_dns, output_dir):
+def create_conf(cfg, output_dir):
     """Create resolv.conf and save it to the given directory.
 
     All values are optional. If no values are specified, no file is created.
@@ -12,14 +12,15 @@ def create_conf(interfaces, host_domain, site_domain, local_dns, external_dns, o
     dhcp = False
     search_domains = []
 
-    if interfaces is not None:
-        for iface in interfaces:
-            dhcp |= iface["ipv4_address"] == "dhcp"
+    interfaces = cfg["interfaces"]
 
-            # search all vlan domains
-            domain = iface["vlan"].get("domain") if "vlan" in iface else None
-            if (domain is not None) and (domain != ""):
-                search_domains.append(domain)
+    for iface in interfaces:
+        dhcp |= iface["ipv4_address"] == "dhcp"
+
+        # possibly search vlan domains
+        domain = iface["vlan"].get("domain") if "vlan" in iface else None
+        if (domain is not None) and (domain != ""):
+            search_domains.append(domain)
 
     if dhcp:
         # do not write resolv.conf; assume DHCP will setup resolv.conf
@@ -28,20 +29,20 @@ def create_conf(interfaces, host_domain, site_domain, local_dns, external_dns, o
     # manually set DNS servers
     buffer = []
 
+    local_dns = cfg["local_dns"]
     if local_dns:
-        if host_domain and host_domain != "":
-            buffer.append(f"domain {host_domain}")
+        # set domain for server
+        if cfg["primary_domain"] != "":
+            buffer.append(f"domain {cfg['primary_domain']}")
 
-        # can search local domains if there is local dns
-        if search_domains and search_domains != "":
-            search_domains.append(site_domain)
+        # can search local domains if there is local DNS
+        search_domains.append(cfg["domain"])
 
-        if len(search_domains) > 0:
-            buffer.append("search {}".format(" ".join(search_domains)))
+        buffer.append("search {}".format(" ".join(search_domains)))
 
         nameservers = local_dns
     else:
-        nameservers = external_dns
+        nameservers = cfg["external_dns"]
 
     for server in nameservers:
         buffer.append("nameserver " + server)
