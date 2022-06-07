@@ -1,4 +1,5 @@
 roles: [dns]
+primary_domain: test.site.example
 interfaces:
   - ipv4_address: 192.168.1.2
     ipv6_address: 2001:db8:0:1::2

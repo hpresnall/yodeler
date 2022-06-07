@@ -15,8 +15,6 @@ def validate(domain, vswitch):
         raise KeyError(
             f"no vlans defined for vswitch {vswitch_name}")
 
-    vswitch_name = vswitch["name"]
-
     # list of vlans in yaml => dicts of names & ids to vswitches
     vlans_by_id = vswitch["vlans_by_id"] = {}
     vlans_by_name = vswitch["vlans_by_name"] = {}
@@ -47,7 +45,7 @@ def validate(domain, vswitch):
             if key not in vlan:
                 vlan[key] = DEFAULT_VLAN_CONFIG[key]
         if "access_vlans" not in vlan:
-            vlan["access_vlans"] = []
+            vlan["access_vlans"] = []  # optional list of other vlans this vlan can access _without_ firewall restrictions
         if "hosts" not in vlan:
             vlan["hosts"] = []  # optional list of hosts for DNS
 

@@ -35,7 +35,7 @@ def load_site_config(site_dir):
 
     site_cfg["site"] = os.path.basename(site_dir)
     site_cfg["site_dir"] = site_dir
-    # also included in default_config
+    # also included in DEFAULT_CONFIG
     # set here because it is needed by _validate_vswitches, _before_ the host
     # config is loaded and the defaults can be checked
     site_cfg["domain"] = site_cfg.get("domain", "")
@@ -55,16 +55,16 @@ def load_host_config(site_cfg, hostname):
     if (site_cfg is None) or (len(site_cfg) == 0):
         raise KeyError("empty site config")
 
-    host_dir = os.path.abspath(os.path.join(
+    host_path = os.path.abspath(os.path.join(
         site_cfg["site_dir"], hostname + ".yaml"))
-    host_cfg = util.file.load_yaml(host_dir)
-    _logger.debug("loaded host YAML file for '%s' from '%s'", hostname, host_dir)
+    host_cfg = util.file.load_yaml(host_path)
+    _logger.debug("loaded host YAML file for '%s' from '%s'", hostname, host_path)
 
     if host_cfg is None:
         raise KeyError("empty host config")
 
     host_cfg["hostname"] = hostname
-    host_cfg["host_path"] = host_dir
+    host_cfg["host_path"] = host_path
 
     # shallow copy
     cfg = {**site_cfg, **host_cfg}
@@ -157,7 +157,7 @@ def _configure_roles(cfg):
     cfg["roles"][0].additional_configuration(cfg)
 
     # for each role, load the module, then the class
-    # instantiate the class and overwrite the config
+    # instantiate the class and add addtional config
     for role in role_names:
         _logger.debug("loading module for %s role on %s", role, cfg["hostname"])
 

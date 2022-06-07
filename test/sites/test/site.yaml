@@ -8,6 +8,7 @@ vswitches:
     uplink: eth0
     vlans:
       - name: test
+        domain: test.site.example
         id: 10
         ipv4_subnet: 192.168.1.0/24
         ipv6_subnet: 2001:db8:0:1::/64
