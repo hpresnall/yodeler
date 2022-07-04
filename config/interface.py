@@ -95,10 +95,9 @@ def validate_iface(iface):
 
     if ipv6_disable:
         iface["ipv6_address"] = None
-        # no SLAAC or DHCP
-        iface["ipv6_dhcp"] = 0
-        iface["privext"] = 0
-        iface["accept_ra"] = 0
+        # no SLAAC
+        iface["privext"] = False
+        iface["accept_ra"] = False
     else:
         address = iface.get("ipv6_address")
         if address is not None:
@@ -116,9 +115,8 @@ def validate_iface(iface):
         else:
             iface["ipv6_address"] = None
 
-        _check_value(iface, "ipv6_dhcp", 1)
-        _check_value(iface, "privext", 2)
-        _check_value(iface, "accept_ra", 1)
+        iface["privext"] = bool(iface.get("privext"))
+        iface["accept_ra"] = True if "accept_ra" not in iface else bool(iface.get("accept_ra"))
 
 
 def _validate_ipaddress(iface, ip_version):
@@ -141,21 +139,8 @@ def _validate_ipaddress(iface, ip_version):
              f"it is not in vlan {iface['vlan']['id']}'s subnet {subnet}"))
 
     if ip_version == "ipv4":
-        iface["ipv4_netmask"] = subnet.netmask
+        iface["ipv4_prefixlen"] = subnet.prefixlen
         iface["ipv4_gateway"] = subnet.network_address + 1
     if ip_version == "ipv6":
         iface["ipv6_prefixlen"] = subnet.prefixlen
-
-
-def _check_value(iface, key, max_val):
-    try:
-        value = int(iface.get(key, max_val))
-    except ValueError:
-        raise KeyError(f"invalid {key}; it must be a number") from None
-
-    if value < 0:
-        raise KeyError(f"invalid {key}; it must be positive") from None
-    if value > max_val:
-        raise KeyError(f"invalid {key}; it must be < {max_val}") from None
-
-    iface[key] = value
+        # gateway provided by router advertisements

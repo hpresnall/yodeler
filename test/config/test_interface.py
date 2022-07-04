@@ -7,19 +7,13 @@ import test.config.base as base
 
 class TestInterface(base.TestCfgBase):
     def test_iface_ipv6_options(self):
-        self._cfg_dict["interfaces"][0]["ipv6_dhcp"] = True
         self._cfg_dict["interfaces"][0]["accept_ra"] = False
         self._cfg_dict["interfaces"][0]["privext"] = 2
 
         cfg = self.build_cfg()
 
-        self.assertEqual(1, cfg["interfaces"][0]["ipv6_dhcp"])
-        self.assertEqual(0, cfg["interfaces"][0]["accept_ra"])
-        self.assertEqual(2, cfg["interfaces"][0]["privext"])
-
-    def test_invalid_ipv6_privext(self):
-        self._cfg_dict["interfaces"][0]["privext"] = 3
-        self.build_error()
+        self.assertFalse(cfg["interfaces"][0]["accept_ra"])
+        self.assertTrue(cfg["interfaces"][0]["privext"])
 
     def test_no_interfaces(self):
         del self._cfg_dict["interfaces"]
@@ -139,6 +133,5 @@ class TestInterface(base.TestCfgBase):
 
         self.assertIsNone(cfg["vswitches"]["public"]["vlans"][0]["ipv6_subnet"])
         self.assertIsNone(cfg["interfaces"][0]["ipv6_address"])
-        self.assertEqual(0, cfg["interfaces"][0]["ipv6_dhcp"])
-        self.assertEqual(0, cfg["interfaces"][0]["privext"])
-        self.assertEqual(0, cfg["interfaces"][0]["accept_ra"])
+        self.assertFalse(cfg["interfaces"][0]["privext"])
+        self.assertFalse(cfg["interfaces"][0]["accept_ra"])

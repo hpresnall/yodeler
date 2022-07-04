@@ -140,7 +140,7 @@ def _configure_vlans(vswitch, iface_name, shorewall):
         if untagged:  # interface with no vlan already created by vswitch; just output the comment
             interfaces.append("# " + comment)
         else:  # create parent interface with the comment
-            interfaces.append(util.interfaces.port(iface_name, comment))
+            interfaces.append(util.interfaces.port(iface_name, None, comment))
 
         # vlan interfaces after the parent
         interfaces.extend(vlan_interfaces)

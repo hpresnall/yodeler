@@ -68,12 +68,11 @@ class TestConfig(base.TestCfgBase):
 
         self.assertEqual("192.168.1.1", str(iface["ipv4_address"]))
         self.assertEqual("192.168.1.1", str(iface["ipv4_gateway"]))
-        self.assertEqual("255.255.255.0", str(iface["ipv4_netmask"]))
+        self.assertEqual("24", str(iface["ipv4_prefixlen"]))
 
-        self.assertEqual(1, iface["ipv6_dhcp"])
         self.assertEqual(64, iface["ipv6_prefixlen"])
-        self.assertEqual(1, iface["accept_ra"])
-        self.assertEqual(2, iface["privext"])
+        self.assertTrue(iface["accept_ra"])
+        self.assertFalse(iface["privext"])
 
     def test_site_and_host(self):
         site = yaml.load_site_config(

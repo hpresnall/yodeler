@@ -1,14 +1,13 @@
 """Utility functions for creating /etc/network/interfaces.
 
-Files created by this module are usable by Debian's ifupdown package.
+Files created by this module are usable by the ifupdown-ng package.
 It _will not_ be usable by the Alpine's default BusyBox ifupdown."""
 
 
 def loopback():
-    """Create the loopback stanza."""
+    """Create the loopback interface."""
     return """auto lo
-iface lo inet loopback
-iface lo inet6 loopback
+iface lo
 """
 
 
@@ -16,43 +15,60 @@ def from_config(interfaces):
     """Convert the interfaces to a form for use in /etc/network/interfaces.
 
     The interfaces must be from a validated host configuration."""
-    buffer = []
+    all_interfaces = []
 
     for iface in interfaces:
+        buffer = []
         if "comment" in iface:
-            buffer.append("# " + iface["comment"])
+            buffer.append("# {comment}")
+
+        buffer.append("auto {name}")
+        buffer.append("iface {name}")
+
+        if iface.get("parent"):
+            buffer.append("  requires {parent}")
+            buffer.append("")
 
         if iface["ipv4_address"] == "dhcp":
-            buffer.append("auto {name}\niface {name} inet dhcp".format_map(iface))
+            buffer.append("  use dhcp")
         else:
-            buffer.append(_IPV4_STATIC_TEMPLATE.format_map(iface))
+            buffer.append("  address {ipv4_address}/{ipv4_prefixlen}")
             if iface["vlan"]["routable"]:
-                buffer.append(f"  gateway {iface['ipv4_gateway']}")
+                buffer.append("  gateway {ipv4_gateway}")
 
-        buffer.append(_IPV6_TEMPLATE.format_map(iface))
-
-        # assume interface validate removes the ipv6_address if disabled by vlan
+        # assume interface validation removes the ipv6_address if disabled by vlan
         if iface["ipv6_address"] is not None:
-            buffer.append(_IPV6_ADDRESS_TEMPLATE.format_map(iface))
+            buffer.append("  address {ipv6_address}")
+
+        if iface["accept_ra"]:
+            buffer.append("  use ipv6-ra")
+        # if "privext" in iface: TODO research RFCs 7217 and 8981 along with dhcpcd's slaac private temporary setting
+        #     buffer.append("  use ipv6-privacy")
 
         buffer.append("")
+        all_interfaces.append("\n".join(buffer).format_map(iface))
 
-    return "\n".join(buffer)
+    return "\n".join(all_interfaces)
 
 
-def port(name, comment):
+def port(name, parent, comment):
     """ Create an interface configuration for "port" interfaces like vswitches and vlan parents."""
+    buffer = []
+
     if comment != "":
-        comment = "# " + comment + "\n"
+        buffer.append("# " + comment)
+
+    buffer.append(f"auto {name}")
+    buffer.append(f"iface {name}")
+
+    if parent:
+        buffer.append(f"  requires {parent}")
+
+    buffer.append("")
 
     # no ipv4 address and no ipv6 SLAAC or DHCP
-    return f"""{comment}auto {name}
-iface {name} inet manual
-iface {name} inet6 auto
-  dhcp 0
-  accept_ra 0
-  privext 0
-"""
+
+    return "\n".join(buffer)
 
 
 def for_vlan(vlan, iface_name):
@@ -62,53 +78,25 @@ def for_vlan(vlan, iface_name):
     else:
         name = f"{iface_name}.{vlan['id']}"
 
-    comment = "# " + vlan["name"] + " vlan\n"
-    iface = {"name": name,
-             "ipv4_address": vlan["ipv4_subnet"].network_address + 1,
-             "ipv4_netmask": vlan["ipv4_subnet"].netmask}
-
+    if vlan["id"] is None:
+        buffer = [f"# {vlan['name']} vlan"]
+    else:
+        buffer= [f"# {vlan['name']} vlan, id {vlan['id']}"]
+    buffer.append(f"auto {name}")
+    buffer.append(f"iface {name}")
+    if vlan["id"] is not None:
+        buffer.append(f"  requires {iface_name}")
+        buffer.append("")
+    buffer.append("  address " + str(vlan["ipv4_subnet"].network_address + 1) + "/" +  str(vlan["ipv4_subnet"].prefixlen))
     # this interface _is_ the gateway, so gateway is not needed
-    interface = comment
-    interface += _IPV4_STATIC_TEMPLATE.format_map(iface)
 
     # disable autoconf
     if not vlan["ipv6_disable"]:
-        iface["ipv6_dhcp"] = 0
-        iface["privext"] = 0
-        iface["accept_ra"] = 0
-
-        interface += "\n"
-        interface += _IPV6_TEMPLATE.format_map(iface)
-
-        # add IPv6 address for subnet
+       # add IPv6 address for subnet
         if vlan.get("ipv6_subnet") is not None:
             # manually set the IPv6 address
-            fmt = {
-                "name": name,
-                "ipv6_address": vlan["ipv6_subnet"].network_address + 1,
-                "ipv6_prefixlen": vlan["ipv6_subnet"].prefixlen
-            }
-            interface += "\n"
-            interface += _IPV6_ADDRESS_TEMPLATE.format_map(fmt)
+            buffer.append("  address " + str(vlan["ipv6_subnet"].network_address + 1) + "/" +  str(vlan["ipv6_subnet"].prefixlen))
 
-        interface += "\n"
+    buffer.append("")
 
-    return interface
-
-
-# static IPv4 address with gateway
-_IPV4_STATIC_TEMPLATE = """auto {name}
-iface {name} inet static
-  address {ipv4_address}
-  netmask {ipv4_netmask}"""
-
-# SLAAC IPv6
-# note always auto even when IPv6 is disabled; config will turn off dhcp and ra
-_IPV6_TEMPLATE = """iface {name} inet6 auto
-  dhcp {ipv6_dhcp}
-  accept_ra {accept_ra}
-  privext {privext}"""
-
-# static IPv6 addresses are added manually with the ip command
-_IPV6_ADDRESS_TEMPLATE = """  post-up ip -6 addr add {ipv6_address}/{ipv6_prefixlen} dev {name}
-  pre-down ip -6 addr del {ipv6_address}/{ipv6_prefixlen} dev {name}"""
+    return "\n".join(buffer)

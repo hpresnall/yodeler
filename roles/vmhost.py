@@ -1,5 +1,6 @@
 """Configuration & setup for the main KVM & Openvswitch Alpine host."""
 import os.path
+
 import xml.etree.ElementTree as xml
 import shutil
 
@@ -51,7 +52,7 @@ def _setup_open_vswitch(cfg, output_dir):
         shell.append(f"ovs-vsctl add-br {vswitch_name}")
 
         # iface for switch itself
-        iface = util.interfaces.port(vswitch_name, "vswitch")
+        iface = util.interfaces.port(vswitch_name, None, "vswitch")
         vswitch_interfaces.append(iface)
 
         uplink_interfaces += _configure_uplinks(shell, vswitch)
@@ -80,11 +81,11 @@ def _configure_uplinks(shell, vswitch):
         shell.append(f"ovs-vsctl add-bond {vswitch_name} {bond_name} {bond_ifaces} lacp=active")
 
         for n, iface in enumerate(uplink):
-            iface = util.interfaces.port(iface, f"uplink {n+1} of {len(uplink)} for vswitch {vswitch_name}")
+            iface = util.interfaces.port(iface, vswitch_name, f"uplink {n+1} of {len(uplink)} for vswitch {vswitch_name}")
             uplink_interfaces.append(iface)
     else:
         shell.append(f"ovs-vsctl add-port {vswitch_name} {uplink}")
-        iface = util.interfaces.port(uplink, "uplink for vswitch " + vswitch_name)
+        iface = util.interfaces.port(uplink, vswitch_name, "uplink for vswitch " + vswitch_name)
         uplink_interfaces.append(iface)
 
     # tag the uplink port
@@ -128,6 +129,7 @@ def _reconfigure_interfaces(shell, cfg, output_dir):
 
         iface["name"] = port
         iface["comment"] = "host interface"
+        iface["parent"] = vswitch_name
 
         shell.append(f"# setup switch port for host interface on vswitch {vswitch_name}")
         shell.append(
