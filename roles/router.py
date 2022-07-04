@@ -135,7 +135,7 @@ def _configure_vlans(vswitch, iface_name, shorewall):
     interfaces = []
 
     if len(vlan_interfaces) > 0:
-        comment = f"vlans on {vswitch['name']} vswitch"
+        comment = f"vlans on '{vswitch['name']}' vswitch"
 
         if untagged:  # interface with no vlan already created by vswitch; just output the comment
             interfaces.append("# " + comment)

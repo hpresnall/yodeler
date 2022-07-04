@@ -23,7 +23,8 @@ def load_site(site_path):
 
     _logger.info("processing hosts for site '%s'", site_cfg["name"])
 
-    required_roles = {"dns", "router"}
+    # TODO proper role hierarchy and ordering
+    required_roles = set() # {"dns", "router"}
     defined_roles = set()
 
     for path in os.listdir(site_path):
@@ -56,11 +57,13 @@ def write_host_configs(site_cfg, output_dir):
     """Create all the configuration scripts and files for the host
     and write them to the given directory."""
 
+    _logger.info("writing setup scripts for site to '%s'", output_dir)
+
     for host_cfg in site_cfg["hosts"].values():
         _logger.debug(file.output_yaml(host_cfg))
         host_dir = os.path.join(output_dir, host_cfg["hostname"])
 
-        _logger.info("creating setup scripts for %s", host_cfg["hostname"])
+        _logger.info("creating setup scripts for '%s'", host_cfg["hostname"])
 
         if os.path.exists(host_dir):
             _logger.warning(
@@ -111,7 +114,7 @@ def _load_host_config(site_cfg, host_path):
 
     site_cfg["hosts"][host_cfg["hostname"]] = host_cfg
 
-    _logger.info("loaded config for '%s' from %s",
+    _logger.info("loaded config for host '%s' from %s",
                  host_cfg["hostname"], os.path.basename(host_path))
 
     return host_cfg

@@ -26,15 +26,11 @@ class Common(Role):
         """Create the scripts and configuration files for the given host's configuration."""
         common = util.shell.ShellScript("common.sh")
 
-        common.append("echo \"Running common config\"")
-        common.append("")
-
         if not cfg["is_vm"]:
             # for physical servers, add packages manually
-            # VMs will have packages installed as part of image creation
-            common.append(_setup_repos(cfg))
-            common.append("# install necessary packages")
-            common.append("apk -q update")
+            # VMs will use host's configured repos and have packages installed as part of image creation
+            _setup_repos(cfg, common)
+            common.append("echo \"Installing required packages\"")
             common.append("apk -q add $(cat $DIR/packages)")
             common.append("")
 
@@ -76,21 +72,22 @@ class Common(Role):
         return [common.name]
 
 
-def _setup_repos(cfg):
+def _setup_repos(cfg, common):
+    common.append("echo \"Configuring APK repositories\"")
+    common.append("")
+
     # TODO create repos file for VM outside of VM and pass into alpine-make-vm-image
     repos = cfg["alpine_repositories"]
-    buffer = []
 
     # overwrite on first, append on subsequent
-    buffer.append("# setup APK repos")
-    buffer.append(f"echo {repos[0]} > /etc/apk/repositories")
+    common.append(f"echo {repos[0]} > /etc/apk/repositories")
 
     repos = repos[1:]
     for repo in repos:
-        buffer.append(f"echo {repo} >> /etc/apk/repositories")
-    buffer.append("")
-
-    return "\n".join(buffer)
+        common.append(f"echo {repo} >> /etc/apk/repositories")
+    common.append("")
+    common.append("apk -q update")
+    common.append("")
 
 
 def _create_chrony_conf(cfg, output_dir):
@@ -143,7 +140,7 @@ def _create_vm(cfg, output_dir):
     delete_vm.write_file(output_dir)
 
 
-_SETUP_METRICS = """# setup Prometheus
+_SETUP_METRICS = """echo "Configuring Prometheus"
 rc-update add node-exporter default
 
 echo "ARGS=\\\"--log.level=warn \\

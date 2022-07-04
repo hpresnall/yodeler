@@ -9,7 +9,3 @@ interfaces:
     ipv6_address:
     vswitch: private
 roles: [vmhost]
-initial_interfaces:
-  - name: eth0
-    ipv4_address: dhcp
-    ipv6_dhcp: false

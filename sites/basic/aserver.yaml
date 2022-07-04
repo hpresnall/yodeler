@@ -11,12 +11,6 @@ interfaces:
   - ipv4_address: 172.16.251.5
     vswitch: private
     firewall_zone: PRIV
-# before the router is configured, the final interfaces config will not work
-# use this instead for inital installation and configuration
-initial_interfaces:
-  - name: eth0
-    ipv4_address: dhcp
-    ipv6_dhcp: false
 # /etc/network/interfaces used during initial Alpine Linux install
 # if not set, install will prompt
 # this is the direct file contents, in _BusyBox's_ interfaces file format, not Debian's!

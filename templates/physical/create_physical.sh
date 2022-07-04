@@ -15,7 +15,7 @@ iptables -P INPUT DROP
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
 # install Alpine with answerfile
-echo -n "Installing Alpine to $ROOT_DEV ... "
+echo -n "Installing Alpine to $ROOT_DEV"
 # TODO log install output somewhere
 setup-alpine -e -f $$DIR/answerfile
 echo
@@ -50,7 +50,7 @@ mount --make-private "$$INSTALLED"/dev
 mount --bind /sys "$$INSTALLED"/sys
 mount --make-private "$$INSTALLED"/sys
 
-echo -n "Running setup for $HOSTNAME... "
+echo -n "Running setup for $HOSTNAME"
 set +o errexit # copy APKs even if setup fails
 chroot "$$INSTALLED" /bin/sh -c "cd /root/$SITE/$HOSTNAME && ./setup.sh"
 RESULT=$$?
@@ -69,7 +69,7 @@ fi
 
 if [ "$$RESULT" == "0" ]; then
   echo "Successful Yodel!"
-  echo "The system will now reboot...""
+  echo "The system will now reboot""
   # reboot
 else
   echo "Installation did not complete successfully; please see the logs for more info"  

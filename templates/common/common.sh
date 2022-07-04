@@ -1,10 +1,9 @@
-# configure new repos
-apk update
-
 # delete unneeded packages
 if [ -n "$REMOVE_PACKAGES_STR" ]; then
   apk -q del $REMOVE_PACKAGES_STR
 fi
+
+echo "Configuring common setup"
 
 # basic config
 echo "$MOTD" > /etc/motd

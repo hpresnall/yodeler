@@ -76,8 +76,7 @@ def router_interface(hostname, vswitch):
     """
     interface = xml.Element("interface")
     interface.attrib["type"] = "network"
-    xml.SubElement(interface, "source",
-                   {"network": vswitch["name"], "portgroup": "router"})
+    xml.SubElement(interface, "source",  {"network": vswitch["name"], "portgroup": "router"})
     xml.SubElement(interface, "target", {"dev": f"{hostname}-{vswitch['name']}"})
     xml.SubElement(interface, "model", {"type": "virtio"})
 
