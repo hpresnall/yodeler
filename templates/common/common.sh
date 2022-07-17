@@ -69,14 +69,11 @@ echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
 echo "$HOSTNAME" > /etc/hostname
 rootinstall $$DIR/hosts /etc
 rootinstall $$DIR/interfaces /etc/network
-rootinstall $$DIR/dhclient.conf /etc/dhcp
+rootinstall $$DIR/dhcpcd.conf /etc
 if [ -f $$DIR/resolv.conf ]; then
   rootinstall $$DIR/resolv.conf /etc
 fi
-
-# Busybox's udhcpc does not work with ifupdown-ng, so remove it
-rm -f /sbin/udhcpc
-rm -f /usr/bin/udhcpc6
-
-# link dhclient to a location ifup can find it
-ln -s /usr/sbin/dhclient /sbin/dhclient
+# prevent dhcpcd starting as a service; let ifupdown-ng start it, if needed
+sed -i -e "s/provide net/# provide net/g" /etc/init.d/dhcpcd
+# remove dhcpcd messages to stdout
+sed -i -e "s#/sbin/dhcpcd#/sbin/dhcpcd -q#g" /usr/libexec/ifupdown-ng/dhcp

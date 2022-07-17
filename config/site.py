@@ -24,7 +24,7 @@ def load_site(site_path):
     _logger.info("processing hosts for site '%s'", site_cfg["name"])
 
     # TODO proper role hierarchy and ordering
-    required_roles = set() # {"dns", "router"}
+    required_roles = set()  # {"dns", "router"}
     defined_roles = set()
 
     for path in os.listdir(site_path):
@@ -107,15 +107,16 @@ def _load_site_config(sites_dir):
 
 
 def _load_host_config(site_cfg, host_path):
+    hostname = host_path[:-5]  # remove .yaml
+
+    _logger.info("loading config for host '%s' from %s", hostname, os.path.basename(host_path))
+
     host_cfg = yaml.load_host_config(
-        site_cfg, host_path[:-5])  # remove .yaml
+        site_cfg, hostname)
     _add_host_dns_to_vlans(host_cfg)
     _map_role_to_fqdn(host_cfg, site_cfg["roles_to_hostnames"])
 
     site_cfg["hosts"][host_cfg["hostname"]] = host_cfg
-
-    _logger.info("loaded config for host '%s' from %s",
-                 host_cfg["hostname"], os.path.basename(host_path))
 
     return host_cfg
 

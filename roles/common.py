@@ -8,6 +8,7 @@ import util.interfaces
 import util.libvirt
 import util.awall
 import util.resolv
+import util.dhcpcd
 
 from roles.role import Role
 
@@ -18,9 +19,17 @@ class Common(Role):
     def __init__(self):
         super().__init__("common")
 
-    def additional_packages(self):
+    def additional_packages(self, cfg):
+        # use dhcpcd for dhcp since it can also handle prefix delegation for routers
         # use better ifupdown-ng  and the Linux ip command, instead of Busybox's built-ins
-        return {"ifupdown-ng", "iproute2"}
+        packages = {"e2fsprogs", "acpi", "doas", "openssh", "chrony", "awall", "dhcpcd", "ifupdown-ng", "iproute2"}
+
+        for iface in cfg["interfaces"]:
+            if iface["name"].startswith("wlan"):
+                packages.add("ifupdown-ng-wifi")
+                break
+
+        return packages
 
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
@@ -42,9 +51,8 @@ class Common(Role):
 
         common.substitute("templates/common/common.sh", cfg)
 
-        # directly copy hosts and dhclient config
+        # directly copy hosts
         shutil.copyfile("templates/common/hosts", os.path.join(output_dir, "hosts"))
-        shutil.copyfile("templates/common/dhclient.conf", os.path.join(output_dir, "dhclient.conf"))
 
         if cfg["metrics"]:
             common.append(_SETUP_METRICS)
@@ -60,6 +68,7 @@ class Common(Role):
         util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
         util.resolv.create_conf(cfg, output_dir)
+        util.dhcpcd.create_conf(cfg, output_dir)
         _create_chrony_conf(cfg, output_dir)
 
         # different installation scripts for physical vs virtual
@@ -76,7 +85,6 @@ def _setup_repos(cfg, common):
     common.append("echo \"Configuring APK repositories\"")
     common.append("")
 
-    # TODO create repos file for VM outside of VM and pass into alpine-make-vm-image
     repos = cfg["alpine_repositories"]
 
     # overwrite on first, append on subsequent

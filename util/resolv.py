@@ -5,8 +5,7 @@ import util.file
 def create_conf(cfg, output_dir):
     """Create resolv.conf and save it to the given directory.
 
-    All values are optional. If no values are specified, no file is created.
-    local_dns and external_dns should be an iterable of IP addresses.
+    If DHCP or DHCP6 is used on any interfaces, no file is created.
     """
    # determine if any interface is using DHCP
     dhcp = False
@@ -16,6 +15,7 @@ def create_conf(cfg, output_dir):
 
     for iface in interfaces:
         dhcp |= iface["ipv4_address"] == "dhcp"
+        dhcp |= iface["ipv6_dhcp"]
 
         # possibly search vlan domains
         domain = iface["vlan"].get("domain") if "vlan" in iface else None

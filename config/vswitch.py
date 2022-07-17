@@ -14,7 +14,7 @@ def validate(cfg):
 
     # list of vswitches in yaml => dict of names to vswitches
     vswitches_by_name = cfg["vswitches"] = {}
-    uplinks = cfg["uplinks"] = set()
+    uplinks = set()
 
     for i, vswitch in enumerate(vswitches, start=1):
         # name is required and must be unique

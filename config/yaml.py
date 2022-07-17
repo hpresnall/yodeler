@@ -84,14 +84,10 @@ def load_host_config(site_cfg, hostname):
             cfg[key] = set(site)
             cfg[key] |= set(host)
 
-    # if either site or host needs it, make sure the package is not removed
-    cfg["remove_packages"] -= (cfg["packages"])
-
     _validate_config(cfg)
     _configure_roles(cfg)
-    _configure_packages(cfg)
-
     config.interface.validate(cfg)
+    _configure_packages(cfg)
 
     return cfg
 
@@ -108,16 +104,16 @@ def config_from_string(config_string):
 def config_from_dict(cfg):
     """Load the configuration from the given dictionary.
 
-    This string must include _all_ required site and host elements.
+    This map must include _all_ required site and host elements.
     """
     if cfg is None:
         raise KeyError("empty config")
 
     _validate_config(cfg)
     _configure_roles(cfg)
-    _configure_packages(cfg)
     config.vswitch.validate(cfg)
     config.interface.validate(cfg)
+    _configure_packages(cfg)
 
     return cfg
 
@@ -169,16 +165,13 @@ def _configure_roles(cfg):
 
 
 def _configure_packages(cfg):
-    if "packages" in cfg:
-        cfg["packages"] |= DEFAULT_PACKAGES
-    else:
-        cfg["packages"] = DEFAULT_PACKAGES
-
+    if "packages" not in cfg:
+        cfg["packages"] = set()
     if "remove_packages" not in cfg:
         cfg["remove_packages"] = set()
 
     for role in cfg["roles"]:
-        cfg["packages"] |= role.additional_packages()
+        cfg["packages"] |= role.additional_packages(cfg)
 
     # update packages based on config
     if cfg["metrics"]:
@@ -208,7 +201,6 @@ def _configure_packages(cfg):
 _REQUIRED_PROPERTIES = ["site", "hostname", "public_ssh_key"]
 
 # accessible for testing
-DEFAULT_PACKAGES = {"acpi", "doas", "openssh", "chrony", "awall", "dhclient"}
 DEFAULT_CONFIG = {
     "is_vm": True,
     "vcpus": 1,

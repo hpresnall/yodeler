@@ -59,6 +59,15 @@ def validate(domain, vswitch):
                 (f"vlan {vlan_name} domain {vlan['domain']} is not in top-level domain {domain} "
                  f"in vswitch {vswitch_name}"))
 
+        ipv6_pd_network = vlan.get("ipv6_pd_network")
+
+        if ipv6_pd_network is None:
+            vlan["ipv6_pd_network"] = None
+        else:
+            if not isinstance(ipv6_pd_network, int):
+                raise KeyError(f"ipv6_pd_network {ipv6_pd_network} must be an integer")
+            vlan["ipv6_pd_network"] = ipv6_pd_network
+
     _configure_default_vlan(vswitch)
     _validate_access_vlans(vswitch)
 
@@ -99,10 +108,10 @@ def _validate_vlan_subnet(vswitch_name, vlan, ip_version):
     dhcp_max = subnet.network_address + dhcp_max
 
     if dhcp_min not in subnet:
-        raise KeyError((f"invalid {min_key} for vlan {vlan_name} "
+        raise KeyError((f"invalid {min_key} {dhcp_min} for vlan {vlan_name} "
                         f"in vswitch {vswitch_name}"))
     if dhcp_max not in subnet:
-        raise KeyError((f"invalid {max_key} for vlan {vlan_name} "
+        raise KeyError((f"invalid {max_key} {dhcp_max} for vlan {vlan_name} "
                         f"in vswitch {vswitch_name}"))
     if dhcp_min > dhcp_max:
         raise KeyError((f"{min_key} > {max_key} for vlan {vlan_name} "

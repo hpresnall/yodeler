@@ -16,7 +16,7 @@ def yodel():
         sys.exit(1)
 
     site_path = sys.argv[1]
-    output_dir =  os.path.join(sys.argv[2], os.path.basename(site_path))
+    output_dir = os.path.join(sys.argv[2], os.path.basename(site_path))
 
     try:
         os.makedirs(output_dir)

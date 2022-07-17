@@ -14,7 +14,7 @@ class Dns(Role):
     def __init__(self):
         super().__init__("dns")
 
-    def additional_packages(self):
+    def additional_packages(self, cfg):
         return {"bind", "bind-tools"}
 
     def create_scripts(self, cfg, output_dir):

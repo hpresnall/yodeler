@@ -18,7 +18,7 @@ class Role(ABC):
         """Add any additional default configuration for the role."""
 
     @abstractmethod
-    def additional_packages(self) -> typing.Set[str]:
+    def additional_packages(self, cfg) -> typing.Set[str]:
         """The packages needed to implement this role."""
 
     @abstractmethod

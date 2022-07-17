@@ -16,8 +16,8 @@ Yodeler will (_eventually_) know how to configure the following:
 1. Multiple Open vSwitch vswitches with multiple VLANs
 1. Minimal Awall based firewalls
 1. Routers based on Shorewall / iptables
-1. DNS / DHCP servers based on Bind 9 and Kea
-1. Dynamic IPv6 prefix delegation with radvd (internal) and udhcpd (external)
+1. DNS / DHCP servers based on PowerDNS and Kea
+1. Dynamic IPv6 prefix delegation with radvd (internal) and dhcpcd (external)
 1. Metrics servers based on Grafana and Prometheus
 
 See [the roadmap](ROADMAP.md) for plans & progress.

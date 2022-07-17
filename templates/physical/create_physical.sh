@@ -69,7 +69,7 @@ fi
 
 if [ "$$RESULT" == "0" ]; then
   echo "Successful Yodel!"
-  echo "The system will now reboot""
+  echo "The system will now reboot"
   # reboot
 else
   echo "Installation did not complete successfully; please see the logs for more info"  

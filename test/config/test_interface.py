@@ -8,12 +8,12 @@ import test.config.base as base
 class TestInterface(base.TestCfgBase):
     def test_iface_ipv6_options(self):
         self._cfg_dict["interfaces"][0]["accept_ra"] = False
-        self._cfg_dict["interfaces"][0]["privext"] = 2
+        self._cfg_dict["interfaces"][0]["ipv6_tempaddr"] = 1
 
         cfg = self.build_cfg()
 
         self.assertFalse(cfg["interfaces"][0]["accept_ra"])
-        self.assertTrue(cfg["interfaces"][0]["privext"])
+        self.assertTrue(cfg["interfaces"][0]["ipv6_tempaddr"])
 
     def test_no_interfaces(self):
         del self._cfg_dict["interfaces"]
@@ -133,5 +133,10 @@ class TestInterface(base.TestCfgBase):
 
         self.assertIsNone(cfg["vswitches"]["public"]["vlans"][0]["ipv6_subnet"])
         self.assertIsNone(cfg["interfaces"][0]["ipv6_address"])
-        self.assertFalse(cfg["interfaces"][0]["privext"])
+        self.assertFalse(cfg["interfaces"][0]["ipv6_tempaddr"])
         self.assertFalse(cfg["interfaces"][0]["accept_ra"])
+
+    def test_no_wifi_config(self):
+        self._cfg_dict["interfaces"][0]["name"] = "wlan0"
+        # wifi without configuration should error
+        self.build_error()

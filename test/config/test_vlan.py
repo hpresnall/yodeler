@@ -194,3 +194,11 @@ class TestVlan(base.TestCfgBase):
         cfg = self.build_cfg()
 
         self.assertIsNone(cfg["vswitches"]["public"]["vlans"][0]["ipv6_subnet"])
+
+    def test_vlan_ipv6_invalid_pd_network(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_pd_network"] = "foo"
+        self.build_error()
+
+    def test_vlan_ipv6_big_pd_network(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_pd_network"] = "300"
+        self.build_error()

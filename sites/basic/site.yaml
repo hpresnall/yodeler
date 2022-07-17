@@ -40,6 +40,9 @@ vswitches:
         domain: infra.example.com
         ipv4_subnet: 192.168.210.0/24
         ipv6_subnet: fd24:87e8:06c7:10::/64
+        # instead of defaulting to index order, set delegated prefix to the 10th /64 in the IPv6 PD
+        # assumes 'ipv6_pd_prefixlen' of 56 defined in the router uplink
+        ipv6_pd_network: 10
         allow_dhcp: false # DHCP server will not be configured
         access_vlans: all # firewall will allow any access to all vlans, including the internet
         allow_access_stopped_firewall: true # allow internet access when firewall is stopped
@@ -49,6 +52,7 @@ vswitches:
         domain: user.example.com
         ipv4_subnet: 192.168.220.0/24
         ipv6_subnet: fd24:87e8:06c7:20::/64
+        ipv6_pd_network: 20
         default: true # if not specified, VMs default to this vlan
         allow_internet: false # firewall will restrict outbound internet access
         dhcp_min_address_ipv4: 2

@@ -43,7 +43,7 @@ def validate(cfg):
     if cfg["primary_domain"] != "":
         if matching_domain is None:
             raise KeyError(
-                f"invalid primary_domain: no vlan domain matches {cfg['primary_domain']}")
+                f"invalid primary_domain: no vlan domain matches 'primary_domain' {cfg['primary_domain']}")
     else:
         # single interface => set host domain to vlan domain
         if len(ifaces) == 1:
@@ -96,8 +96,10 @@ def validate_iface(iface):
     if ipv6_disable:
         iface["ipv6_address"] = None
         # no SLAAC
-        iface["privext"] = False
+        iface["ipv6_tempaddr"] = False
         iface["accept_ra"] = False
+        # no DHCP
+        iface["ipv6_dhcp"] = False
     else:
         address = iface.get("ipv6_address")
         if address is not None:
@@ -115,8 +117,19 @@ def validate_iface(iface):
         else:
             iface["ipv6_address"] = None
 
-        iface["privext"] = bool(iface.get("privext"))
+        # default to False, SLAAC only
+        # note will not preclude using DHCP6 for options
+        iface["ipv6_dhcp"] = bool(iface.get("ipv6_dhcp"))
+
+        # default to False; dhcpcd will use another temporary address method
+        iface["ipv6_tempaddr"] = bool(iface.get("ipv6_tempaddr"))
+
+        # default to True
         iface["accept_ra"] = True if "accept_ra" not in iface else bool(iface.get("accept_ra"))
+
+        if iface["name"].startswith("wlan"):
+            if not ("wifi-ssid" in iface) and not ("wifi-psk" in iface):
+                raise KeyError("both 'wifi-ssd' and 'wifi-psk' must be defined for WiFi interfaces")
 
 
 def _validate_ipaddress(iface, ip_version):
@@ -127,11 +140,11 @@ def _validate_ipaddress(iface, ip_version):
     except Exception as exp:
         raise KeyError(f"invalid {key} {value}") from exp
 
-    subnet = iface['vlan'][ip_version + "_subnet"]
+    subnet = iface.get("vlan", iface).get(ip_version + "_subnet")
 
     if subnet is None:
         raise KeyError(
-            f"subnet for vlan {iface['vlan']['id']} cannot be None when specifying an IP address")
+            f"subnet cannot be None when specifying an IP address")
 
     if address not in subnet:
         raise KeyError(
@@ -144,3 +157,10 @@ def _validate_ipaddress(iface, ip_version):
     if ip_version == "ipv6":
         iface["ipv6_prefixlen"] = subnet.prefixlen
         # gateway provided by router advertisements
+
+
+def find_config(cfg, iface_name):
+    for iface in cfg["interfaces"]:
+        if iface["name"] == iface_name:
+            return iface
+    return KeyError(f"cannot find interface config for '{iface_name}'")

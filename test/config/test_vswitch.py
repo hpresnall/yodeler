@@ -36,7 +36,6 @@ class TestVswitch(base.TestCfgBase):
 
         # key should exist and be None
         self.assertIsNone(cfg["vswitches"]["public"]["uplink"])
-        self.assertEqual(0, len(cfg["uplinks"]))
 
     def test_multi_uplink(self):
         self._cfg_dict["vswitches"][0]["uplink"] = ["eth0", "eth1"]
@@ -44,7 +43,6 @@ class TestVswitch(base.TestCfgBase):
 
         # key should exist
         self.assertEqual(2, len(cfg["vswitches"]["public"]["uplink"]))
-        self.assertEqual(2, len(cfg["uplinks"]))
 
     def test_reused_uplink(self):
         self._cfg_dict["vswitches"][1]["uplink"] = "eth0"

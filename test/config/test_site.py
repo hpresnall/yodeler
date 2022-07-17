@@ -46,7 +46,7 @@ class TestSetup(unittest.TestCase):
                 self.assertTrue(os.path.isdir(host_dir))
 
                 required_files = ["setup.sh", "common.sh", "hosts", "interfaces",
-                                  "resolv.conf", "dhclient.conf", "chrony.conf", "packages"]
+                                  "resolv.conf", "dhcpcd.conf", "chrony.conf", "packages"]
                 required_dirs = []
 
                 if host_cfg["local_firewall"]:

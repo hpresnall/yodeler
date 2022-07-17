@@ -3,5 +3,7 @@ primary_domain: infra.example.com
 memory_mb: 256
 uplink:
   ipv4_address: dhcp
+  ipv6_dhcp: true # request a DHCP6 address in addtion to SLAAC and DHCP6 options
+  ipv6_pd_prefixlen: 56 # request an IPv6 prefix delegation of this length
   macvtap: eth0
 roles: [router]

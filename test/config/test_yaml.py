@@ -28,8 +28,11 @@ class TestConfig(base.TestCfgBase):
 
         # has all default packages
         packages = cfg["packages"]
-        for package in yaml.DEFAULT_PACKAGES:
-            self.assertIn(package, packages)
+        self.assertIsNotNone(packages)
+        self.assertEqual(10, len(packages))
+        # common packages + metrics enabled by default
+        self.assertEqual(0, len({"e2fsprogs", "acpi", "doas", "openssh", "chrony",
+                         "awall", "dhcpcd", "ifupdown-ng", "iproute2", "prometheus-node-exporter"} - packages))
 
         # default metrics; default is_vm
         self.assertIn("prometheus-node-exporter", packages)
@@ -39,8 +42,7 @@ class TestConfig(base.TestCfgBase):
 
         self.assertIsNotNone(vswitch["vlans_by_name"])
         self.assertIsNotNone(vswitch["vlans_by_id"])
-        self.assertEqual(len(vswitch["vlans_by_name"]),
-                         len(vswitch["vlans_by_id"]))
+        self.assertEqual(len(vswitch["vlans_by_name"]), len(vswitch["vlans_by_id"]))
 
         # single vlan
         # default not specified; should default to only vlan
@@ -49,10 +51,6 @@ class TestConfig(base.TestCfgBase):
 
         # single interface, no domain specified
         self.assertIsNotNone(cfg["primary_domain"])
-
-        # uplinks added from all vswitches
-        self.assertIsNotNone(cfg["uplinks"])
-        self.assertEqual(1, len(cfg["uplinks"]))
 
         # has all default vlan config
         vlan = vswitch["vlans_by_id"][10]
@@ -70,9 +68,8 @@ class TestConfig(base.TestCfgBase):
         self.assertEqual("192.168.1.1", str(iface["ipv4_gateway"]))
         self.assertEqual("24", str(iface["ipv4_prefixlen"]))
 
-        self.assertEqual(64, iface["ipv6_prefixlen"])
         self.assertTrue(iface["accept_ra"])
-        self.assertFalse(iface["privext"])
+        self.assertFalse(iface["ipv6_tempaddr"])
 
     def test_site_and_host(self):
         site = yaml.load_site_config(
