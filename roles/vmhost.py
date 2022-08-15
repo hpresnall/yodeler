@@ -2,7 +2,6 @@
 import os.path
 
 import xml.etree.ElementTree as xml
-import shutil
 
 import util.shell
 import util.file
@@ -24,7 +23,7 @@ class VmHost(Role):
 
     def additional_packages(sel, cfg):
         return {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
-                "libvirt", "libvirt-daemon", "libvirt-qemu", "dbus", "polkit", "git"}
+                "libvirt", "libvirt-daemon", "libvirt-qemu", "ovmf", "dbus", "polkit", "git"}
 
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
@@ -89,6 +88,7 @@ def _configure_uplinks(cfg, shell, vswitch):
         # multiple uplink interfaces; create a bond named 'uplink'
         bond_ifaces = " ".join(uplink)
         bond_name = f"{vswitch_name}-uplink"
+        shell.append("# bonded uplink")
         shell.append(f"ovs-vsctl add-bond {vswitch_name} {bond_name} {bond_ifaces} lacp=active")
 
         for n, iface in enumerate(uplink):
@@ -97,6 +97,7 @@ def _configure_uplinks(cfg, shell, vswitch):
             uplink_interfaces.append(bond)
         uplink = bond_name  # use new uplink name for tagging, if needed
     else:
+        shell.append("# uplink")
         shell.append(f"ovs-vsctl add-port {vswitch_name} {uplink}")
         iface = util.interfaces.port(uplink, vswitch_name, "uplink for vswitch " + vswitch_name,
                                      config.interface.find_config(cfg, uplink))

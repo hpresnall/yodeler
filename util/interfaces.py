@@ -43,8 +43,6 @@ def from_config(interfaces):
         # if "tempaddr" in iface: TODO research RFCs 7217 and 8981 along with dhcpcd's slaac private temporary setting
         #     buffer.append("  use ipv6-privacy")
 
-        space |= output_wifi(iface, buffer)
-
         if space:
             buffer.append("")
             space = False
@@ -63,6 +61,8 @@ def from_config(interfaces):
         if space:
             buffer.append("")
 
+        output_wifi(iface, buffer)
+
         all_interfaces.append("\n".join(buffer).format_map(iface))
 
     return "\n".join(all_interfaces)
@@ -76,7 +76,7 @@ def port(name, parent, comment, uplink=None):
     iface <nanme>
       requires <parent> # if exists
 
-    If uplink_name is specified, WiFi configuration will be moved from the uplink to the new port.
+    If uplink is specified, WiFi configuration will be moved from the uplink to the new port.
     """
     buffer = []
 
@@ -85,20 +85,23 @@ def port(name, parent, comment, uplink=None):
 
     buffer.append(f"auto {name}")
     buffer.append(f"iface {name}")
-    space = True
 
     if parent:
         buffer.append(f"  requires {parent}")
-        buffer.append("")
-        space = False
 
-    if uplink:
-        space |= output_wifi(uplink, buffer, remove=True)
-
-    if space:
-        buffer.append("")
+    buffer.append("")
 
     # no ipv4 address and no ipv6 SLAAC or DHCP
+    if uplink:
+        print(uplink)
+        output_wifi(uplink, buffer)
+        port = "\n".join(buffer).format_map(uplink)
+
+        if "wifi_ssid" in uplink:
+            del uplink["wifi_ssid"]
+            del uplink["wifi_psk"]
+
+        return port
 
     return "\n".join(buffer)
 
@@ -143,15 +146,9 @@ def for_vlan(vlan, iface_name):
     return "\n".join(buffer)
 
 
-def output_wifi(iface, buffer, remove=False):
-    if "wifi-ssid" in iface:
+def output_wifi(iface, buffer):
+    if "wifi_ssid" in iface:
         buffer.append("  use wifi")
-        buffer.append("  wifi-ssid {wifi-ssid}")
-        buffer.append("  wifi-psk {wifi-psk}")
-
-        if remove:
-            del iface["wifi-ssid"]
-            del iface["wifi-psk"]
-
-        return True
-    return False
+        buffer.append("  wifi-ssid {wifi_ssid}")
+        buffer.append("  wifi-psk {wifi_psk}")
+        buffer.append("")

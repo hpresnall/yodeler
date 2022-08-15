@@ -128,8 +128,8 @@ def validate_iface(iface):
         iface["accept_ra"] = True if "accept_ra" not in iface else bool(iface.get("accept_ra"))
 
         if iface["name"].startswith("wlan"):
-            if not ("wifi-ssid" in iface) and not ("wifi-psk" in iface):
-                raise KeyError("both 'wifi-ssd' and 'wifi-psk' must be defined for WiFi interfaces")
+            if not ("wifi_ssid" in iface) and not ("wifi_psk" in iface):
+                raise KeyError("both 'wifi_ssd' and 'wifi_psk' must be defined for WiFi interfaces")
 
 
 def _validate_ipaddress(iface, ip_version):
@@ -163,4 +163,4 @@ def find_config(cfg, iface_name):
     for iface in cfg["interfaces"]:
         if iface["name"] == iface_name:
             return iface
-    return KeyError(f"cannot find interface config for '{iface_name}'")
+    raise KeyError(f"cannot find interface config for '{iface_name}'")

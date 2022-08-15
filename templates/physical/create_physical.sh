@@ -1,5 +1,8 @@
 set -o errexit
 
+# ensure the drive running this script is writable
+mount -o remount,rw $(realpath $(df . | grep '^/' | cut -d' ' -f1))
+
 # use site-level APK cache for this boot
 # will be partially populated by Alpine install
 echo "Setting up APK cache for site $SITE"
@@ -50,11 +53,10 @@ mount --make-private "$$INSTALLED"/dev
 mount --bind /sys "$$INSTALLED"/sys
 mount --make-private "$$INSTALLED"/sys
 
-echo -n "Running setup for $HOSTNAME"
-set +o errexit # copy APKs even if setup fails
+echo "Running setup for $HOSTNAME inside chroot"
+set +o errexit # copy cached APKs even if setup fails
 chroot "$$INSTALLED" /bin/sh -c "cd /root/$SITE/$HOSTNAME && ./setup.sh"
 RESULT=$$?
-echo "Complete"
 
 echo "Synching $HOSTNAME's APK cache back to site-level cache"
 # copy any new APKS back to the site APK cache
@@ -72,5 +74,5 @@ if [ "$$RESULT" == "0" ]; then
   echo "The system will now reboot"
   # reboot
 else
-  echo "Installation did not complete successfully; please see the logs for more info"  
+  echo "Installation did not complete successfully; please see the logs for more info"
 fi

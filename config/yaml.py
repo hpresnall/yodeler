@@ -220,7 +220,7 @@ DEFAULT_CONFIG = {
     "password": "apassword",
     "timezone": "UTC",
     "keymap": "us us",
-    "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main"],
+    "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
     "ntp_pool_servers": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
     "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
     # top-level domain for the site

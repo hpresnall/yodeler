@@ -22,12 +22,16 @@ chmod +x /etc/profile.d/aliases.sh
 
 # cleanup TTYs
 if [ "$IS_VM" = "True" ]; then
-  # no TTYs on VMs; faster boot
+  # no TTYs on VMs
   sed -i -E "s/^tty([1-6])/\#tty\1/g" /etc/inittab
+  # only 1s at boot menu; faster boot
   sed -i -e "s/TIMEOUT 30/TIMEOUT 10/g" /boot/extlinux.conf
 else
   # keep 2 TTYs on physical
   sed -i -E "s/^tty([3-6])/\#tty\1/g" /etc/inittab
+
+  # force console video mode in kernel opts
+  sed -i -e "s/quiet/video=1920x1080 quiet/g" /boot/grub/grub.cfg
 fi
 
 # non-root user config

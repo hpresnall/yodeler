@@ -18,4 +18,5 @@ USEROPTS="-a $USER"
 # install system to $ROOT_DEV
 export DISKLABEL=gpt
 export ERASE_DISKS=$ROOT_DEV
+export USE_EFI=yes
 DISKOPTS="-m sys $ROOT_DEV"
