@@ -4,19 +4,23 @@
 APKREPOSOPTS="-1"
 PROXYOPTS=none
 
+# general options
 KEYMAPOPTS="$KEYMAP"
 TIMEZONEOPTS="-z $TIMEZONE"
 SSHDOPTS="-k none openssh"
 NTPOPTS="-c chrony"
 HOSTNAMEOPTS="-n $HOSTNAME"
+
+# network options; note interface config is in BusyBox's format
 INTERFACESOPTS="$INSTALL_INTERFACES"
+# assume internal network is not yet configured; use external DNS instead
 DNSOPTS="-n $EXTERNAL_DNS_STR"
 
 # add user to wheel and setup doas
 USEROPTS="-a $USER"
 
-# install system to $ROOT_DEV
+# install EFI system to $ROOT_DEV
 export DISKLABEL=gpt
-export ERASE_DISKS=$ROOT_DEV
 export USE_EFI=yes
+export ERASE_DISKS=$ROOT_DEV
 DISKOPTS="-m sys $ROOT_DEV"

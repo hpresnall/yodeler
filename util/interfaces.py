@@ -1,7 +1,8 @@
 """Utility functions for creating /etc/network/interfaces.
 
 Files created by this module are usable by the ifupdown-ng package.
-It _will not_ be usable by the Alpine's default BusyBox ifupdown."""
+It _will not_ be usable by the Alpine's default BusyBox ifupdown command or by
+the Debian's version from the ifupdown package."""
 
 
 def loopback():
@@ -53,6 +54,10 @@ def from_config(interfaces):
                 buffer.append("  gateway {ipv4_gateway}")
             space = True
 
+        if space:
+            buffer.append("")
+            space = False
+
         # assume interface validation removes the ipv6_address if disabled by vlan
         if iface["ipv6_address"] is not None:
             buffer.append("  address {ipv6_address}")
@@ -61,7 +66,7 @@ def from_config(interfaces):
         if space:
             buffer.append("")
 
-        output_wifi(iface, buffer)
+        _output_wifi(iface, buffer)
 
         all_interfaces.append("\n".join(buffer).format_map(iface))
 
@@ -73,7 +78,7 @@ def port(name, parent, comment, uplink=None):
 
     # <comment>
     auto <name>
-    iface <nanme>
+    iface <name>
       requires <parent> # if exists
 
     If uplink is specified, WiFi configuration will be moved from the uplink to the new port.
@@ -92,9 +97,9 @@ def port(name, parent, comment, uplink=None):
     buffer.append("")
 
     # no ipv4 address and no ipv6 SLAAC or DHCP
+
     if uplink:
-        print(uplink)
-        output_wifi(uplink, buffer)
+        _output_wifi(uplink, buffer)
         port = "\n".join(buffer).format_map(uplink)
 
         if "wifi_ssid" in uplink:
@@ -138,7 +143,7 @@ def for_vlan(vlan, iface_name):
        # add IPv6 address for subnet
         if vlan.get("ipv6_subnet") is not None:
             # manually set the IPv6 address
-            buffer.append("  address " + str(vlan["ipv6_subnet"].network_address +
+            buffer.append("\n  address " + str(vlan["ipv6_subnet"].network_address +
                           1) + "/" + str(vlan["ipv6_subnet"].prefixlen))
 
     buffer.append("")
@@ -146,7 +151,7 @@ def for_vlan(vlan, iface_name):
     return "\n".join(buffer)
 
 
-def output_wifi(iface, buffer):
+def _output_wifi(iface, buffer):
     if "wifi_ssid" in iface:
         buffer.append("  use wifi")
         buffer.append("  wifi-ssid {wifi_ssid}")

@@ -10,6 +10,7 @@ echo "Building VM image for $HOSTNAME"
   --image-format raw \
   --serial-console \
   --image-size ${DISK_SIZE_MB}M \
+  --repositories-file /etc/apk/repositories \
   --packages "$$(cat $$DIR/packages)" \
   --script-chroot \
   $VM_IMAGES_PATH/$HOSTNAME.img \
@@ -20,13 +21,16 @@ if [ "$$?" = "0" ]; then
   echo "Creating VM definition for $HOSTNAME"
   virsh define $$DIR/$HOSTNAME.xml
 
-  # if successful, start the VM
+  # if successful, set the image perms & autostart the VM
   if [ "$$?" = "0" ]; then
-    echo "Starting VM $HOSTNAME"
     chmod 660 $VM_IMAGES_PATH/$HOSTNAME.img
     chown root:libvirt $VM_IMAGES_PATH/$HOSTNAME.img
 
     virsh autostart $HOSTNAME
-    virsh start $HOSTNAME
+
+    if [ "$$1" = "start" ]; then
+      echo "Starting VM $HOSTNAME"
+      virsh start $HOSTNAME
+    fi
   fi
 fi

@@ -14,6 +14,10 @@ class TestVlan(base.TestCfgBase):
         self._cfg_dict["vswitches"][0]["vlans"] = []
         self.build_error()
 
+    def test_string_vlans(self):
+        self._cfg_dict["vswitches"][0]["vlans"] = "invalid"
+        self.build_error()
+
     def test_no_vlan_name(self):
         del self._cfg_dict["vswitches"][0]["vlans"][0]["name"]
         self.build_error()

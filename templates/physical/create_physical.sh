@@ -1,7 +1,7 @@
 set -o errexit
 
 # ensure the drive running this script is writable
-mount -o remount,rw $(realpath $(df . | grep '^/' | cut -d' ' -f1))
+mount -o remount,rw $$(realpath $$(df . | grep '^/' | cut -d' ' -f1))
 
 # use site-level APK cache for this boot
 # will be partially populated by Alpine install
@@ -24,23 +24,38 @@ setup-alpine -e -f $$DIR/answerfile
 echo
 echo "Alpine install complete"
 
-# assume the 3rd partition is root
+# mount the installed system and run setup inside of chroot
 echo "Mounting installed system"
 INSTALLED=/media/installed
 mkdir -p "$$INSTALLED"
-mount ${ROOT_DEV}3 "$$INSTALLED"
+mount ${ROOT_DEV}${ROOT_PARTITION} "$$INSTALLED"
+
+# TODO this is only needed for vmhost; need a method to add to this script based on role
 
 echo "Copying yodeler scripts for site '$SITE' to $$INSTALLED/root/"
 # note this includes the site-level apk_cache
 cp -R $$DIR/../../$SITE "$$INSTALLED/root/"
 
-# for setup.sh that needs the internet, use _this install's_ resolv.conf
+# vm host install need openvswitch module running
+# however, the installer's kernel version could be different than the installed system
+# so, modprobe in chroot will not work; do it here instead
+# TODO need check for intel / amd
+# TODO remove this for non-vmhost physical servers
+setup-apkrepos -1 -c
+apk -q add openvswitch qemu-system-x86_64
+modprobe openvswitch
+modprobe nbd
+modprobe tun
+modprobe kvm_intel
+
+# still using Alpine installer's network configuration in chroot
+# backup the installed resolv.conf and use the current installation's instead
 if [ -f "$$INSTALLED/root/$SITE/$HOSTNAME/resolv.conf" ]; then
   cp "$$INSTALLED/root/$SITE/$HOSTNAME/resolv.conf" "$$INSTALLED/root/$SITE/$HOSTNAME/resolv.orig"
 fi
 cp /etc/resolv.conf "$$INSTALLED/root/$SITE/$HOSTNAME/resolv.conf" # will be moved to /etc by setup.sh
 
-# cache APKs on installed system in /root
+# cache APKs on installed system in /root/$SITE
 # note symlinks are relative to installed root fs
 rm -f "$$INSTALLED/etc/apk/cache"
 ln -s /root/$SITE/apk_cache "$$INSTALLED/etc/apk/cache"
@@ -69,7 +84,7 @@ if [ -f "$$INSTALLED/root/$SITE/$HOSTNAME/resolv.orig" ]; then
   install -o root -g root -m 644 "$$INSTALLED/root/$SITE/$HOSTNAME/resolv.conf" "$$INSTALLED/etc"
 fi
 
-if [ "$$RESULT" == "0" ]; then
+if [ "$$RESULT" == 0 ]; then
   echo "Successful Yodel!"
   echo "The system will now reboot"
   # reboot

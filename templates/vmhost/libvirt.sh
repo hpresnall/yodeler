@@ -30,14 +30,21 @@ git clone https://github.com/alpinelinux/alpine-make-vm-image.git
 chown -R $USER:$USER alpine-make-vm-image
 
 echo "Starting libvirt services"
-# libvirt needs networking, but do not start the openvswitch configured networking
-# continue to use the installer network, but make libvirt think networking is started
+# libvirt needs networking; make libvirt think it is started
+# continue to use the installer network instead
 mkdir -p /var/run/openrc/started
 ln -s /etc/init.d/networking /var/run/openrc/started/networking
 
 rc-service dbus start
 rc-service polkit start
 rc-service libvirtd start
+
+# wait for libvirt to start
+virsh list > /dev/null 2>&1
+while [ "$$?" -ne 0 ]; do
+    sleep 1
+    virsh list > /dev/null 2>&1
+done
 
 echo "Configuring libvirt storage"
 mkdir $VM_IMAGES_PATH

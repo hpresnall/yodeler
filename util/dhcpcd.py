@@ -23,6 +23,7 @@ def create_conf(cfg, output_dir):
         if iface["ipv6_dhcp"]:
             if not ipv6:
                 buffer.append("  ipv6")
+                ipv6 = True
             buffer.append("  ia_na 0")
 
         prefixes = iface.get("ipv6_delegated_prefixes")
@@ -30,6 +31,7 @@ def create_conf(cfg, output_dir):
         if (prefixes is not None) and (len(prefixes) > 0):
             if not ipv6:
                 buffer.append("  ipv6")
+                ipv6 = True
             prefixes.insert(0, f"  ia_pd 1/::{iface['ipv6_pd_prefixlen']}")
             buffer.append(" ".join(prefixes))
 

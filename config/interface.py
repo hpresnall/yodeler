@@ -43,7 +43,7 @@ def validate(cfg):
     if cfg["primary_domain"] != "":
         if matching_domain is None:
             raise KeyError(
-                f"invalid primary_domain: no vlan domain matches 'primary_domain' {cfg['primary_domain']}")
+                f"invalid primary_domain: no interface's vlan domain matches 'primary_domain' {cfg['primary_domain']}")
     else:
         # single interface => set host domain to vlan domain
         if len(ifaces) == 1:
@@ -87,7 +87,7 @@ def validate_iface(iface):
             try:
                 ipaddress.ip_network(iface["ipv4_subnet"])
             except Exception as exp:
-                raise KeyError("invalid ipv4_subnet") from exp
+                raise KeyError(f"invalid ipv4_subnet {iface['ipv4_subnet']}") from exp
 
     # ipv6 disabled at vlan level of interface level => ignore address
     ipv6_disable = (vlan["ipv6_disable"] or iface.get("ipv6_disable")

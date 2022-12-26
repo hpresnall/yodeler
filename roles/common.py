@@ -35,19 +35,27 @@ class Common(Role):
         """Create the scripts and configuration files for the given host's configuration."""
         common = util.shell.ShellScript("common.sh")
 
-        if not cfg["is_vm"]:
-            # for physical servers, add packages manually
-            # VMs will use host's configured repos and have packages installed as part of image creation
-            _setup_repos(cfg, common)
-            common.append("echo \"Installing required packages\"")
-            common.append("apk -q add $(cat $DIR/packages)")
-            common.append("")
-
         # write all packages to a file; usage depends on vm or physical server
         util.file.write("packages", " ".join(cfg["packages"]), output_dir)
 
-        # removing packages always handled by script
-        cfg["remove_packages_str"] = " ".join(cfg["remove_packages"])
+        if not cfg["is_vm"]:
+            # for physical servers, add packages manually
+            _setup_repos(cfg, common)
+            _apk_update(common)
+            common.append("echo \"Installing required packages\"")
+            common.append("apk -q --no-progress add $(cat $DIR/packages)")
+            common.append("")
+        else:
+            # VMs will use host's configured repo file and have packages installed as part of image creation
+            _apk_update(common)
+
+            # VMs are setup without USB, so remove the library
+            cfg["remove_packages"].add("libusb")
+
+        if (cfg["remove_packages"]):
+            common.append("echo \"Removing unneeded packages\"")
+            common.append("apk -q del " + " ".join(cfg["remove_packages"]))
+            common.append("")
 
         common.substitute("templates/common/common.sh", cfg)
 
@@ -90,10 +98,13 @@ def _setup_repos(cfg, common):
     # overwrite on first, append on subsequent
     common.append(f"echo {repos[0]} > /etc/apk/repositories")
 
-    repos = repos[1:]
-    for repo in repos:
+    for repo in repos[1:]:
         common.append(f"echo {repo} >> /etc/apk/repositories")
+
     common.append("")
+
+
+def _apk_update(common):
     common.append("apk -q update")
     common.append("")
 
@@ -136,7 +147,7 @@ def _create_physical(cfg, output_dir):
 
 
 def _create_vm(cfg, output_dir):
-    # setup.sh will run in the installed vm via
+    # setup.sh will run in the installed vm via create_vm.sh
     create_vm = util.shell.ShellScript("create_vm.sh")
     create_vm.append_self_dir()
     create_vm.substitute("templates/vm/create_vm.sh", cfg)
@@ -166,7 +177,7 @@ echo "ARGS=\\\"--log.level=warn \\
 --no-collector.xfs \\
 --no-collector.zfs \\
 --web.disable-exporter-metrics \\
---collector.diskstats.ignored-devices='^(ram|loop|fd|(h|s|v|xv)d[a-z]|nbd|sr|nvme\\\\d+n\\\\d+p)\\\\d+$' \\
---collector.filesystem.ignored-fs-types='^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs|vfat)$'\\"" \\
+--collector.diskstats.device-exclude='^(ram|loop|fd|(h|s|v|xv)d[a-z]|nbd|sr|nvme\\\\d+n\\\\d+p)\\\\d+$' \\
+--collector.filesystem.fs-types-exclude='^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs|vfat)$'\\"" \\
 > /etc/conf.d/node-exporter
 """

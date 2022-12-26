@@ -22,8 +22,10 @@ class VmHost(Role):
         super().__init__("vmhost")
 
     def additional_packages(sel, cfg):
+        # packages for openvswitch, qemu, libvirt and alpine-make-vm-image
         return {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
-                "libvirt", "libvirt-daemon", "libvirt-qemu", "ovmf", "dbus", "polkit", "git"}
+                "libvirt", "libvirt-daemon", "libvirt-qemu", "ovmf", "dbus", "polkit", 
+                "e2fsprogs", "rsync", "sfdisk", "git"}
 
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
@@ -31,6 +33,7 @@ class VmHost(Role):
 
         scripts.append(_setup_open_vswitch(cfg, output_dir))
         scripts.append(_setup_libvirt(cfg, output_dir))
+        scripts.append(_setup_vms(cfg, output_dir))
 
         return scripts
 
@@ -135,7 +138,10 @@ def _reconfigure_interfaces(shell, cfg, output_dir):
     # change original interface name to the port name
     for iface in cfg["interfaces"]:
         vswitch_name = iface["vswitch"]["name"]
-        port = f"{cfg['hostname']}-{vswitch_name}"
+        port = f"{cfg['hostname']}-{iface['vlan']['name']}"
+
+        if cfg["local_firewall"]:
+            awall_base = awall_base.replace(iface["name"], port)
 
         iface["name"] = port
         iface["comment"] = "host interface"
@@ -151,9 +157,6 @@ def _reconfigure_interfaces(shell, cfg, output_dir):
             shell.append(f"ovs-vsctl set port {port} vlan_mode=access")
 
         shell.append("")
-
-        if cfg["local_firewall"]:
-            awall_base = awall_base.replace(iface["name"], port)
 
     shell.write_file(output_dir)
 
@@ -221,6 +224,28 @@ def _setup_libvirt(cfg, output_dir):
         shell.append(f"virsh net-define $DIR/{network_xml}")
         shell.append(f"virsh net-start {name}")
         shell.append(f"virsh net-autostart {name}")
+        shell.append("")
+
+    shell.write_file(output_dir)
+
+    return shell.name
+
+def _setup_vms(cfg, output_dir):
+    shell = util.shell.ShellScript("create_vms.sh")
+    shell.append("# run create_vm.sh for each VM for this site")
+    shell.append("cd $DIR")
+    shell.append("")
+
+    for _, host in cfg["hosts"].items():
+        hostname = host["hostname"]
+
+        if not host["is_vm"] or hostname == cfg["hostname"]:
+            continue
+
+        shell.append("echo \"Setting up VM " + hostname + "...\"")
+        shell.append("cd ..")
+        shell.append("cd " + hostname)
+        shell.append("./create_vm.sh")
         shell.append("")
 
     shell.write_file(output_dir)

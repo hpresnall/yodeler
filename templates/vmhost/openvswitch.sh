@@ -15,6 +15,6 @@ mkdir -p /run/openrc/exclusive
 echo default > /run/openrc/softlevel
 
 # run now
-rc-service ovs-modules start
+# ovs-modules starts openvswitch kernel module; this was loaded loaded before running this script in chroot
 rc-service ovsdb-server start
 rc-service ovs-vswitchd start

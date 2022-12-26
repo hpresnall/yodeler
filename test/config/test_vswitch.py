@@ -14,6 +14,10 @@ class TestVswitch(base.TestCfgBase):
         self._cfg_dict["vswitches"] = []
         self.build_error()
 
+    def test_string_switches(self):
+        self._cfg_dict["vswitches"] = "invalid"
+        self.build_error()
+
     def test_no_vswitch_name(self):
         del self._cfg_dict["vswitches"][0]["name"]
         self.build_error()

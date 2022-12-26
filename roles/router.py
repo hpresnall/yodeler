@@ -53,7 +53,7 @@ class Router(Role):
 
         shorewall = _init_shorewall()
 
-        # delegate prefixes across all switches
+        # delegate IPv6 delegated prefixes across all switches
         # network for each vlan is in the order they are defined unless vlan['ipv6_pd_network'] is set
         # start at 1 => do not delegate the 0 network
         delegated_prefixes = []
@@ -75,11 +75,11 @@ class Router(Role):
                 vlan_interfaces.append(util.interfaces.for_vlan(vlan, iface_name))
                 _configure_shorwall(shorewall, vswitch["name"], vlan)
 
-                # add a prefix delegation stanza to dhcpcd.conf for the vlan
+                # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
                 network = vlan.get("ipv6_pd_network")
                 if network is None:
                     network = prefix_counter
-                    network = prefix_counter + 1
+                    prefix_counter += 1
                 else:
                     _validate_vlan_pd_network(uplink["ipv6_pd_prefixlen"], vlan)
                 delegated_prefixes.append(f"{iface_name}.{vlan['id']}/{network}")
@@ -105,22 +105,20 @@ class Router(Role):
             # else no routable vlans, no need to create any matching libvirt interface
         # end for all vswitches
 
-        uplink["ipv6_delegated_prefixes"] = delegated_prefixes
-
         # re-number config defined interfaces and make uplink (eth0) first
         # TODO explicitly defined interfaces should not be renumbered or used for vlans; need to mark in config/interface.py
         for iface in cfg["interfaces"]:
             iface["name"] = f"eth{iface_counter}"
             iface_counter += 1
+
+        uplink["ipv6_delegated_prefixes"] = delegated_prefixes
         cfg["interfaces"].insert(0, uplink)
 
         # recreate the interfaces file; loopback and uplink first
-        interfaces = [util.interfaces.loopback(), util.interfaces.from_config(
-            cfg["interfaces"])]
-        interfaces.extend(new_interfaces)
+        interfaces = [util.interfaces.loopback(), util.interfaces.from_config(cfg["interfaces"]), *new_interfaces]
         util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
-        # rewrite dhcpcd.conf with the uplink and prefix delegations
+        # create dhcpcd.conf with the uplink and prefix delegations
         util.dhcpcd.create_conf(cfg, output_dir)
 
         if cfg["is_vm"]:

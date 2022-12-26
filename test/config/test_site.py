@@ -6,7 +6,7 @@ import os.path
 import tempfile
 
 import config.site as site
-
+import util.file as config
 
 class TestSetup(unittest.TestCase):
     _base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -15,7 +15,7 @@ class TestSetup(unittest.TestCase):
         site_cfg = site.load_site(
             os.path.join(self._base_path, "sites", "test"))
 
-        self.assertEqual(site_cfg["name"], "test")
+        self.assertEqual(site_cfg["site"], "test")
         self.assertIsNotNone(site_cfg["hosts"])
 
         roles = site_cfg["roles_to_hostnames"]

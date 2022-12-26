@@ -11,6 +11,8 @@ def validate(cfg):
     vswitches = cfg.get("vswitches")
     if (vswitches is None) or (len(vswitches) == 0):
         raise KeyError("no vswitches defined")
+    if isinstance(vswitches, str):
+        raise KeyError(f"vswitches cannot be a string")
 
     # list of vswitches in yaml => dict of names to vswitches
     vswitches_by_name = cfg["vswitches"] = {}

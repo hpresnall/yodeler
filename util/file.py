@@ -29,7 +29,7 @@ def write(path, data_str, base_dir=None):
 
 
 def substitute(path, cfg):
-    """Read the given file and do $variable substitution from the given config."""
+    """Read the given file and do $variable substitution from the given config. Return the content as a string."""
     # use $UPPERCASE in scripts
     upper_cfg = {k.upper(): v for (k, v) in cfg.items()}
     template = string.Template(read(path))

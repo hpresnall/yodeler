@@ -34,10 +34,6 @@ class TestConfig(base.TestCfgBase):
         self.assertEqual(0, len({"e2fsprogs", "acpi", "doas", "openssh", "chrony",
                          "awall", "dhcpcd", "ifupdown-ng", "iproute2", "prometheus-node-exporter"} - packages))
 
-        # default metrics; default is_vm
-        self.assertIn("prometheus-node-exporter", packages)
-        self.assertIn("libusb", cfg["remove_packages"])
-
         vswitch = cfg["vswitches"]["public"]
 
         self.assertIsNotNone(vswitch["vlans_by_name"])

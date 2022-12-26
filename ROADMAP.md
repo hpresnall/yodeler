@@ -11,8 +11,8 @@
 ## KVM Virtual Machine Host
 - [x] Minimal KVM Server Configuration
 - [x] Open vSwitch configuration with multiple switches and vlans
-- [ ] Automated, ordered VM setup for an entire site
-- [x] Better handling of apk_cache and passing back to install media
+- [x] Automated VM setup for an entire site
+- [x] Confiture apk_cache and pass it to install media & VMs
 - [ ] Let's Encrypt support for wildcard domains and distribution to VMs
 
 ## Router
@@ -21,7 +21,7 @@
 - [ ] nftables firewall configuration
 - [ ] SMCroute config for multicast routing
 - [ ] dhcrelay config for DHCP between VLans
-- [ ] dhcpcd config for IPv6 DHCP prefix requests to ISPs & distribution to vlans
+- [x] dhcpcd config for IPv6 DHCP prefix requests to ISPs & distribution to vlans
 - [ ] Dynamic DNS updates for external addresses
 - [ ] [WireGuard](https://www.wireguard.com/) VPN support
 
@@ -29,7 +29,6 @@
 - [x] Basic BIND 9 configuration
 - [x] YAML-based configuration for additional DNS entries
 - [ ] Bind alternatives?
-- [ ] Add DNS entries on DHCP updates
 - [ ] Add DHCP and IPv6 SLAAC to DNS
 
 ## DHCP
@@ -41,6 +40,7 @@
 - [ ] Configure chronyd server
 
 ## Metrics
+- [x] Configure Prometheus client on all systems
 - [ ] Configure Prometheus server
 - [ ] Configure Grafana
 - [ ] Create / generate dashboards for all servers in a site
@@ -59,3 +59,7 @@
 - [ ] Configure golang builds
 - [ ] Create process for building executables and sharing with other VMs
 - [ ] Create durable build partition for builds without network access
+
+## XWindows
+- [ ] Configure basic XFCE GUI
+- [ ] Setup simple desktop with standard plugins

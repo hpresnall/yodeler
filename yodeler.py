@@ -9,7 +9,8 @@ import config.site as site
 
 def yodel():
     """Create all configuration files for the site."""
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s: %(levelname)s %(message)s")
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s.%(msecs)03d %(levelname)7s %(message)s", datefmt="%H:%M:%S")
 
     if len(sys.argv) < 2:
         print("usage: yodeler.py <site_path> <output_dir>")

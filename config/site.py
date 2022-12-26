@@ -21,7 +21,7 @@ def load_site(site_path):
 
     site_cfg = _load_site_config(site_path)
 
-    _logger.info("processing hosts for site '%s'", site_cfg["name"])
+    _logger.info("processing hosts for site '%s'", site_cfg["site"])
 
     # TODO proper role hierarchy and ordering
     required_roles = set()  # {"dns", "router"}
@@ -95,13 +95,14 @@ def write_host_configs(site_cfg, output_dir):
 
 
 def _load_site_config(sites_dir):
+    sites_dir = os.path.abspath(sites_dir)
+
+    _logger.info("loading config for site from %s", sites_dir)
     site_cfg = yaml.load_site_config(sites_dir)
-    site_cfg["name"] = os.path.basename(sites_dir)
+
     site_cfg["hosts"] = {}  # map hostname to host config
     # map roles to fully qualified domain names; shared with host configs
     site_cfg["roles_to_hostnames"] = {}
-
-    _logger.info("loaded config for site '%s'", site_cfg["name"])
 
     return site_cfg
 
@@ -109,10 +110,8 @@ def _load_site_config(sites_dir):
 def _load_host_config(site_cfg, host_path):
     hostname = host_path[:-5]  # remove .yaml
 
-    _logger.info("loading config for host '%s' from %s", hostname, os.path.basename(host_path))
-
-    host_cfg = yaml.load_host_config(
-        site_cfg, hostname)
+    _logger.info("loading config for host from %s", os.path.basename(host_path))
+    host_cfg = yaml.load_host_config(site_cfg, hostname)
     _add_host_dns_to_vlans(host_cfg)
     _map_role_to_fqdn(host_cfg, site_cfg["roles_to_hostnames"])
 
@@ -170,6 +169,9 @@ def _confgure_router_hosts(cfg):
 
 
 def preview_dir(output_dir, limit=sys.maxsize):
+    if not _logger.isEnabledFor(logging.DEBUG):
+        return
+
     """Output all files in the given directory, up to the limit number of lines per file."""
     _logger.debug(output_dir)
     _logger.debug("")

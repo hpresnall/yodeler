@@ -12,7 +12,7 @@ interfaces:
     firewall_zone: PRIV
 # /etc/network/interfaces used during initial Alpine Linux install
 # if not set, install will prompt
-# this is the direct file contents, in _BusyBox's_ interfaces file format, not Debian's!
+# this is the direct file contents, in _BusyBox's_ interfaces file format, not ifupdown-ng!
 install_interfaces: |
   auto lo
   iface lo inet loopback
@@ -22,3 +22,6 @@ install_interfaces: |
 install_private_ssh_key: true
 packages: [ndisc6 tcpdump]
 roles: [vmhost]
+root_dev: /dev/nvme0n1
+#root_dev: /dev/vdb
+root_partition: p3

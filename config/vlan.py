@@ -12,8 +12,9 @@ def validate(domain, vswitch):
 
     vlans = vswitch.get("vlans")
     if (vlans is None) or (len(vlans) == 0):
-        raise KeyError(
-            f"no vlans defined for vswitch {vswitch_name}")
+        raise KeyError(f"no vlans defined for vswitch {vswitch_name}")
+    if isinstance(vlans, str):
+        raise KeyError(f"vlans cannot be a string for vswitch {vswitch_name}")
 
     # list of vlans in yaml => dicts of names & ids to vswitches
     vlans_by_id = vswitch["vlans_by_id"] = {}

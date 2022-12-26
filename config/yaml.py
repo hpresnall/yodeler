@@ -128,9 +128,10 @@ def _validate_config(cfg):
             cfg[key] = DEFAULT_CONFIG[key]
     if "local_dns" not in cfg:
         cfg["local_dns"] = []
+    # external_dns defined in DEFAULT_CONFIG
 
     # remove from script output if not needed
-    if not cfg.get("install_private_ssh_key"):
+    if not cfg["install_private_ssh_key"]:
         cfg["private_ssh_key"] = ""
 
     for dns in cfg["local_dns"]:
@@ -182,10 +183,7 @@ def _configure_packages(cfg):
         cfg["remove_packages"] |= {"iptables", "ip6tables"}
         cfg["packages"].discard("awall")
 
-    # VMs are setup without USB, so remove the library
-    if cfg["is_vm"]:
-        cfg["remove_packages"].add("libusb")
-    else:
+    if not cfg["is_vm"]:
         # add cpufreq and other utils to real hosts
         cfg["packages"] |= {"util-linux", "cpufreqd", "cpufrequtils"}
 
@@ -209,6 +207,7 @@ DEFAULT_CONFIG = {
     "image_format": "raw",
     "vm_images_path": "/vmstorage",
     "root_dev": "/dev/sda",
+    "root_partition": "3",  # default disk layout puts /root on /dev/sda3
     # configure a local firewall and metrics on all systems
     "local_firewall": True,
     "metrics": True,
