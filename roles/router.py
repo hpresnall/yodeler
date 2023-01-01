@@ -26,7 +26,7 @@ class Router(Role):
         cfg["local_firewall"] = False
 
     def additional_packages(self, cfg):
-        return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay"}
+        return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "iptables", "ip6tables"}
 
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
@@ -59,6 +59,9 @@ class Router(Role):
         delegated_prefixes = []
         prefix_counter = 1
 
+        radvd_template = util.file.read("templates/router/radvd.conf")
+        radvd_config = []
+
         for vswitch in cfg["vswitches"].values():
             iface_name = f"eth{iface_counter}"
 
@@ -74,6 +77,7 @@ class Router(Role):
 
                 vlan_interfaces.append(util.interfaces.for_vlan(vlan, iface_name))
                 _configure_shorwall(shorewall, vswitch["name"], vlan)
+                vlan_iface = f"{iface_name}.{vlan['id']}"
 
                 # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
                 network = vlan.get("ipv6_pd_network")
@@ -82,7 +86,9 @@ class Router(Role):
                     prefix_counter += 1
                 else:
                     _validate_vlan_pd_network(uplink["ipv6_pd_prefixlen"], vlan)
-                delegated_prefixes.append(f"{iface_name}.{vlan['id']}/{network}")
+                delegated_prefixes.append(f"{vlan_iface}/{network}")
+
+                radvd_config.append(radvd_template.format(vlan_iface, "on" if vlan["dhcp6_managed"] else "off"))
 
             if len(vlan_interfaces) > 0:
                 # create the parent interface for the vlan interfaces
@@ -124,6 +130,8 @@ class Router(Role):
         if cfg["is_vm"]:
             util.libvirt.update_interfaces(cfg['hostname'], libvirt_interfaces, output_dir)
 
+        util.file.write("radvd.conf", "\n".join(radvd_config), output_dir)
+
         return [_write_shorewall_config(cfg, shorewall, output_dir)]
 
 
@@ -144,15 +152,13 @@ def _create_uplink(cfg):
     prefixlen = uplink.get("ipv6_pd_prefixlen")
 
     if prefixlen is None:
-        prefixlen = 56
+        uplink["ipv6_pd_prefixlen"] = 56
     elif not isinstance(prefixlen, int):
         raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be an integer")
     elif prefixlen >= 64:
         raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be < 64")
     elif prefixlen < 48:
         raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be >= 48")
-
-    uplink["ipv6_pd_prefixlen"] = prefixlen
 
     return uplink
 

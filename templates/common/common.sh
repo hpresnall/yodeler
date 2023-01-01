@@ -78,4 +78,4 @@ fi
 # prevent dhcpcd starting as a service; let ifupdown-ng start it, if needed
 sed -i -e "s/provide net/# provide net/g" /etc/init.d/dhcpcd
 # remove dhcpcd messages to stdout
-sed -i -e "s#/sbin/dhcpcd $$optargs#/sbin/dhcpcd -q $$optargs#g" /usr/libexec/ifupdown-ng/dhcp
+sed -i -e "s#/sbin/dhcpcd \$$optargs#/sbin/dhcpcd -q \$$optargs#g" /usr/libexec/ifupdown-ng/dhcp

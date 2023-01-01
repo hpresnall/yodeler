@@ -1,0 +1,8 @@
+{
+  "service": {
+    "dhcpv6-server": {
+      "proto": "udp",
+      "port": 547
+    }
+  }
+}

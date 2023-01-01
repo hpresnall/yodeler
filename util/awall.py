@@ -1,7 +1,6 @@
 """Utility for awall configuration."""
 import logging
 import os
-import json
 
 import util.file
 
@@ -50,9 +49,8 @@ def configure(interfaces, roles, output_dir):
     awall = os.path.join(output_dir, "awall")
     os.mkdir(awall)
 
-    util.file.write("base.json", json.dumps(base, indent=2), awall)
-    util.file.write("custom-services.json",
-                    json.dumps(custom_services, indent=2), awall)
+    util.file.write("base.json", util.file.output_json(base), awall)
+    util.file.write("custom-services.json", util.file.output_json(custom_services), awall)
 
     buffer = ["echo \"Configuring awall\""]
     buffer.append("rootinstall $DIR/awall/base.json /etc/awall/private")
@@ -60,7 +58,7 @@ def configure(interfaces, roles, output_dir):
         "rootinstall $DIR/awall/custom-services.json /etc/awall/private")
 
     for name, service in services.items():
-        util.file.write(name, json.dumps(service, indent=2), awall)
+        util.file.write(name, util.file.output_json(service), awall)
 
         buffer.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
         buffer.append("awall enable {}".format(
@@ -83,8 +81,7 @@ def _load_templates(services, template_dir):
         return
 
     for path in os.listdir(template_dir):
-        with open(os.path.join(template_dir, path)) as template:
-            service = json.load(template)
+        service = util.file.load_json(os.path.join(template_dir, path))
 
         if path == "custom-services.json":
             # consolidate custom service definitions into a single entry

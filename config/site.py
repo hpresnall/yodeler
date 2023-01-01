@@ -126,15 +126,18 @@ def _add_host_dns_to_vlans(cfg):
     for iface in cfg["interfaces"]:
         vlan = iface["vlan"]
 
+        if "dns_entries" not in vlan:
+            vlan["dns_entries"] = []
+
         # no domain name => no DNS
-        if vlan["domain"] == "":
+        if not vlan["domain"]:
             continue
-        vlan["hosts"].append({
+        vlan["dns_entries"].append({
             "hostname": cfg["hostname"],
             "ipv4_address": iface["ipv4_address"],
             "ipv6_address": iface["ipv6_address"],
-            "mac_address": None,
             "aliases": [role.name for role in cfg["roles"] if role.name != "common"]})
+            # TODO deal with duplicate roles
 
 
 def _map_role_to_fqdn(cfg, role_fqdn):
@@ -160,11 +163,10 @@ def _confgure_router_hosts(cfg):
     for vswitch in cfg["vswitches"].values():
         for vlan in vswitch["vlans"]:
             if vlan["routable"]:
-                vlan["hosts"].append({
+                vlan["dns_entries"].append({
                     "hostname": cfg["hostname"],
                     "ipv4_address": vlan["ipv4_subnet"].network_address + 1,
                     "ipv6_address": vlan["ipv6_subnet"].network_address + 1,
-                    "mac_address": None,
                     "aliases": ["router"]})
 
 

@@ -1,6 +1,6 @@
 motd: "hello, I am a minimal Alpine BIND9 VM"
 primary_domain: infra.example.com
-roles: [dns]
+roles: [dns, dhcp]
 interfaces:
   - ipv4_address: 192.168.210.2
     ipv6_address: fd24:87e8:06c7:10::2
@@ -8,3 +8,5 @@ interfaces:
     vlan: infra
   - ipv4_address: 172.16.251.2
     vswitch: private
+    # note that this switch is _not_ routable, so the DNS server _must_ have an interface on each vlan
+    # or that vlan will not be able to make DNS queries

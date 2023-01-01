@@ -18,6 +18,14 @@ class TestVlan(base.TestCfgBase):
         self._cfg_dict["vswitches"][0]["vlans"] = "invalid"
         self.build_error()
 
+    def test_num_vlan(self):
+        self._cfg_dict["vswitches"][0]["vlans"] = 123
+        self.build_error()
+
+    def test_nonobject_vswitch(self):
+        self._cfg_dict["vswitches"][0]["vlans"] = ["invalid"]
+        self.build_error()
+
     def test_no_vlan_name(self):
         del self._cfg_dict["vswitches"][0]["vlans"][0]["name"]
         self.build_error()
@@ -206,3 +214,65 @@ class TestVlan(base.TestCfgBase):
     def test_vlan_ipv6_big_pd_network(self):
         self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_pd_network"] = "300"
         self.build_error()
+
+    def test_vlan_dhcpres_nonarray(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = "invalid"
+        self.build_error()
+
+    def test_vlan_dhcpres_nonobject(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = ["invalid"]
+        self.build_error()
+
+    def test_vlan_dhcpres_no_name(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [{}]
+        self.build_error()
+
+    def test_vlan_dhcpres_invalid_namet(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [{"hostname": 1}]
+        self.build_error()
+
+    def test_vlan_dhcpres_invalid_ip(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
+            {"hostname": "test", "mac_address": "00:11:22:33:44:55", "ipv4_address": "invalid"}]
+        self.build_error()
+
+    def test_vlan_dhcpres_invalid_subnet(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
+            {"hostname": "test", "mac_address": "00:11:22:33:44:55", "ipv4_address": "192.168.2.5"}]
+        self.build_error()
+
+    def test_vlan_dhcpres_disabled_ivp6(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_disable"] = True
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
+            {"hostname": "test", "mac_address": "00:11:22:33:44:55", "ipv6_address": "2001:db8:0:1::5"}]
+        self.build_cfg()  # should build with warning logged
+
+    def test_vlan_dhcpres_nonstring_mac(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
+            {"hostname": "test", "ipv4_address": "192.168.1.5", "mac_address": 123}]
+        self.build_error()
+
+    def test_vlan_dhcpres_no_mac(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
+            {"hostname": "test", "ipv4_address": "192.168.1.5"}]
+        self.build_error()
+
+    def test_vlan_dhcpres_invalid_mac(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
+            {"hostname": "test", "ipv4_address": "192.168.1.5", "mac_address": "invalid"}]
+        self.build_error()
+
+    def test_vlan_dhcpres_nonlist_aliases(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
+            {"hostname": "test", "ipv4_address": "192.168.1.5", "mac_address": "00:11:22:33:44:55", "aliases": "invalid"}]
+        self.build_error()
+
+    def test_vlan_dhcpres_nonstring_alias(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
+            {"hostname": "test", "ipv4_address": "192.168.1.5", "mac_address": "00:11:22:33:44:55", "aliases": [123]}]
+        self.build_error()
+
+    def test_vlan_host(self):
+        self._cfg_dict["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
+            {"hostname": "test", "mac_address": "00:11:22:33:44:55", "ipv4_address": "192.168.1.5"}]
+        self.build_cfg()

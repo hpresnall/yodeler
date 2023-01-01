@@ -1,0 +1,10 @@
+{
+  "description": "allow DHCPv6 client request",
+  "filter": [
+    {
+      "in": [],
+      "service": "dhcpv6-server",
+      "action": "accept"
+    }
+  ]
+}

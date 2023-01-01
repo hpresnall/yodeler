@@ -3,6 +3,7 @@
 import os
 import string
 import yaml
+import json
 
 try:
     loader, dumper = yaml.CLoader, yaml.CDumper
@@ -50,3 +51,18 @@ def load_yaml_string(yaml_str):
 def output_yaml(data):
     """Output the object tree to a YAML string."""
     return yaml.dump(data)
+
+def load_json(path):
+    """Load the given JSON file into an object tree."""
+    with open(path, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def load_json_string(json_str):
+    """Load the given JSON string into an object tree."""
+    return json.load(json_str)
+
+
+def output_json(data):
+    """Output the object tree to a JSON string."""
+    return json.dumps(data, indent=2)

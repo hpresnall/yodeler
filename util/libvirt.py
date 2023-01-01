@@ -66,7 +66,7 @@ def macvtap_interface(cfg, iface_name):
 
 
 def router_interface(hostname, vswitch):
-    """Create an <interface> XML element that trunks all routable vlans on the given vwitch.
+    """Create an <interface> XML element that trunks all routable vlans on the given vswitch.
 
     <interface type="network">
       <source network="<vswitch>" portgroup="router" />

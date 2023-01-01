@@ -20,7 +20,7 @@
 - [x] Basic Shorewall configuration with routing
 - [ ] nftables firewall configuration
 - [ ] SMCroute config for multicast routing
-- [ ] dhcrelay config for DHCP between VLans
+- [x] dhcrelay config for DHCP between vlans
 - [x] dhcpcd config for IPv6 DHCP prefix requests to ISPs & distribution to vlans
 - [ ] Dynamic DNS updates for external addresses
 - [ ] [WireGuard](https://www.wireguard.com/) VPN support
@@ -28,12 +28,13 @@
 ## DNS
 - [x] Basic BIND 9 configuration
 - [x] YAML-based configuration for additional DNS entries
-- [ ] Bind alternatives?
-- [ ] Add DHCP and IPv6 SLAAC to DNS
+- [ ] Bind alternatives? PowerDNS?
+- [ ] Add / update IPv6 SLAAC addresses
 
 ## DHCP
-- [ ] Basic Kea configuration
-- [ ] Update DNS on DHCP changes
+- [x] Kea configuration for IPv4 and IPv6 with host reservations
+- [x] Update DNS on DHCP changes
+- [x] DHCP client support via dhcpcd for both IPv4 and IPv6 (autoconf & managed)
 - [ ] Track DHCP reservations and IPv6 SLAAC addresses over time
 
 ## NTP

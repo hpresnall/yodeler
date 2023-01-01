@@ -1,6 +1,8 @@
 # pylint: disable=missing-module-docstring
 import unittest
 
+import logging
+
 import os.path
 import copy
 
@@ -15,6 +17,8 @@ class TestCfgBase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        logging.basicConfig(level="ERROR")
+
         cls._minimal = util.file.load_yaml(
             os.path.join(cls._base_path, "yaml/minimal.yaml"))
 

@@ -9,16 +9,19 @@ _logger = logging.getLogger(__name__)
 def validate(cfg):
     """Validate all the vswitches defined in the site configuration."""
     vswitches = cfg.get("vswitches")
-    if (vswitches is None) or (len(vswitches) == 0):
+    if vswitches is None:
         raise KeyError("no vswitches defined")
-    if isinstance(vswitches, str):
-        raise KeyError(f"vswitches cannot be a string")
+    if not isinstance(vswitches, list):
+        raise KeyError("vswitches must be an array")
 
     # list of vswitches in yaml => dict of names to vswitches
     vswitches_by_name = cfg["vswitches"] = {}
     uplinks = set()
 
     for i, vswitch in enumerate(vswitches, start=1):
+        if not isinstance(vswitch, dict):
+            raise KeyError(f"vswitch {i} must be an object")
+
         # name is required and must be unique
         if ("name" not in vswitch) or (vswitch["name"] is None) or (vswitch["name"] == ""):
             raise KeyError(f"no name defined for vswitch {i}: {vswitch}")

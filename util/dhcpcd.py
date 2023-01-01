@@ -44,5 +44,6 @@ def create_conf(cfg, output_dir):
     for iface, buffer in interfaces.items():
         conf.append(f"interface {iface}")
         conf.append("\n".join(buffer))
+    conf.append("")
 
     util.file.write("dhcpcd.conf", "\n".join(conf), output_dir)

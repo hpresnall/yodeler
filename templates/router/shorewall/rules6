@@ -33,4 +33,4 @@ ACCEPT	all	inet	udp	443
 
 # allow DNS and ping to infra
 DNS(ACCEPT)	all	infra
-PING(ACCEPT)	all	infra
+Ping(ACCEPT)	all	infra

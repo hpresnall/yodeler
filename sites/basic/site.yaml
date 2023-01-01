@@ -43,7 +43,7 @@ vswitches:
         # instead of defaulting to index order, set delegated prefix to the 10th /64 in the IPv6 PD
         # assumes 'ipv6_pd_prefixlen' of 56 defined in the router uplink
         ipv6_pd_network: 10
-        allow_dhcp: false # DHCP server will not be configured
+        dhcp_enabled: false # DHCP server will not be configured
         access_vlans: all # firewall will allow any access to all vlans, including the internet
         allow_access_stopped_firewall: true # allow internet access when firewall is stopped
         allow_dns_update: true # allow this subnet to make DDNS updates
@@ -57,9 +57,8 @@ vswitches:
         allow_internet: false # firewall will restrict outbound internet access
         dhcp_min_address_ipv4: 2
         dhcp_max_address_ipv4: 252
-        dhcp_min_address_ipv6: 2
-        dhcp_max_address_ipv6: 0xffff
-        hosts:
+        # dhcp6_managed defaults to true so DHCP6 will be information only
+        dhcp_reservations:
           - hostname: laptop
             ipv4_address: 192.168.220.3
             ipv6_address: fd24:87e8:06c7:20::3
