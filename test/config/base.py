@@ -8,7 +8,8 @@ import copy
 
 import util.file
 
-import config.yaml as yaml
+import config.site
+import config.host
 
 
 class TestCfgBase(unittest.TestCase):
@@ -19,18 +20,19 @@ class TestCfgBase(unittest.TestCase):
     def setUpClass(cls):
         logging.basicConfig(level="ERROR")
 
-        cls._minimal = util.file.load_yaml(
-            os.path.join(cls._base_path, "yaml/minimal.yaml"))
+        cls._site_cfg = config.site.load(os.path.join(cls._base_path, "sites/minimal"))
 
     def setUp(self):
-        self._cfg_dict = copy.deepcopy(self._minimal)
+        self._site_cfg = copy.deepcopy(self._site_cfg)
+        self._cfg_dict = {}
 
     def tearDown(self):
+        self._site_cfg = None
         self._cfg_dict = None
 
     def build_cfg(self):
         """Build the current configuration. This should not error."""
-        return yaml.config_from_dict(self._cfg_dict)
+        return config.host.load_from_dict(self._site_cfg, self._cfg_dict)
 
     def build_error(self):
         """Build the current configuration, assuming it will error."""

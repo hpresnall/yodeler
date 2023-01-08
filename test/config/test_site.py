@@ -8,12 +8,12 @@ import tempfile
 import config.site as site
 import util.file as config
 
+
 class TestSetup(unittest.TestCase):
     _base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
     def test_load_site(self):
-        site_cfg = site.load_site(
-            os.path.join(self._base_path, "sites", "test"))
+        site_cfg = site.load(os.path.join(self._base_path, "sites", "test"))
 
         self.assertEqual(site_cfg["site"], "test")
         self.assertIsNotNone(site_cfg["hosts"])
@@ -34,8 +34,7 @@ class TestSetup(unittest.TestCase):
 
     def test_write_host_config(self):
         with tempfile.TemporaryDirectory() as config_dir:
-            site_cfg = site.load_site(os.path.join(
-                self._base_path, "sites", "test"))
+            site_cfg = site.load(os.path.join(self._base_path, "sites", "test"))
 
             site.write_host_configs(site_cfg, config_dir)
 
@@ -53,8 +52,7 @@ class TestSetup(unittest.TestCase):
                     required_dirs.append("awall")
 
                 if host_cfg["is_vm"]:
-                    required_files.extend(
-                        ["create_vm.sh", "delete_vm.sh", hostname + ".xml"])
+                    required_files.extend(["create_vm.sh", "delete_vm.sh", hostname + ".xml"])
                 else:
                     required_files.extend(["create_physical.sh", "answerfile"])
 

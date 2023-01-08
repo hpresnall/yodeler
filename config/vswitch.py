@@ -1,7 +1,7 @@
 """Handles parsing and validating vswitch configuration from site YAML files."""
 import logging
 
-import config.vlan
+import config.vlan as vlan
 
 _logger = logging.getLogger(__name__)
 
@@ -51,4 +51,4 @@ def validate(cfg):
         else:
             vswitch["uplink"] = None
 
-        config.vlan.validate(cfg["domain"], vswitch)
+        vlan.validate(cfg["domain"], vswitch)

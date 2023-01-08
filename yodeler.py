@@ -25,8 +25,7 @@ def yodel():
         if exc.errno == errno.EEXIST and os.path.isdir(output_dir):
             pass
 
-    site_cfg = site.load_site(site_path)
-
+    site_cfg = site.load(site_path)
     site.write_host_configs(site_cfg, output_dir)
 
 

@@ -6,32 +6,92 @@ import os
 import shutil
 import sys
 
-import config.yaml as yaml
-
 import util.shell as shell
 import util.file as file
+
+import config.vswitch as vswitch
+import config.host as host
 
 _logger = logging.getLogger(__name__)
 
 
-def load_site(site_path):
-    """Load to configuration for all hosts defined in the given site.
-    Return a the site configuration as a map."""
-    site_path = os.path.abspath(site_path)
+def load(site_dir: str) -> dict:
+    """Load 'site.yaml' from the given directory and validate it.
 
-    site_cfg = _load_site_config(site_path)
+    Return the site configuration as a dictionary. This configuration _is not_ valid for creating a set of scripts for
+    a specific host. Instead this configuration must be used as the base for loading host YAML files.
+    """
+    if not site_dir:
+        raise ValueError("site_dir cannot be empty")
 
-    _logger.info("processing hosts for site '%s'", site_cfg["site"])
+    site_dir = os.path.abspath(site_dir)
+
+    _logger.info("loading site config from '%s'", site_dir)
+
+    site_cfg = file.load_yaml(os.path.join(site_dir, "site.yaml"))
+
+    # TODO change to site_name
+    if "name" in site_cfg:
+        site_cfg["site"] = site_cfg.pop("name")
+    else:
+        site_cfg["site"] = os.path.basename(site_dir)
+    site_cfg["site_dir"] = site_dir
+
+    site_cfg = load_from_dict(site_cfg)
+    _logger.debug("loaded site '%s' from '%s'", site_cfg["site"], site_dir)
+
+    return site_cfg
+
+
+def load_from_dict(site_cfg: dict) -> dict:
+    if site_cfg is None:
+        raise ValueError("empty site config")
+    if not isinstance(site_cfg, dict):
+        raise ValueError("site config must be a dictionary")
+
+    if "site" not in site_cfg:
+        raise KeyError("site cannot be empty")
+    if not site_cfg["site"]:
+        raise KeyError("site cannot be empty")
+
+    site_cfg["domain"] = site_cfg.get("domain", "")  # ensure set even if empty, the defaulf
+
+    vswitch.validate(site_cfg)
+
+    site_cfg["hosts"] = {}  # map hostname to host config
+    # map roles to fully qualified domain names; shared with host configs
+    site_cfg["roles_to_hostnames"] = {}
+
+    _load_hosts(site_cfg)
+
+    return site_cfg
+
+
+def _load_hosts(site_cfg: dict):
+    """Load all host YAML files for the given site, validating each one.
+
+    Return the site configuration as a dictionary. This configuration _is not_ valid for creating a set of scripts for
+    a specific host. Instead this configuration must be used as the base for loading host YAML files.
+    """
+    _logger.debug("loading hosts for site '%s'", site_cfg["site"])
 
     # TODO proper role hierarchy and ordering
     required_roles = set()  # {"dns", "router"}
     defined_roles = set()
 
-    for path in os.listdir(site_path):
-        if path == "site.yaml":
+    site_dir = site_cfg["site_dir"]
+
+    for host_path in os.listdir(site_dir):
+        if host_path == "site.yaml":
+            continue
+        if not host_path.endswith(".yaml"):
+            _logger.debug("skipping file %s", host_path)
             continue
 
-        host_cfg = _load_host_config(site_cfg, path)
+        host_cfg = host.load(site_cfg, os.path.join(site_dir, host_path))
+
+        _add_host_dns_to_vlans(host_cfg)
+        _map_role_to_fqdn(host_cfg, site_cfg["roles_to_hostnames"])
 
         if host_cfg["is_vm"]:
             required_roles.add("vmhost")
@@ -50,7 +110,8 @@ def load_site(site_path):
             raise Exception(
                 f"required role {role} not defined for site {site_cfg['site']}")
 
-    return site_cfg
+    # TODO number of hosts
+    _logger.debug("loaded %n hosts for site '%s'", 0, site_cfg["site"])
 
 
 def write_host_configs(site_cfg, output_dir):
@@ -66,8 +127,7 @@ def write_host_configs(site_cfg, output_dir):
         _logger.info("creating setup scripts for '%s'", host_cfg["hostname"])
 
         if os.path.exists(host_dir):
-            _logger.warning(
-                "removing existing host configuration scripts from '%s'", host_dir)
+            _logger.debug("removing existing host configuration scripts from '%s'", host_dir)
             shutil.rmtree(host_dir)
         os.mkdir(host_dir)
 
@@ -94,32 +154,6 @@ def write_host_configs(site_cfg, output_dir):
         preview_dir(host_dir)
 
 
-def _load_site_config(sites_dir):
-    sites_dir = os.path.abspath(sites_dir)
-
-    _logger.info("loading config for site from %s", sites_dir)
-    site_cfg = yaml.load_site_config(sites_dir)
-
-    site_cfg["hosts"] = {}  # map hostname to host config
-    # map roles to fully qualified domain names; shared with host configs
-    site_cfg["roles_to_hostnames"] = {}
-
-    return site_cfg
-
-
-def _load_host_config(site_cfg, host_path):
-    hostname = host_path[:-5]  # remove .yaml
-
-    _logger.info("loading config for host from %s", os.path.basename(host_path))
-    host_cfg = yaml.load_host_config(site_cfg, hostname)
-    _add_host_dns_to_vlans(host_cfg)
-    _map_role_to_fqdn(host_cfg, site_cfg["roles_to_hostnames"])
-
-    site_cfg["hosts"][host_cfg["hostname"]] = host_cfg
-
-    return host_cfg
-
-
 def _add_host_dns_to_vlans(cfg):
     # add hostname information for DNS
     # assume site config and vswitch & vlan objects are shared by all configs
@@ -137,7 +171,7 @@ def _add_host_dns_to_vlans(cfg):
             "ipv4_address": iface["ipv4_address"],
             "ipv6_address": iface["ipv6_address"],
             "aliases": [role.name for role in cfg["roles"] if role.name != "common"]})
-            # TODO deal with duplicate roles
+        # TODO deal with duplicate roles
 
 
 def _map_role_to_fqdn(cfg, role_fqdn):
