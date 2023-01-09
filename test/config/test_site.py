@@ -6,13 +6,39 @@ import os.path
 import tempfile
 
 import config.site as site
-import util.file as config
 
-
-class TestSetup(unittest.TestCase):
+class TestSite(unittest.TestCase):
     _base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-    def test_load_site(self):
+    def test_load_none_site_path(self):
+        with self.assertRaises(ValueError):
+            site.load(None)
+
+    def test_load_empty_site_path(self):
+        with self.assertRaises(ValueError):
+            site.load("")
+
+    def test_load_config_str(self):
+        with self.assertRaises(ValueError):
+            site.load_from_dict("")
+
+    def test_load_config_none(self):
+        with self.assertRaises(ValueError):
+            site.load_from_dict(None)
+
+    def test_load_config_no_name(self):
+        with self.assertRaises(KeyError):
+            site.load_from_dict({})
+
+    def test_load_config_nonstr_name(self):
+        with self.assertRaises(KeyError):
+            site.load_from_dict({"site": 0})
+
+    def test_load_config_empty_name(self):
+        with self.assertRaises(KeyError):
+            site.load_from_dict({"site": ""})
+
+    def test_load_test_site(self):
         site_cfg = site.load(os.path.join(self._base_path, "sites", "test"))
 
         self.assertEqual(site_cfg["site"], "test")

@@ -96,14 +96,14 @@ def _configure_uplinks(cfg, shell, vswitch):
 
         for n, iface in enumerate(uplink):
             bond = util.interfaces.port(iface, vswitch_name, f"uplink {n+1} of {len(uplink)} for vswitch {vswitch_name}",
-                                        config.interface.find_config(cfg, iface))
+                                        config.interface.find_by_name(cfg, iface))
             uplink_interfaces.append(bond)
         uplink = bond_name  # use new uplink name for tagging, if needed
     else:
         shell.append("# uplink")
         shell.append(f"ovs-vsctl add-port {vswitch_name} {uplink}")
         iface = util.interfaces.port(uplink, vswitch_name, "uplink for vswitch " + vswitch_name,
-                                     config.interface.find_config(cfg, uplink))
+                                     config.interface.find_by_name(cfg, uplink))
         uplink_interfaces.append(iface)
 
     # tag the uplink port

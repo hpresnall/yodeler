@@ -3,9 +3,6 @@ import logging
 
 import config.vlan as vlan
 
-_logger = logging.getLogger(__name__)
-
-
 def validate(cfg):
     """Validate all the vswitches defined in the site configuration."""
     vswitches = cfg.get("vswitches")
@@ -13,6 +10,8 @@ def validate(cfg):
         raise KeyError("no vswitches defined")
     if not isinstance(vswitches, list):
         raise KeyError("vswitches must be an array")
+    if len(vswitches) == 0:
+        raise KeyError("vswitches cannot be empty")
 
     # list of vswitches in yaml => dict of names to vswitches
     vswitches_by_name = cfg["vswitches"] = {}

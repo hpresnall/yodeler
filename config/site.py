@@ -38,6 +38,8 @@ def load(site_dir: str) -> dict:
     site_cfg["site_dir"] = site_dir
 
     site_cfg = load_from_dict(site_cfg)
+    _load_all_hosts(site_cfg)
+
     _logger.debug("loaded site '%s' from '%s'", site_cfg["site"], site_dir)
 
     return site_cfg
@@ -51,6 +53,8 @@ def load_from_dict(site_cfg: dict) -> dict:
 
     if "site" not in site_cfg:
         raise KeyError("site cannot be empty")
+    if not isinstance(site_cfg["site"], str):
+        raise KeyError("site must be a string")
     if not site_cfg["site"]:
         raise KeyError("site cannot be empty")
 
@@ -62,12 +66,10 @@ def load_from_dict(site_cfg: dict) -> dict:
     # map roles to fully qualified domain names; shared with host configs
     site_cfg["roles_to_hostnames"] = {}
 
-    _load_hosts(site_cfg)
-
     return site_cfg
 
 
-def _load_hosts(site_cfg: dict):
+def _load_all_hosts(site_cfg: dict):
     """Load all host YAML files for the given site, validating each one.
 
     Return the site configuration as a dictionary. This configuration _is not_ valid for creating a set of scripts for
@@ -90,6 +92,7 @@ def _load_hosts(site_cfg: dict):
 
         host_cfg = host.load(site_cfg, os.path.join(site_dir, host_path))
 
+        # TODO move this to host config
         _add_host_dns_to_vlans(host_cfg)
         _map_role_to_fqdn(host_cfg, site_cfg["roles_to_hostnames"])
 

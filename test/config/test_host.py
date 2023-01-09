@@ -5,13 +5,41 @@ import os.path
 
 import test.config.base as base
 
+import config.site as site
 import config.host as host
-import config.vlan as vlan
 
-class TestConfig(base.TestCfgBase):
-    # def test_empty_string(self):
-    #     with self.assertRaises(KeyError):
-    #         yaml.config_from_string("")
+import config.vlan
+
+
+class TestHost(base.TestCfgBase):
+
+    def test_load_none_host_path(self):
+        with self.assertRaises(ValueError):
+            host.load(self._site_cfg, None)
+
+    def test_load_empty_host_path(self):
+        with self.assertRaises(ValueError):
+            host.load(self._site_cfg, "")
+
+    def test_load_config_str(self):
+        with self.assertRaises(ValueError):
+            host.load_from_dict(self._site_cfg, "")
+
+    def test_load_config_none(self):
+        with self.assertRaises(ValueError):
+            host.load_from_dict(self._site_cfg, None)
+
+    def test_load_config_no_hostname(self):
+        with self.assertRaises(KeyError):
+            host.load_from_dict(self._site_cfg, {"value": 0})
+
+    def test_load_config_nonstr_hostname(self):
+        with self.assertRaises(KeyError):
+            host.load_from_dict(self._site_cfg, {"hostname": 0})
+
+    def test_load_config_empty_name(self):
+        with self.assertRaises(KeyError):
+            host.load_from_dict(self._site_cfg, {"hostname": ""})
 
     def test_minimal(self):
         cfg = self.build_cfg()
@@ -49,9 +77,9 @@ class TestConfig(base.TestCfgBase):
 
         # has all default vlan config
         vlan = vswitch["vlans_by_id"][10]
-        for key in vlan.DEFAULT_VLAN_CONFIG:
+        for key in config.vlan.DEFAULT_VLAN_CONFIG:
             self.assertIsNotNone(vlan[key])
-            self.assertEqual(vlan.DEFAULT_VLAN_CONFIG[key], vlan[key])
+            self.assertEqual(config.vlan.DEFAULT_VLAN_CONFIG[key], vlan[key])
 
         # has interface config
         iface = cfg["interfaces"][0]
@@ -66,53 +94,34 @@ class TestConfig(base.TestCfgBase):
         self.assertTrue(iface["accept_ra"])
         self.assertFalse(iface["ipv6_tempaddr"])
 
-    # def test_site_and_host(self):
-    #     site = yaml.load_site_config(
-    #         os.path.join(self._base_path, "sites/test"))
-    #     host = yaml.load_host_config(site, "server")
+    def test_site_and_host(self):
+        site_cfg = site.load(os.path.join(self._base_path, "sites", "test"))
 
-    #     # host overwrites site
-    #     self.assertEqual("server", host["motd"])
+        self.assertIsNotNone(site_cfg["hosts"])
 
-    #     # validate merging of packages with overlapping add / remove
-    #     # sanity check package is still in the merged sets
-    #     self.assertIn("both_need", host["packages"])
-    #     self.assertNotIn("both_need", host["remove_packages"])
-    #     self.assertNotIn("both_remove", host["packages"])
-    #     self.assertIn("both_remove", host["remove_packages"])
+        host = site_cfg["hosts"]["server"]
+        self.assertIsNotNone(host)
 
-    #     # conflicts on either side should not remove
-    #     self.assertIn("site_needs", host["packages"])
-    #     self.assertNotIn("site_needs", host["remove_packages"])
+        # host overwrites site
+        self.assertEqual("server", host["motd"])
 
-    #     self.assertIn("server_needs", host["packages"])
-    #     self.assertNotIn("server_needs", host["remove_packages"])
+        # validate merging of packages with overlapping add / remove
+        # sanity check package is still in the merged sets
+        self.assertIn("both_need", host["packages"])
+        self.assertNotIn("both_need", host["remove_packages"])
+        self.assertNotIn("both_remove", host["packages"])
+        self.assertIn("both_remove", host["remove_packages"])
+
+        # conflicts on either side should not remove
+        self.assertIn("site_needs", host["packages"])
+        self.assertNotIn("site_needs", host["remove_packages"])
+
+        self.assertIn("server_needs", host["packages"])
+        self.assertNotIn("server_needs", host["remove_packages"])
 
     def test_missing_required(self):
         del self._cfg_dict["site"]
         self.build_error()
-
-    # def test_none_site_(self):
-    #     with self.assertRaises(KeyError):
-    #         yaml.load_host_config(None, "server")
-
-    # def test_empty_site(self):
-    #     with self.assertRaises(KeyError):
-    #         yaml.load_site_config(os.path.join(
-    #             self._base_path, "sites/empty"))
-
-    # def test_empty_site_for_host(self):
-    #     site = {}
-    #     with self.assertRaises(KeyError):
-    #         yaml.load_host_config(site, "server")
-
-    # def test_empty_host(self):
-    #     site = yaml.load_site_config(
-    #         os.path.join(self._base_path, "sites/test"))
-    #     # keep empty host YAML out of working test site
-    #     site["site_dir"] = "test/sites/empty"
-    #     with self.assertRaises(KeyError):
-    #         yaml.load_host_config(site, "empty")
 
     def test_invalid_role(self):
         self._cfg_dict["roles"] = ["invalid"]

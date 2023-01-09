@@ -159,7 +159,7 @@ def _validate_ipaddress(iface, ip_version):
         # gateway provided by router advertisements
 
 
-def find_config(cfg, iface_name):
+def find_by_name(cfg, iface_name):
     for iface in cfg["interfaces"]:
         if iface["name"] == iface_name:
             return iface

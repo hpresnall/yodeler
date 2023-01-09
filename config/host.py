@@ -43,17 +43,19 @@ def load_from_dict(site_cfg: dict, cfg: dict) -> dict:
     if not isinstance(site_cfg, dict):
         raise ValueError("site config must be a dictionary")
     if len(site_cfg) == 0:
-        raise KeyError("empty site config")
+        raise ValueError("empty site config")
 
     if cfg is None:
-        raise KeyError("empty host config")
+        raise ValueError("empty host config")
     if not isinstance(cfg, dict):
-        raise KeyError("host config must be a dictionary")
+        raise ValueError("host config must be a dictionary")
     if len(cfg) == 0:
-        raise KeyError("empty host config")
+        raise ValueError("empty host config")
 
     if "hostname" not in cfg:
         raise KeyError("hostname cannot be empty")
+    if not isinstance(cfg["hostname"], str):
+        raise KeyError("hostname must be a string")
     if not cfg["hostname"]:
         raise KeyError("hostname cannot be empty")
 
