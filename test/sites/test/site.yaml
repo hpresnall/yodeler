@@ -7,14 +7,14 @@ vswitches:
   - name: public
     uplink: eth0
     vlans:
-      - name: test
+      - name: pub_test
         domain: test.site.example
         id: 10
         ipv4_subnet: 192.168.1.0/24
         ipv6_subnet: 2001:db8:0:1::/64
   - name: private
     vlans:
-      - name: test
+      - name: priv_test
         id: 10
         ipv4_subnet: 192.168.2.0/24
         ipv6_subnet: 2001:db8:0:2::/64

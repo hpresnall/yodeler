@@ -10,6 +10,7 @@ _logger = logging.getLogger(__name__)
 def validate(cfg):
     """Validate all the interfaces defined in the host."""
     ifaces = cfg.get("interfaces")
+
     if (ifaces is None) or (len(ifaces) == 0):
         for role in cfg["roles"]:
             if role.name == "router":
@@ -33,7 +34,7 @@ def validate(cfg):
             validate_iface(iface)
         except KeyError as err:
             msg = err.args[0]
-            raise KeyError(f"{msg} for interface {i}: {iface['name']}") from err
+            raise KeyError(f"{msg} for interface {i}: '{iface['name']}'") from err
 
         # host's primary domain, if set, should match one vlan
         vlan = iface["vlan"]
@@ -43,7 +44,7 @@ def validate(cfg):
     if cfg["primary_domain"] != "":
         if matching_domain is None:
             raise KeyError(
-                f"invalid primary_domain: no interface's vlan domain matches 'primary_domain' {cfg['primary_domain']}")
+                f"invalid primary_domain: no interface's vlan domain matches primary_domain '{cfg['primary_domain']}'")
     else:
         # single interface => set host domain to vlan domain
         if len(ifaces) == 1:
@@ -57,7 +58,7 @@ def validate_network(iface, vswitches):
     vswitch = vswitches.get(vswitch_name)
 
     if vswitch is None:
-        raise KeyError(f"invalid vswitch {vswitch_name}")
+        raise KeyError(f"invalid vswitch '{vswitch_name}'")
 
     iface["vswitch"] = vswitch
 
@@ -138,18 +139,15 @@ def _validate_ipaddress(iface, ip_version):
         value = iface.get(key)
         iface[key] = address = ipaddress.ip_address(value)
     except Exception as exp:
-        raise KeyError(f"invalid {key} {value}") from exp
+        raise KeyError(f"invalid {key} '{value}'") from exp
 
     subnet = iface.get("vlan", iface).get(ip_version + "_subnet")
 
     if subnet is None:
-        raise KeyError(
-            f"subnet cannot be None when specifying an IP address")
+        raise KeyError(f"subnet cannot be None when specifying an IP address")
 
     if address not in subnet:
-        raise KeyError(
-            (f"invalid address {address}; "
-             f"it is not in vlan {iface['vlan']['id']}'s subnet {subnet}"))
+        raise KeyError(f"invalid address {address}; it is not in vlan {iface['vlan']['id']}'s subnet {subnet}")
 
     if ip_version == "ipv4":
         iface["ipv4_prefixlen"] = subnet.prefixlen

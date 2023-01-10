@@ -7,8 +7,8 @@ import test.config.base as base
 
 class TestInterface(base.TestCfgBase):
     def test_iface_ipv6_options(self):
-        self._cfg_dict["interfaces"][0]["accept_ra"] = False
-        self._cfg_dict["interfaces"][0]["ipv6_tempaddr"] = 1
+        self._host_yaml["interfaces"][0]["accept_ra"] = False
+        self._host_yaml["interfaces"][0]["ipv6_tempaddr"] = 1
 
         cfg = self.build_cfg()
 
@@ -16,40 +16,40 @@ class TestInterface(base.TestCfgBase):
         self.assertTrue(cfg["interfaces"][0]["ipv6_tempaddr"])
 
     def test_no_interfaces(self):
-        del self._cfg_dict["interfaces"]
+        del self._host_yaml["interfaces"]
         self.build_error()
 
     def test_empty_interfaces(self):
-        self._cfg_dict["interfaces"] = []
+        self._host_yaml["interfaces"] = []
         self.build_error()
 
     def test_no_interface_vswitch(self):
-        del self._cfg_dict["interfaces"][0]["vswitch"]
+        del self._host_yaml["interfaces"][0]["vswitch"]
         self.build_error()
 
     def test_empty_interface_vswitch(self):
-        self._cfg_dict["interfaces"][0]["vswitch"] = ""
+        self._host_yaml["interfaces"][0]["vswitch"] = ""
         self.build_error()
 
     def test_none_interface_vswitch(self):
-        self._cfg_dict["interfaces"][0]["vswitch"] = None
+        self._host_yaml["interfaces"][0]["vswitch"] = None
         self.build_error()
 
     def test_interface_str_vlan(self):
-        self._cfg_dict["interfaces"][0]["vlan"] = "test"
+        self._host_yaml["interfaces"][0]["vlan"] = "pub_test"
         cfg = self.build_cfg()
 
         # interface vlan as string should be valid
         self.assertIsNotNone(cfg["interfaces"][0]["vlan"])
-        self.assertEqual("test", cfg["interfaces"][0]["vlan"]["name"])
+        self.assertEqual("pub_test", cfg["interfaces"][0]["vlan"]["name"])
 
     def test_none_interface_vlan_no_pvid_vswitch(self):
         vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
                  "ipv6_subnet": "2001:db8:0:2::/64", "default": True}
-        self._cfg_dict["vswitches"][0]["vlans"].append(vlan2)
-        self._cfg_dict["interfaces"][0]["vlan"] = None
-        self._cfg_dict["interfaces"][0]["ipv4_address"] = "192.168.2.1"
-        self._cfg_dict["interfaces"][0]["ipv6_address"] = "2001:db8:0:2::1"
+        self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
+        self._host_yaml["interfaces"][0]["vlan"] = None
+        self._host_yaml["interfaces"][0]["ipv4_address"] = "192.168.2.1"
+        self._host_yaml["interfaces"][0]["ipv6_address"] = "2001:db8:0:2::1"
         cfg = self.build_cfg()
 
         # no interface vlan; should still be set to valid vlan in config
@@ -60,75 +60,75 @@ class TestInterface(base.TestCfgBase):
     def test_none_interface_vlan_pvid_vswitch(self):
         vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
                  "ipv6_subnet": "2001:db8:0:2::/64", "default": True}
-        self._cfg_dict["vswitches"][0]["vlans"].append(vlan2)
-        self._cfg_dict["vswitches"][0]["vlans"][0]["id"] = None
-        del self._cfg_dict["interfaces"][0]["vlan"]
+        self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
+        self._site_yaml["vswitches"][0]["vlans"][0]["id"] = None
+        del self._host_yaml["interfaces"][0]["vlan"]
         cfg = self.build_cfg()
 
         # no interface vlan; should still be set to valid vlan in config
         self.assertIsNotNone(cfg["interfaces"][0]["vlan"])
         # PVID vlan defined in vswitch, should be the vlan with no id
-        self.assertEqual("test", cfg["interfaces"][0]["vlan"]["name"])
+        self.assertEqual("pub_test", cfg["interfaces"][0]["vlan"]["name"])
 
     def test_none_interface_vlan_no_default(self):
         vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
                  "ipv6_subnet": "2001:db8:0:2::/64"}
-        self._cfg_dict["vswitches"][0]["vlans"].append(vlan2)
-        self._cfg_dict["interfaces"][0]["vlan"] = None
-        self._cfg_dict["interfaces"][0]["ipv4_address"] = "192.168.2.1"
-        self._cfg_dict["interfaces"][0]["ipv6_address"] = "2001:db8:0:2::1"
+        self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
+        self._host_yaml["interfaces"][0]["vlan"] = None
+        self._host_yaml["interfaces"][0]["ipv4_address"] = "192.168.2.1"
+        self._host_yaml["interfaces"][0]["ipv6_address"] = "2001:db8:0:2::1"
 
         self.build_error()
         # no PVID vlan defined in vswitch, no default vlan; should error
 
     def test_dhcp4_interface(self):
-        self._cfg_dict["interfaces"][0]["ipv4_address"] = "dhcp"
+        self._host_yaml["interfaces"][0]["ipv4_address"] = "dhcp"
         cfg = self.build_cfg()
 
         self.assertEqual("dhcp", cfg["interfaces"][0]["ipv4_address"])
 
     def test_invalid_interface_vswitch(self):
-        self._cfg_dict["interfaces"][0]["vswitch"] = "unknown"
+        self._host_yaml["interfaces"][0]["vswitch"] = "unknown"
         self.build_error()
 
     def test_invalid_interface_vlan(self):
-        self._cfg_dict["interfaces"][0]["vlan"] = 100
+        self._host_yaml["interfaces"][0]["vlan"] = 100
         self.build_error()
 
     def test_invalid_interface_ipv4_address(self):
-        self._cfg_dict["interfaces"][0]["ipv4_address"] = "invalid"
+        self._host_yaml["interfaces"][0]["ipv4_address"] = "invalid"
         self.build_error()
 
     def test_invalid_interface_ipv6_address(self):
-        self._cfg_dict["interfaces"][0]["ipv6_address"] = "invalid"
+        self._host_yaml["interfaces"][0]["ipv6_address"] = "invalid"
         self.build_error()
 
     def test_none_interface_ipv4_address(self):
-        del self._cfg_dict["interfaces"][0]["ipv4_address"]
+        del self._host_yaml["interfaces"][0]["ipv4_address"]
         self.build_error()
 
     def test_none_interface_ipv6_address(self):
-        del self._cfg_dict["interfaces"][0]["ipv6_address"]
+        del self._host_yaml["interfaces"][0]["ipv6_address"]
         cfg = self.build_cfg()
 
         # should be set to None
         self.assertIsNone(cfg["interfaces"][0]["ipv6_address"])
 
     def test_invalid_subnet_interface_ipv4_address(self):
-        self._cfg_dict["interfaces"][0]["ipv4_address"] = "192.168.2.1"
+        self._host_yaml["interfaces"][0]["ipv4_address"] = "192.168.2.1"
         self.build_error()
 
     def test_invalid_subnet_interface_ipv6_address(self):
-        self._cfg_dict["interfaces"][0]["ipv6_address"] = "2001:db8:0:2::1"
+        self._host_yaml["interfaces"][0]["ipv6_address"] = "2001:db8:0:2::1"
         self.build_error()
 
     def test_none_subnet_interface_ipv6_address(self):
-        del self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_subnet"]
+        del self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_subnet"]
         # ip address set without a subnet should error
         self.build_error()
 
     def test_vlan_ipv6_disabled(self):
-        self._cfg_dict["vswitches"][0]["vlans"][0]["ipv6_disable"] = True
+        self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_disable"] = True
         cfg = self.build_cfg()
 
         self.assertIsNone(cfg["vswitches"]["public"]["vlans"][0]["ipv6_subnet"])
@@ -137,6 +137,6 @@ class TestInterface(base.TestCfgBase):
         self.assertFalse(cfg["interfaces"][0]["accept_ra"])
 
     def test_no_wifi_config(self):
-        self._cfg_dict["interfaces"][0]["name"] = "wlan0"
+        self._host_yaml["interfaces"][0]["name"] = "wlan0"
         # wifi without configuration should error
         self.build_error()

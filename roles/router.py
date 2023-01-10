@@ -25,24 +25,22 @@ class Router(Role):
         # router will use Shorewall instead
         cfg["local_firewall"] = False
 
+        _configure_uplink(cfg)
+
     def additional_packages(self, cfg):
         return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "iptables", "ip6tables"}
 
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
-        uplink = _create_uplink(cfg)
+        uplink = cfg["uplink"]
 
         if cfg["is_vm"]:
             # uplink can be an existing vswitch or a physical iface on the host via macvtap
             if "vswitch" in uplink:
-                config.interface.validate_network(uplink, cfg["vswitches"])
                 iface = {"vswitch": uplink["vswitch"], "vlan": uplink["vlan"]}
                 uplink_xml = util.libvirt.interface_from_config(cfg["hostname"], iface)
-            elif "macvtap" in uplink:
+            else: # macvtap
                 uplink_xml = util.libvirt.macvtap_interface(cfg, uplink["macvtap"])
-            else:
-                raise KeyError(("invald uplink in router; "
-                                "it must define a vswitch+vlan or a macvtap host interface"))
 
             # add an interface to the host's libvirt definition for each vswitch; order matches network_interfaces
             libvirt_interfaces = [uplink_xml]
@@ -135,7 +133,7 @@ class Router(Role):
         return [_write_shorewall_config(cfg, shorewall, output_dir)]
 
 
-def _create_uplink(cfg):
+def _configure_uplink(cfg):
     # create interface definition for uplink
     uplink = cfg.get("uplink")
 
@@ -148,6 +146,14 @@ def _create_uplink(cfg):
     uplink["name"] = "eth0"  # always the first interface on the router
     uplink["forward"] = True
     config.interface.validate_iface(uplink)
+
+    if cfg["is_vm"]:
+        # uplink can be an existing vswitch or a physical iface on the host via macvtap
+        if "vswitch" in uplink:
+            config.interface.validate_network(uplink, cfg["vswitches"])
+        elif "macvtap" not in uplink:
+            uplink["vswitch"] = None
+            raise KeyError(("invald uplink in router; it must define a vswitch+vlan or a macvtap host interface"))
 
     prefixlen = uplink.get("ipv6_pd_prefixlen")
 
@@ -162,7 +168,6 @@ def _create_uplink(cfg):
 
     return uplink
 
-
 def _validate_vlan_pd_network(prefixlen, vlan):
     ipv6_pd_network = vlan.get("ipv6_pd_network")
 
@@ -173,7 +178,7 @@ def _validate_vlan_pd_network(prefixlen, vlan):
     else:
         maxnetworks = 2 ** (64 - prefixlen)
         if ipv6_pd_network >= maxnetworks:
-            raise KeyError((f"pd network {ipv6_pd_network} for vlan {vlan['name']} is larger than the {maxnetworks} networks " +
+            raise KeyError((f"pd network {ipv6_pd_network} for vlan '{vlan['name']}' is larger than the {maxnetworks} networks " +
                             f"available with the 'ipv6_pd_prefixlen' of {prefixlen}"))
 
         vlan["ipv6_pd_network"] = ipv6_pd_network

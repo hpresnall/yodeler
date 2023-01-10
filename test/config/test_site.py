@@ -7,6 +7,7 @@ import tempfile
 
 import config.site as site
 
+
 class TestSite(unittest.TestCase):
     _base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -20,23 +21,23 @@ class TestSite(unittest.TestCase):
 
     def test_load_config_str(self):
         with self.assertRaises(ValueError):
-            site.load_from_dict("")
+            site.validate("")
 
     def test_load_config_none(self):
         with self.assertRaises(ValueError):
-            site.load_from_dict(None)
+            site.validate(None)
 
     def test_load_config_no_name(self):
         with self.assertRaises(KeyError):
-            site.load_from_dict({})
+            site.validate({})
 
     def test_load_config_nonstr_name(self):
         with self.assertRaises(KeyError):
-            site.load_from_dict({"site": 0})
+            site.validate({"site": 0})
 
     def test_load_config_empty_name(self):
         with self.assertRaises(KeyError):
-            site.load_from_dict({"site": ""})
+            site.validate({"site": ""})
 
     def test_load_test_site(self):
         site_cfg = site.load(os.path.join(self._base_path, "sites", "test"))
@@ -62,7 +63,7 @@ class TestSite(unittest.TestCase):
         with tempfile.TemporaryDirectory() as config_dir:
             site_cfg = site.load(os.path.join(self._base_path, "sites", "test"))
 
-            site.write_host_configs(site_cfg, config_dir)
+            site.write_host_scripts(site_cfg, config_dir)
 
             for host_cfg in site_cfg["hosts"].values():
                 hostname = host_cfg["hostname"]

@@ -6,15 +6,15 @@ import re
 _logger = logging.getLogger(__name__)
 
 
-def validate(domain, vswitch):
+def validate(domain: str, vswitch, other_vswitch_vlans: set):
     """Validate all the vlans defined in the vswitch."""
     vswitch_name = vswitch["name"]
 
     vlans = vswitch.get("vlans")
     if vlans is None:
-        raise KeyError(f"no vlans defined for vswitch {vswitch_name}")
+        raise KeyError(f"no vlans defined for vswitch '{vswitch_name}'")
     if not isinstance(vlans, list):
-        raise KeyError(f"vlans must be an array for vswitch {vswitch_name}")
+        raise KeyError(f"vlans must be an array for vswitch '{vswitch_name}'")
 
     # list of vlans in yaml => dicts of names & ids to vswitches
     vlans_by_id = vswitch["vlans_by_id"] = {}
@@ -22,15 +22,18 @@ def validate(domain, vswitch):
 
     for i, vlan in enumerate(vlans, start=1):
         if not isinstance(vlan, dict):
-            raise KeyError(f"vlan {i} must be an object for vswitch {vswitch_name}")
+            raise KeyError(f"vlan {i} must be an object for vswitch '{vswitch_name}'")
 
         # name is required and must be unique
         if not vlan.get("name") or (vlan["name"] == ""):
-            raise KeyError(f"no name for vlan {i} in vswitch {vswitch_name}")
+            raise KeyError(f"no name for vlan {i} in vswitch '{vswitch_name}'")
 
         vlan_name = vlan["name"]
         if vlan_name in vlans_by_name:
-            raise KeyError(f"duplicate name {vlan_name} for vlan in vswitch {vswitch_name}")
+            raise KeyError(f"duplicate name '{vlan_name}' for vlan in vswitch '{vswitch_name}'")
+        if vlan_name in other_vswitch_vlans:
+            raise KeyError(f"duplicate name '{vlan_name}' for vlan in vswitch '{vswitch_name}'")
+        other_vswitch_vlans.add(vlan_name)
         vlans_by_name[vlan_name] = vlan
 
         # vlan id must be unique
@@ -38,8 +41,11 @@ def validate(domain, vswitch):
         vlan_id = vlan["id"] = vlan.get("id", None)
 
         if vlan_id in vlans_by_id:
-            raise KeyError(f"duplicate id {vlan_id} for vlan {vlan_name} in vswitch {vswitch_name}")
+            raise KeyError(f"duplicate id '{vlan_id}' for vlan '{vlan_name}' in vswitch '{vswitch_name}'")
         vlans_by_id[vlan_id] = vlan
+
+        if vlan_id and not isinstance(vlan_id, int):
+            raise KeyError(f"non-integer id '{vlan_id}' for vlan '{vlan_name}' in vswitch '{vswitch_name}'")
 
         # add default values
         for key in DEFAULT_VLAN_CONFIG:
@@ -55,7 +61,7 @@ def validate(domain, vswitch):
         # domain must be a subdomain of the top-level site
         if vlan["domain"] and (domain not in vlan["domain"]):
             raise KeyError(
-                (f"vlan {vlan_name} domain {vlan['domain']} is not in top-level domain {domain} for vswitch {vswitch_name}"))
+                (f"vlan '{vlan_name}' domain '{vlan['domain']}' is not in top-level domain '{domain}' for vswitch '{vswitch_name}'"))
 
         ipv6_pd_network = vlan.get("ipv6_pd_network")
 
@@ -63,7 +69,7 @@ def validate(domain, vswitch):
             vlan["ipv6_pd_network"] = None
         else:
             if not isinstance(ipv6_pd_network, int):
-                raise KeyError(f"ipv6_pd_network {ipv6_pd_network} must be an integer")
+                raise KeyError(f"ipv6_pd_network '{ipv6_pd_network}' must be an integer")
             vlan["ipv6_pd_network"] = ipv6_pd_network
 
     _configure_default_vlan(vswitch)
@@ -78,7 +84,7 @@ def _validate_vlan_subnet(vswitch_name, vlan, ip_version):
 
     if subnet is None:
         if ip_version == "ipv4":
-            raise KeyError(f"no {ip_version}_subnet for vlan {vlan_name} in vswitch {vswitch_name}")
+            raise KeyError(f"no {ip_version}_subnet for vlan '{vlan_name}' in vswitch '{vswitch_name}'")
         if ip_version == "ipv6":
             vlan["ipv6_subnet"] = None
             return
@@ -91,7 +97,7 @@ def _validate_vlan_subnet(vswitch_name, vlan, ip_version):
     try:
         vlan[ip_version + "_subnet"] = subnet = ipaddress.ip_network(subnet)
     except Exception as exp:
-        raise KeyError(f"invalid {ip_version}_subnet for vlan {vlan_name} in vswitch {vswitch_name}") from exp
+        raise KeyError(f"invalid {ip_version}_subnet for vlan '{vlan_name}' in vswitch '{vswitch_name}'") from exp
 
     # default to DHCP range over all addresses except the router
     min_key = "dhcp_min_address_" + ip_version
@@ -104,11 +110,11 @@ def _validate_vlan_subnet(vswitch_name, vlan, ip_version):
     dhcp_max = subnet.network_address + dhcp_max
 
     if dhcp_min not in subnet:
-        raise KeyError(f"invalid {min_key} {dhcp_min} for vlan {vlan_name} for vswitch {vswitch_name}")
+        raise KeyError(f"invalid {min_key} '{dhcp_min}' for vlan '{vlan_name}' for vswitch '{vswitch_name}'")
     if dhcp_max not in subnet:
-        raise KeyError(f"invalid {max_key} {dhcp_max} for vlan {vlan_name} for vswitch {vswitch_name}")
+        raise KeyError(f"invalid {max_key} '{dhcp_max}' for vlan '{vlan_name}' for vswitch '{vswitch_name}'")
     if dhcp_min > dhcp_max:
-        raise KeyError(f"{min_key} > {max_key} for vlan {vlan_name} for vswitch {vswitch_name}")
+        raise KeyError(f"{min_key} > {max_key} for vlan '{vlan_name}' for vswitch '{vswitch_name}'")
 
 
 _VALID_MAC = re.compile("^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$")
@@ -120,19 +126,20 @@ def _validate_vlan_dhcp_reservations(vswitch_name, vlan):
     if reservations is None:
         reservations = vlan["dhcp_reservations"] = []
     if not isinstance(reservations, list):
-        raise KeyError(f"dhcp_resverations must be an array in vlan {vlan['name']} for vswitch {vswitch_name}")
+        raise KeyError(f"dhcp_resverations must be an array in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
     if len(reservations) == 0:
         return
 
     for i, res in enumerate(reservations, start=1):
         if not isinstance(res, dict):
-            raise KeyError(f"reservation {i} must be an object in vlan {vlan['name']} for vswitch {vswitch_name}")
+            raise KeyError(f"reservation {i} must be an object in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
 
         # hostname & mac address required; ip addresses are not
         if "hostname" not in res:
-            raise KeyError(f"no hostname for reservation {i} in vlan {vlan['name']} for vswitch {vswitch_name}")
+            raise KeyError(f"no hostname for reservation {i} in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
         if not isinstance(res["hostname"], str):
-            raise KeyError(f"non-string hostname for reservation {i} in vlan {vlan['name']} for vswitch {vswitch_name}")
+            raise KeyError(
+                f"non-string hostname for reservation {i} in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
 
         _validate_ip_address("ipv4", i-1, vlan, vswitch_name)
         _validate_ip_address("ipv6", i-1, vlan, vswitch_name)
@@ -141,23 +148,23 @@ def _validate_vlan_dhcp_reservations(vswitch_name, vlan):
             mac = res["mac_address"]
             if not isinstance(mac, str):
                 raise KeyError(
-                    f"invalid mac_address for reservation {i} in vlan {vlan['name']} for vswitch {vswitch_name}")
+                    f"invalid mac_address for reservation {i} in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
             if _VALID_MAC.match(mac.upper()) is None:
                 raise KeyError(
-                    f"invalid mac_address for reservation {i} in vlan {vlan['name']} for vswitch {vswitch_name}")
+                    f"invalid mac_address for reservation {i} in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
         else:
             raise KeyError(
-                f"no mac_address for reservation {res['hostname']} in vlan {vlan['name']} for vswitch {vswitch_name}")
+                f"no mac_address for reservation '{res['hostname']}' in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
 
         if "aliases" in res:
             aliases = res["aliases"]
             if not isinstance(aliases, list):
                 raise KeyError(
-                    f"invalid aliases for reservation {i}; it must be an array in vlan {vlan['name']} for vswitch {vswitch_name}")
+                    f"invalid aliases for reservation {i}; it must be an array in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
             for alias in res["aliases"]:
                 if not isinstance(alias, str):
                     raise KeyError(
-                        f"invalid alias {alias} for reservation {i}; it must be a string in vlan {vlan['name']} for vswitch {vswitch_name}")
+                        f"invalid alias '{alias}' for reservation {i}; it must be a string in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
         else:
             res["aliases"] = []
 
@@ -173,7 +180,7 @@ def _validate_ip_address(ip_version, index, vlan, vswitch_name):
         address = ipaddress.ip_address(vlan["dhcp_reservations"][index][key])
     except Exception as exp:
         raise KeyError(
-            f"invalid {ip_version}_address for host {index} in vlan {vlan['name']} for vswitch {vswitch_name}") from exp
+            f"invalid {ip_version}_address for host {index} in vlan '{vlan['name']}' for vswitch '{vswitch_name}'") from exp
 
     if (ip_version == "ipv6") and (vlan["ipv6_subnet"] is None):
         _logger.warning("ipv6_address %s for host %s in vlan %s with ipv6 disabled in vswitch %s will be ignored",
@@ -183,7 +190,7 @@ def _validate_ip_address(ip_version, index, vlan, vswitch_name):
 
     if address not in vlan[ip_version + "_subnet"]:
         raise KeyError(
-            f"invalid {ip_version}_address {address} for host{index}; it is not in vlan {vlan['name']}'s subnet or vswitch {vswitch_name}")
+            f"invalid {ip_version}_address {address} for host {index}; it is not in the subnet for vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
 
     vlan["dhcp_reservations"][index][key] = address
 
@@ -196,8 +203,7 @@ def _configure_default_vlan(vswitch):
         # only allow one default
         if "default" in vlan:
             if default_vlan is not None:
-                raise KeyError(
-                    f"multiple default vlans for vswitch {vswitch['name']}")
+                raise KeyError(f"multiple default vlans for vswitch '{vswitch['name']}'")
             default_vlan = vlan
         else:
             vlan["default"] = False
@@ -221,7 +227,7 @@ def _validate_access_vlans(vswitch):
             if isinstance(access_vlans, str):
                 access_vlans = [access_vlans]
             else:
-                raise KeyError(f"non-array access_vlans in vlan {vlan_name} for vswitch {vswitch['name']}")
+                raise KeyError(f"non-array access_vlans in vlan '{vlan_name}' for vswitch '{vswitch['name']}'")
 
         vlan["access_vlans"] = []
 
@@ -254,10 +260,10 @@ def lookup(vlan_id, vswitch):
             vlan = vswitch["default_vlan"]
 
         if vlan is None:
-            raise KeyError(f"vlan id must be specified when vswitch {vswitch['name']} has no default vlan")
+            raise KeyError(f"vlan id must be specified when vswitch '{vswitch['name']}' has no default vlan")
     else:
         if vlan is None:
-            raise KeyError(f"invalid vlan {vlan_id}; not defined in vswitch {vswitch['name']}")
+            raise KeyError(f"invalid vlan '{vlan_id}'; not defined in vswitch '{vswitch['name']}'")
 
     return vlan
 

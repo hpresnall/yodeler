@@ -3,10 +3,8 @@ It also creates the final, static set of configuration files for each host at th
 """
 import logging
 import os
-import shutil
-import sys
+import copy
 
-import util.shell as shell
 import util.file as file
 
 import config.vswitch as vswitch
@@ -16,10 +14,10 @@ _logger = logging.getLogger(__name__)
 
 
 def load(site_dir: str) -> dict:
-    """Load 'site.yaml' from the given directory and validate it.
+    """Load 'site.yaml' from the given directory and validate it. This method also loads and validates all the host
+    configuration for the site.
 
-    Return the site configuration as a dictionary. This configuration _is not_ valid for creating a set of scripts for
-    a specific host. Instead this configuration must be used as the base for loading host YAML files.
+    Return the site configuration that can be used in a subsequent call to write_host_configs().
     """
     if not site_dir:
         raise ValueError("site_dir cannot be empty")
@@ -28,16 +26,17 @@ def load(site_dir: str) -> dict:
 
     _logger.info("loading site config from '%s'", site_dir)
 
-    site_cfg = file.load_yaml(os.path.join(site_dir, "site.yaml"))
+    site_yaml = file.load_yaml(os.path.join(site_dir, "site.yaml"))
 
     # TODO change to site_name
-    if "name" in site_cfg:
-        site_cfg["site"] = site_cfg.pop("name")
+    if "name" in site_yaml:
+        site_yaml["site"] = site_yaml.pop("name")
     else:
-        site_cfg["site"] = os.path.basename(site_dir)
-    site_cfg["site_dir"] = site_dir
+        site_yaml["site"] = os.path.basename(site_dir)
+    site_yaml["site_dir"] = site_dir
 
-    site_cfg = load_from_dict(site_cfg)
+    site_cfg = validate(site_yaml)
+
     _load_all_hosts(site_cfg)
 
     _logger.debug("loaded site '%s' from '%s'", site_cfg["site"], site_dir)
@@ -45,24 +44,31 @@ def load(site_dir: str) -> dict:
     return site_cfg
 
 
-def load_from_dict(site_cfg: dict) -> dict:
-    if site_cfg is None:
+def validate(site_yaml: dict) -> dict:
+    """Validate the given YAML formatted site configuration.
+
+    This configuration _is not_ valid for creating a set of scripts for a specific host.
+    Instead, this configuration must be used as the base for loading host YAML files.
+    """
+    if site_yaml is None:
         raise ValueError("empty site config")
-    if not isinstance(site_cfg, dict):
+    if not isinstance(site_yaml, dict):
         raise ValueError("site config must be a dictionary")
 
-    if "site" not in site_cfg:
+    if "site" not in site_yaml:
         raise KeyError("site cannot be empty")
-    if not isinstance(site_cfg["site"], str):
+    if not isinstance(site_yaml["site"], str):
         raise KeyError("site must be a string")
-    if not site_cfg["site"]:
+    if not site_yaml["site"]:
         raise KeyError("site cannot be empty")
 
+    site_cfg = copy.deepcopy(site_yaml)
     site_cfg["domain"] = site_cfg.get("domain", "")  # ensure set even if empty, the defaulf
 
     vswitch.validate(site_cfg)
 
-    site_cfg["hosts"] = {}  # map hostname to host config
+    # map hostname to host config
+    site_cfg["hosts"] = {}
     # map roles to fully qualified domain names; shared with host configs
     site_cfg["roles_to_hostnames"] = {}
 
@@ -70,11 +76,7 @@ def load_from_dict(site_cfg: dict) -> dict:
 
 
 def _load_all_hosts(site_cfg: dict):
-    """Load all host YAML files for the given site, validating each one.
-
-    Return the site configuration as a dictionary. This configuration _is not_ valid for creating a set of scripts for
-    a specific host. Instead this configuration must be used as the base for loading host YAML files.
-    """
+    """Load and validate all host YAML files for the given site."""
     _logger.debug("loading hosts for site '%s'", site_cfg["site"])
 
     # TODO proper role hierarchy and ordering
@@ -117,44 +119,12 @@ def _load_all_hosts(site_cfg: dict):
     _logger.debug("loaded %n hosts for site '%s'", 0, site_cfg["site"])
 
 
-def write_host_configs(site_cfg, output_dir):
-    """Create all the configuration scripts and files for the host
-    and write them to the given directory."""
-
+def write_host_scripts(site_cfg: dict, output_dir: str):
+    """Create the configuration scripts and files for the site's hosts and write them to the given directory."""
     _logger.info("writing setup scripts for site to '%s'", output_dir)
 
     for host_cfg in site_cfg["hosts"].values():
-        _logger.debug(file.output_yaml(host_cfg))
-        host_dir = os.path.join(output_dir, host_cfg["hostname"])
-
-        _logger.info("creating setup scripts for '%s'", host_cfg["hostname"])
-
-        if os.path.exists(host_dir):
-            _logger.debug("removing existing host configuration scripts from '%s'", host_dir)
-            shutil.rmtree(host_dir)
-        os.mkdir(host_dir)
-
-        # create a setup script that sources all the other scripts
-        setup_script = shell.ShellScript("setup.sh")
-        setup_script.append_self_dir()
-        setup_script.append_rootinstall()
-
-        setup_script.append(f"echo \"Setting up {host_cfg['hostname']}\"\n")
-
-        # add all scripts from each role
-        for role in host_cfg["roles"]:
-            try:
-                for script in role.create_scripts(host_cfg, host_dir):
-                    setup_script.append(". $DIR/" + script)
-            except (TypeError, AttributeError):
-                _logger.fatal(("cannot run create_scripts on class %s; "
-                               "it should have a create_scripts(cfg, output_dir) function "
-                               "that returns an iterable list of scripts"), role)
-                raise
-
-        setup_script.write_file(host_dir)
-
-        preview_dir(host_dir)
+        host.write_scripts(host_cfg, output_dir)
 
 
 def _add_host_dns_to_vlans(cfg):
@@ -205,31 +175,3 @@ def _confgure_router_hosts(cfg):
                     "ipv4_address": vlan["ipv4_subnet"].network_address + 1,
                     "ipv6_address": vlan["ipv6_subnet"].network_address + 1,
                     "aliases": ["router"]})
-
-
-def preview_dir(output_dir, limit=sys.maxsize):
-    if not _logger.isEnabledFor(logging.DEBUG):
-        return
-
-    """Output all files in the given directory, up to the limit number of lines per file."""
-    _logger.debug(output_dir)
-    _logger.debug("")
-
-    for file in os.listdir(output_dir):
-        path = os.path.join(output_dir, file)
-
-        if not os.path.isfile(path):
-            preview_dir(path, limit)
-            continue
-
-        _logger.debug("**********")
-        _logger.debug(path)
-        _logger.debug("")
-        line_count = 0
-        with open(path) as file:
-            for line in file:
-                if line_count > limit:
-                    break
-                line_count += 1
-                _logger.debug(line, end='')
-        _logger.debug("")

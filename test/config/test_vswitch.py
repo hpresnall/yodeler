@@ -7,60 +7,64 @@ import test.config.base as base
 
 class TestVswitch(base.TestCfgBase):
     def test_no_vswitches(self):
-        del self._cfg_dict["vswitches"]
+        del self._site_yaml["vswitches"]
         self.build_error()
 
     def test_empty_vswitches(self):
-        self._cfg_dict["vswitches"] = []
+        self._site_yaml["vswitches"] = []
         self.build_error()
 
     def test_string_vswitches(self):
-        self._cfg_dict["vswitches"] = "invalid"
+        self._site_yaml["vswitches"] = "invalid"
         self.build_error()
 
     def test_num_vswitches(self):
-        self._cfg_dict["vswitches"] = 123
+        self._site_yaml["vswitches"] = 123
         self.build_error()
 
     def test_nonobject_vswitch(self):
-        self._cfg_dict["vswitches"] = [ "invalid" ]
+        self._site_yaml["vswitches"] = [ "invalid" ]
         self.build_error()
 
     def test_no_vswitch_name(self):
-        del self._cfg_dict["vswitches"][0]["name"]
+        del self._site_yaml["vswitches"][0]["name"]
         self.build_error()
 
     def test_empty_vswitch_name(self):
-        self._cfg_dict["vswitches"][0]["name"] = ""
+        self._site_yaml["vswitches"][0]["name"] = ""
         self.build_error()
 
     def test_none_vswitch_name(self):
-        self._cfg_dict["vswitches"][0]["name"] = None
+        self._site_yaml["vswitches"][0]["name"] = None
         self.build_error()
 
     def test_duplicate_vswitch_name(self):
-        self._cfg_dict["vswitches"][0]["name"] = "private"
+        self._site_yaml["vswitches"][0]["name"] = "private"
         self.build_error()
 
     def test_no_uplink(self):
-        del self._cfg_dict["vswitches"][0]["uplink"]
+        del self._site_yaml["vswitches"][0]["uplink"]
         cfg = self.build_cfg()
 
         # key should exist and be None
         self.assertIsNone(cfg["vswitches"]["public"]["uplink"])
 
+    def test_invalid_type_uplink(self):
+        self._site_yaml["vswitches"][0]["uplink"] = 0
+        self.build_error()
+
     def test_multi_uplink(self):
-        self._cfg_dict["vswitches"][0]["uplink"] = ["eth0", "eth1"]
+        self._site_yaml["vswitches"][0]["uplink"] = ["eth0", "eth1"]
         cfg = self.build_cfg()
 
         # key should exist
         self.assertEqual(2, len(cfg["vswitches"]["public"]["uplink"]))
 
     def test_reused_uplink(self):
-        self._cfg_dict["vswitches"][1]["uplink"] = "eth0"
+        self._site_yaml["vswitches"][1]["uplink"] = "eth0"
         self.build_error()
 
     def test_reused_uplink_multi(self):
-        self._cfg_dict["vswitches"][0]["uplink"] = "eth0"
-        self._cfg_dict["vswitches"][1]["uplink"] = ["eth0", "eth1"]
+        self._site_yaml["vswitches"][0]["uplink"] = "eth0"
+        self._site_yaml["vswitches"][1]["uplink"] = ["eth0", "eth1"]
         self.build_error()

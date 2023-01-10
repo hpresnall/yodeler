@@ -1,8 +1,11 @@
 """Handles parsing and validating host configuration from YAML files."""
 import logging
 import os
+import shutil
+import sys
 
 import util.file as file
+import util.shell as shell
 
 import config.interface as interface
 
@@ -15,7 +18,10 @@ _logger = logging.getLogger(__name__)
 
 def load(site_cfg: dict, host_path: str) -> dict:
     """Load the given host YAML file from given path, using the existing site config.
-    The site config will be merged with the host configuration."""
+
+    Return a configuration that is a combination of the site and host configuration.
+    This merged configuration is valid for creating a set of scripts for a specific host.
+    """
     if not host_path:
         raise ValueError("host_path cannot be empty")
 
@@ -23,21 +29,26 @@ def load(site_cfg: dict, host_path: str) -> dict:
 
     _logger.info("loading host config from '%s'", os.path.basename(host_path))
 
-    host_cfg = file.load_yaml(host_path)
+    host_yaml = file.load_yaml(host_path)
 
-    if "hostname" in host_cfg:
-        host_cfg["hostname"] = host_cfg.pop("hostname")
+    if "hostname" in host_yaml:
+        host_yaml["hostname"] = host_yaml.pop("hostname")
     else:
-        host_cfg["hostname"] = os.path.basename(host_path)[:-5]  # remove .yaml
+        host_yaml["hostname"] = os.path.basename(host_path)[:-5]  # remove .yaml
 
-    host_cfg = load_from_dict(site_cfg, host_cfg)
+    host_cfg = validate(site_cfg, host_yaml)
 
     _logger.debug("loaded host '%s' from '%s'", host_cfg["hostname"], host_path)
 
     return host_cfg
 
 
-def load_from_dict(site_cfg: dict, cfg: dict) -> dict:
+def validate(site_cfg: dict, host_yaml: dict) -> dict:
+    """Validate the given YAML formatted host configuration.
+
+    Returns a configuration file that is a combination of the site and host configuration.
+    This merged configuration is valid for creating a set of scripts for a specific host.
+    """
     if site_cfg is None:
         raise ValueError("empty site config")
     if not isinstance(site_cfg, dict):
@@ -45,50 +56,74 @@ def load_from_dict(site_cfg: dict, cfg: dict) -> dict:
     if len(site_cfg) == 0:
         raise ValueError("empty site config")
 
-    if cfg is None:
+    if host_yaml is None:
         raise ValueError("empty host config")
-    if not isinstance(cfg, dict):
+    if not isinstance(host_yaml, dict):
         raise ValueError("host config must be a dictionary")
-    if len(cfg) == 0:
+    if len(host_yaml) == 0:
         raise ValueError("empty host config")
 
-    if "hostname" not in cfg:
+    if "hostname" not in host_yaml:
         raise KeyError("hostname cannot be empty")
-    if not isinstance(cfg["hostname"], str):
+    if not isinstance(host_yaml["hostname"], str):
         raise KeyError("hostname must be a string")
-    if not cfg["hostname"]:
+    if not host_yaml["hostname"]:
         raise KeyError("hostname cannot be empty")
+
+    # silently ignore attempts to overwrite site config
+    host_yaml.pop("vswitches", None)
 
     # shallow copy site config; host values overwrite site values
-    host_cfg = {**site_cfg, **cfg}
+    host_cfg = {**site_cfg, **host_yaml}
 
-    # manually merge of packages
-    for key in ["packages", "remove_packages"]:
-        site = site_cfg.get(key)
-        host = cfg.get(key)
-
-        if site is None and host is None:
-            host_cfg[key] = set()
-        elif site is None:
-            host_cfg[key] = set(host)
-        elif host is None:
-            host_cfg[key] = set(site)
-        else:
-            # combine; host overwrites site
-            host_cfg[key] = set(site)
-            host_cfg[key] |= set(host)
-
-    _validate_config(host_cfg)
+    _set_defaults(host_cfg)
     _configure_roles(host_cfg)
     interface.validate(host_cfg)
-    _configure_packages(host_cfg)
+    _configure_packages(site_cfg, host_yaml, host_cfg)
 
     site_cfg["hosts"][host_cfg["hostname"]] = host_cfg
 
     return host_cfg
 
 
-def _validate_config(cfg):
+def write_scripts(host_cfg: dict, output_dir: str):
+    """Create the configuration scripts and files for host and write them to the given directory."""
+    if _logger.isEnabledFor(logging.DEBUG):
+        _logger.debug(file.output_yaml(host_cfg))
+
+    host_dir = os.path.join(output_dir, host_cfg["hostname"])
+
+    _logger.info("creating setup scripts for '%s'", host_cfg["hostname"])
+
+    if os.path.exists(host_dir):
+        _logger.debug("removing existing host configuration scripts from '%s'", host_dir)
+        shutil.rmtree(host_dir)
+    os.mkdir(host_dir)
+
+    # create a setup script that sources all the other scripts
+    setup_script = shell.ShellScript("setup.sh")
+    setup_script.append_self_dir()
+    setup_script.append_rootinstall()
+
+    setup_script.append(f"echo \"Setting up {host_cfg['hostname']}\"\n")
+
+    # add all scripts from each role
+    for role in host_cfg["roles"]:
+        try:
+            for script in role.create_scripts(host_cfg, host_dir):
+                setup_script.append(". $DIR/" + script)
+        except (TypeError, AttributeError):
+            _logger.fatal(("cannot run create_scripts on class %s; "
+                           "it should have a create_scripts(cfg, output_dir) function "
+                           "that returns an iterable list of scripts"), role)
+            raise
+
+    setup_script.write_file(host_dir)
+
+    _preview_dir(host_dir)
+
+
+def _set_defaults(cfg):
     for key in _REQUIRED_PROPERTIES:
         if key not in cfg:
             raise KeyError("{0} not defined".format(key))
@@ -135,29 +170,73 @@ def _configure_roles(cfg):
             cfg["roles"][-1].additional_configuration(cfg)
 
 
-def _configure_packages(cfg):
-    for role in cfg["roles"]:
-        cfg["packages"] |= role.additional_packages(cfg)
+def _configure_packages(site_cfg, host_yaml, host_cfg):
+    # manually merge packages use set for uniqueness and union/interection operations
+    for key in ["packages", "remove_packages"]:
+        site = site_cfg.get(key)
+        host = host_yaml.get(key)
+
+        if site is None and host is None:
+            host_cfg[key] = set()
+        elif site is None:
+            host_cfg[key] = set(host)
+        elif host is None:
+            host_cfg[key] = set(site)
+        else:
+            # combine; host overwrites site
+            host_cfg[key] = set(site)
+            host_cfg[key] |= set(host)
+
+    for role in host_cfg["roles"]:
+        host_cfg["packages"] |= role.additional_packages(host_cfg)
 
     # update packages based on config
-    if cfg["metrics"]:
-        cfg["packages"].add("prometheus-node-exporter")
+    if host_cfg["metrics"]:
+        host_cfg["packages"].add("prometheus-node-exporter")
 
      # remove iptables if there is no local firewall
-    if not cfg["local_firewall"]:
-        cfg["remove_packages"] |= {"iptables", "ip6tables"}
-        cfg["packages"].discard("awall")
+    if not host_cfg["local_firewall"]:
+        host_cfg["remove_packages"] |= {"iptables", "ip6tables"}
+        host_cfg["packages"].discard("awall")
 
-    if not cfg["is_vm"]:
+    if not host_cfg["is_vm"]:
         # add cpufreq and other utils to real hosts
-        cfg["packages"] |= {"util-linux", "cpufreqd", "cpufrequtils"}
+        host_cfg["packages"] |= {"util-linux", "cpufreqd", "cpufrequtils"}
 
     # resolve conflicts in favor of adding the package
-    cfg["remove_packages"] -= cfg["packages"]
+    host_cfg["remove_packages"] -= host_cfg["packages"]
 
     if _logger.isEnabledFor(logging.DEBUG):
-        _logger.debug("adding packages %s", cfg["packages"])
-        _logger.debug("removing packages %s", cfg["remove_packages"])
+        _logger.debug("adding packages %s", host_cfg["packages"])
+        _logger.debug("removing packages %s", host_cfg["remove_packages"])
+
+
+def _preview_dir(output_dir, limit=sys.maxsize):
+    if not _logger.isEnabledFor(logging.DEBUG):
+        return
+
+    """Output all files in the given directory, up to the limit number of lines per file."""
+    _logger.debug(output_dir)
+    _logger.debug("")
+
+    for file in os.listdir(output_dir):
+        path = os.path.join(output_dir, file)
+
+        if not os.path.isfile(path):
+            _preview_dir(path, limit)
+            continue
+
+        _logger.debug("**********")
+        _logger.debug(path)
+        _logger.debug("")
+        line_count = 0
+        with open(path) as file:
+            for line in file:
+                if line_count > limit:
+                    break
+                line_count += 1
+                _logger.debug(line, end='')
+        _logger.debug("")
 
 
 # properties that are unique and cannot be set as defaults

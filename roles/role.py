@@ -1,4 +1,4 @@
-"""Module for the Role base class."""
+"""Defines the abstract Role class. A role represents various configurations that can be applied to a host."""
 import typing
 import importlib
 import inspect
@@ -28,11 +28,11 @@ class Role(ABC):
 
 
 def load(role_name):
-    """Load an instance of the given role name."""
+    """Load an Role subclass instance using the given role name."""
     try:
         mod = importlib.import_module("roles." + role_name)
     except ModuleNotFoundError:
-        raise KeyError(f"cannot load module for role {role_name} from the roles package")
+        raise KeyError(f"cannot load module for role '{role_name}' from the roles package")
 
     # find class for role; assume only 1 class in each module
     role_class = None
@@ -42,10 +42,10 @@ def load(role_name):
             break
 
     if role_class is None:
-        raise KeyError(f"cannot find class for role {role_name} in module {mod}")
+        raise KeyError(f"cannot find class for role '{role_name}' in module {mod}")
 
     # instantiate the class and add to the list
     try:
         return role_class()
     except TypeError:
-        raise KeyError(f"cannot instantiate class {role_class}")
+        raise KeyError(f"cannot instantiate class '{role_class}'")

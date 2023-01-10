@@ -12,34 +12,33 @@ import config.vlan
 
 
 class TestHost(base.TestCfgBase):
-
     def test_load_none_host_path(self):
         with self.assertRaises(ValueError):
-            host.load(self._site_cfg, None)
+            host.load(site.validate(self._site_yaml), None)
 
     def test_load_empty_host_path(self):
         with self.assertRaises(ValueError):
-            host.load(self._site_cfg, "")
+            host.load(site.validate(self._site_yaml), "")
 
     def test_load_config_str(self):
         with self.assertRaises(ValueError):
-            host.load_from_dict(self._site_cfg, "")
+            host.validate(site.validate(self._site_yaml), "")
 
     def test_load_config_none(self):
         with self.assertRaises(ValueError):
-            host.load_from_dict(self._site_cfg, None)
+            host.validate(site.validate(self._site_yaml), None)
 
     def test_load_config_no_hostname(self):
         with self.assertRaises(KeyError):
-            host.load_from_dict(self._site_cfg, {"value": 0})
+            host.validate(site.validate(self._site_yaml), {"value": 0})
 
     def test_load_config_nonstr_hostname(self):
         with self.assertRaises(KeyError):
-            host.load_from_dict(self._site_cfg, {"hostname": 0})
+            host.validate(site.validate(self._site_yaml), {"hostname": 0})
 
-    def test_load_config_empty_name(self):
+    def test_load_config_empty_hostname(self):
         with self.assertRaises(KeyError):
-            host.load_from_dict(self._site_cfg, {"hostname": ""})
+            host.validate(site.validate(self._site_yaml), {"hostname": ""})
 
     def test_minimal(self):
         cfg = self.build_cfg()
@@ -69,7 +68,7 @@ class TestHost(base.TestCfgBase):
 
         # single vlan
         # default not specified; should default to only vlan
-        self.assertEqual("test", vswitch["default_vlan"]["name"])
+        self.assertEqual("pub_test", vswitch["default_vlan"]["name"])
         self.assertTrue(vswitch["vlans_by_id"][10]["default"])
 
         # single interface, no domain specified
@@ -120,24 +119,24 @@ class TestHost(base.TestCfgBase):
         self.assertNotIn("server_needs", host["remove_packages"])
 
     def test_missing_required(self):
-        del self._cfg_dict["site"]
+        del self._host_yaml["hostname"]
         self.build_error()
 
     def test_invalid_role(self):
-        self._cfg_dict["roles"] = ["invalid"]
+        self._host_yaml["roles"] = ["invalid"]
         self.build_error()
 
     def test_invalid_role_class(self):
-        self._cfg_dict["roles"] = ["role"]
+        self._host_yaml["roles"] = ["role"]
         self.build_error()
 
     def test_invalid_external_dns(self):
-        self._cfg_dict["external_dns"] = ["invalid"]
+        self._host_yaml["external_dns"] = ["invalid"]
         self.build_error()
 
     def test_package_conflict(self):
-        self._cfg_dict["packages"] = {"explicit_add", "add"}
-        self._cfg_dict["remove_packages"] = {"explicit_add", "remove"}
+        self._host_yaml["packages"] = {"explicit_add", "add"}
+        self._host_yaml["remove_packages"] = {"explicit_add", "remove"}
         cfg = self.build_cfg()
 
         self.assertIn("explicit_add", cfg["packages"])
@@ -147,11 +146,11 @@ class TestHost(base.TestCfgBase):
         self.assertIn("remove", cfg["remove_packages"])
 
     def test_invalid_local_dns(self):
-        self._cfg_dict["local_dns"] = ["invalid"]
+        self._host_yaml["local_dns"] = ["invalid"]
         self.build_error()
 
     def test_no_local_firewall(self):
-        self._cfg_dict["local_firewall"] = False
+        self._host_yaml["local_firewall"] = False
         cfg = self.build_cfg()
 
         # remove iptables when no firewall

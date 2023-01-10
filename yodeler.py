@@ -26,7 +26,7 @@ def yodel():
             pass
 
     site_cfg = site.load(site_path)
-    site.write_host_configs(site_cfg, output_dir)
+    site.write_host_scripts(site_cfg, output_dir)
 
 
 if __name__ == "__main__":

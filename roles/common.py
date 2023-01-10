@@ -71,8 +71,7 @@ class Common(Role):
 
         common.write_file(output_dir)
 
-        interfaces = [util.interfaces.loopback(
-        ), util.interfaces.from_config(cfg["interfaces"])]
+        interfaces = [util.interfaces.loopback(), util.interfaces.from_config(cfg["interfaces"])]
         util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
         util.resolv.create_conf(cfg, output_dir)
