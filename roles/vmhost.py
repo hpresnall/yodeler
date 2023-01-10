@@ -242,7 +242,7 @@ def _setup_vms(cfg, output_dir):
         if not host["is_vm"] or hostname == cfg["hostname"]:
             continue
 
-        shell.append("echo \"Setting up VM " + hostname + "...\"")
+        shell.append("echo \"Setting up VM '" + hostname + "'...\"")
         shell.append("cd ..")
         shell.append("cd " + hostname)
         shell.append("./create_vm.sh")

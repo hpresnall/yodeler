@@ -1,6 +1,6 @@
 # minimal, combined site + host config for testing
 hostname: minimal
-site: test_site
+site_name: test_site
 public_ssh_key: ssh
 vswitches:
   - name: public

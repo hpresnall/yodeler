@@ -105,7 +105,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup_script.append_self_dir()
     setup_script.append_rootinstall()
 
-    setup_script.append(f"echo \"Setting up {host_cfg['hostname']}\"\n")
+    setup_script.append(f"echo \"Setting up '{host_cfg['hostname']}'\"\n")
 
     # add all scripts from each role
     for role in host_cfg["roles"]:
@@ -226,21 +226,21 @@ def _preview_dir(output_dir, limit=sys.maxsize):
             _preview_dir(path, limit)
             continue
 
-        _logger.debug("**********")
-        _logger.debug(path)
-        _logger.debug("")
         line_count = 0
+        lines = [path + "\n"]
+
         with open(path) as file:
             for line in file:
                 if line_count > limit:
                     break
+
                 line_count += 1
-                _logger.debug(line, end='')
-        _logger.debug("")
+                lines.append(line)
+        _logger.debug("".join(lines))
 
 
 # properties that are unique and cannot be set as defaults
-_REQUIRED_PROPERTIES = ["site", "hostname", "public_ssh_key"]
+_REQUIRED_PROPERTIES = ["site_name", "hostname", "public_ssh_key"]
 
 # accessible for testing
 DEFAULT_CONFIG = {

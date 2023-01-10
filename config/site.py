@@ -30,16 +30,16 @@ def load(site_dir: str) -> dict:
 
     # TODO change to site_name
     if "name" in site_yaml:
-        site_yaml["site"] = site_yaml.pop("name")
+        site_yaml["site_name"] = site_yaml.pop("name")
     else:
-        site_yaml["site"] = os.path.basename(site_dir)
+        site_yaml["site_name"] = os.path.basename(site_dir)
     site_yaml["site_dir"] = site_dir
 
     site_cfg = validate(site_yaml)
 
     _load_all_hosts(site_cfg)
 
-    _logger.debug("loaded site '%s' from '%s'", site_cfg["site"], site_dir)
+    _logger.debug("loaded site '%s' from '%s'", site_cfg["site_name"], site_dir)
 
     return site_cfg
 
@@ -55,12 +55,12 @@ def validate(site_yaml: dict) -> dict:
     if not isinstance(site_yaml, dict):
         raise ValueError("site config must be a dictionary")
 
-    if "site" not in site_yaml:
-        raise KeyError("site cannot be empty")
-    if not isinstance(site_yaml["site"], str):
-        raise KeyError("site must be a string")
-    if not site_yaml["site"]:
-        raise KeyError("site cannot be empty")
+    if "site_name" not in site_yaml:
+        raise KeyError("site_name cannot be empty")
+    if not isinstance(site_yaml["site_name"], str):
+        raise KeyError("site_name must be a string")
+    if not site_yaml["site_name"]:
+        raise KeyError("site_name cannot be empty")
 
     site_cfg = copy.deepcopy(site_yaml)
     site_cfg["domain"] = site_cfg.get("domain", "")  # ensure set even if empty, the defaulf
@@ -77,7 +77,7 @@ def validate(site_yaml: dict) -> dict:
 
 def _load_all_hosts(site_cfg: dict):
     """Load and validate all host YAML files for the given site."""
-    _logger.debug("loading hosts for site '%s'", site_cfg["site"])
+    _logger.debug("loading hosts for site '%s'", site_cfg["site_name"])
 
     # TODO proper role hierarchy and ordering
     required_roles = set()  # {"dns", "router"}
@@ -103,8 +103,7 @@ def _load_all_hosts(site_cfg: dict):
 
         for role in host_cfg["roles"]:
             if (role.name != "common") and (role.name in defined_roles):
-                raise Exception(
-                    f"cannot have more than one {role.name} server for site {site_cfg['name']}")
+                raise Exception(f"cannot have more than one {role.name} server for site '{site_cfg['site_name']}'")
             defined_roles.add(role.name)
 
             if role.name == "router":
@@ -112,11 +111,9 @@ def _load_all_hosts(site_cfg: dict):
 
     for role in required_roles:
         if role not in defined_roles:
-            raise Exception(
-                f"required role {role} not defined for site {site_cfg['site']}")
+            raise Exception(f"required role {role} not defined for site '{site_cfg['site_name']}'")
 
-    # TODO number of hosts
-    _logger.debug("loaded %n hosts for site '%s'", 0, site_cfg["site"])
+    _logger.debug("loaded %d hosts for site '%s'", len(site_cfg["hosts"]), site_cfg["site_name"])
 
 
 def write_host_scripts(site_cfg: dict, output_dir: str):

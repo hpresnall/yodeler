@@ -57,10 +57,10 @@ chown -R $USER:$USER /home/$USER/.ssh
 if [ "$INSTALL_PRIVATE_SSH_KEY" = "True" ]; then
     echo "Host=*
 User=$USER
-IdentityFile=~/.ssh/$SITE" > /home/$USER/.ssh/config
+IdentityFile=~/.ssh/$SITE_NAME" > /home/$USER/.ssh/config
 
-    echo "$PRIVATE_SSH_KEY" > /home/$USER/.ssh/$SITE
-    chmod 600 /home/$USER/.ssh/$SITE
+    echo "$PRIVATE_SSH_KEY" > /home/$USER/.ssh/$SITE_NAME
+    chmod 600 /home/$USER/.ssh/$SITE_NAME
 fi
 
 # only allow private key access

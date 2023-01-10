@@ -33,16 +33,16 @@ class TestSite(unittest.TestCase):
 
     def test_load_config_nonstr_name(self):
         with self.assertRaises(KeyError):
-            site.validate({"site": 0})
+            site.validate({"site_name": 0})
 
     def test_load_config_empty_name(self):
         with self.assertRaises(KeyError):
-            site.validate({"site": ""})
+            site.validate({"site_name": ""})
 
     def test_load_test_site(self):
         site_cfg = site.load(os.path.join(self._base_path, "sites", "test"))
 
-        self.assertEqual(site_cfg["site"], "test")
+        self.assertEqual(site_cfg["site_name"], "test")
         self.assertIsNotNone(site_cfg["hosts"])
 
         roles = site_cfg["roles_to_hostnames"]

@@ -5,7 +5,7 @@ umask 022
 
 # create the virtual machine
 # run setup.sh inside a chroot of the VM's filesystem
-echo "Building VM image for $HOSTNAME"
+echo "Building VM image for '$HOSTNAME'"
 /home/$USER/alpine-make-vm-image/alpine-make-vm-image \
   --image-format raw \
   --serial-console \
@@ -18,7 +18,7 @@ echo "Building VM image for $HOSTNAME"
 
 # if successful, define the VM
 if [ "$$?" = "0" ]; then
-  echo "Creating VM definition for $HOSTNAME"
+  echo "Creating VM definition for '$HOSTNAME'"
   virsh define $$DIR/$HOSTNAME.xml
 
   # if successful, set the image perms & autostart the VM
@@ -29,7 +29,7 @@ if [ "$$?" = "0" ]; then
     virsh autostart $HOSTNAME
 
     if [ "$$1" = "start" ]; then
-      echo "Starting VM $HOSTNAME"
+      echo "Starting VM '$HOSTNAME'"
       virsh start $HOSTNAME
     fi
   fi

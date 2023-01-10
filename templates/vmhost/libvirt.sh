@@ -59,4 +59,4 @@ echo "Configuring libvirt networks"
 virsh net-destroy default
 virsh net-undefine default
 
-DIR=/root/$SITE/$HOSTNAME
+DIR=/root/$SITE_NAME/$HOSTNAME
