@@ -85,7 +85,7 @@ def port(name, parent, comment, uplink=None):
     """
     buffer = []
 
-    if comment != "":
+    if comment:
         buffer.append("# " + comment)
 
     buffer.append(f"auto {name}")

@@ -41,7 +41,7 @@ def validate(cfg):
         if cfg["primary_domain"] == vlan["domain"]:
             matching_domain = vlan["domain"]
 
-    if cfg["primary_domain"] != "":
+    if cfg["primary_domain"]:
         if matching_domain is None:
             raise KeyError(
                 f"invalid primary_domain: no interface's vlan domain matches primary_domain '{cfg['primary_domain']}'")

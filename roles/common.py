@@ -31,6 +31,11 @@ class Common(Role):
 
         return packages
 
+    def additional_configuration(self, cfg):
+        cfg["fqdn"] = ""
+        if ("prmary_domain" in cfg) and (cfg["prmary_domain"]):
+            cfg["fqdn"] = cfg["hostname"] + '.' + cfg["prmary_domain"]
+
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
         common = util.shell.ShellScript("common.sh")

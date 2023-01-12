@@ -19,7 +19,7 @@ def create_conf(cfg, output_dir):
 
         # possibly search vlan domains
         domain = iface["vlan"].get("domain") if "vlan" in iface else None
-        if (domain is not None) and (domain != ""):
+        if domain:
             search_domains.append(domain)
 
     if dhcp:

@@ -18,17 +18,25 @@ class Dns(Role):
     def additional_packages(self, cfg):
         return {"bind", "bind-tools"}
 
-    def create_scripts(self, cfg, output_dir):
-        """Create the scripts and configuration files for the given host's configuration."""
+    def additional_configuration(self, cfg):
         if len(cfg["external_dns"]) == 0:
             raise KeyError("cannot configure DNS server with no external_dns addresses defined")
 
-        domain = cfg["primary_domain"]
-        if domain == "":
-            domain = cfg["domain"]
-            if domain == "":
+        domain = cfg["domain"]
+        if not domain:
+            domain = cfg["primary_domain"]
+            if not domain:
                 raise KeyError(("cannot configure DNS server with no primary_domain or top-level site domain"))
         cfg["dns_domain"] = domain
+
+        # add hostname information for DNS
+        # each vlan will be a separate zone
+        cfg["dns_entries_by_vlan"] = {}
+
+    def create_scripts(self, cfg, output_dir):
+        """Create the scripts and configuration files for the given host's configuration."""
+
+        _create_dns_entries(cfg)
 
         # for resolv.conf, force resolution to local nameserver and add all vlan domains to search
         resolv = ["nameserver 127.0.0.1", "nameserver ::1"]
@@ -52,7 +60,7 @@ class Dns(Role):
 
             for vlan in iface["vswitch"]["vlans"]:
                 # no domain => no dns
-                if vlan["domain"] == "":
+                if not vlan["domain"]:
                     continue
 
                 domains.append(vlan["domain"])
@@ -69,9 +77,9 @@ class Dns(Role):
 
                 _configure_zones(cfg, vlan, named, zone_dir)
 
-        if domain != "":
+        if cfg["dns_domain"] not in domains:
             # top level domain last in search order
-            domains.append(domain)
+            domains.append(cfg["dns_domain"])
             _configure_tld(cfg, named, zone_dir)
 
         _format_named(named)
@@ -85,6 +93,43 @@ class Dns(Role):
         shell.write_file(output_dir)
 
         return [shell.name]
+
+
+def _create_dns_entries(cfg):
+    # create dns entries for all hosts
+    for host_cfg in cfg["hosts"].values():
+        for iface in host_cfg["interfaces"]:
+            vlan = iface["vlan"]
+
+            # no domain name => no DNS
+            if not vlan["domain"]:
+                continue
+
+            if vlan["name"] not in cfg["dns_entries_by_vlan"]:
+                cfg["dns_entries_by_vlan"][vlan["name"]] = []
+
+            cfg["dns_entries_by_vlan"][vlan["name"]].append({
+                "hostname": host_cfg["hostname"],
+                "ipv4_address": iface["ipv4_address"],
+                "ipv6_address": iface["ipv6_address"],
+                "aliases": [role.name for role in host_cfg["roles"] if role.name != "common"]})
+
+    # manually add host entries for router interfaces since they are defined based on routable vlans
+    router = cfg["roles_to_hostnames"]["router"][0]
+
+    for vswitch in cfg["vswitches"].values():
+        for vlan in vswitch["vlans"]:
+            if (not vlan["routable"]) or (not vlan["domain"]):
+                continue
+
+            if vlan["name"] not in cfg["dns_entries_by_vlan"]:
+                cfg["dns_entries_by_vlan"][vlan["name"]] = []
+
+            cfg["dns_entries_by_vlan"][vlan["name"]].append({
+                "hostname": router,
+                "ipv4_address": vlan["ipv4_subnet"].network_address + 1,
+                "ipv6_address": vlan["ipv6_subnet"].network_address + 1,
+                "aliases": ["router"]})
 
 
 def _init_named(cfg):
@@ -126,7 +171,7 @@ def _configure_zones(cfg, vlan, named, zone_dir):
 
     # note one forward zone
     # but, separate reverse zones for ipv4 and ipv6
-    _forward_zone_file(zone_name, cfg["dns_domain"], vlan, zone_file_name, zone_dir)
+    _forward_zone_file(cfg, zone_name, vlan, zone_file_name, zone_dir)
 
     reverse_zone_name = util.address.rptr_ipv4(vlan["ipv4_subnet"])
     reverse_zone_file_name = reverse_zone_name[:-13] + ".zone"  # drop in-addr.arpa from end
@@ -136,7 +181,7 @@ def _configure_zones(cfg, vlan, named, zone_dir):
 
     # add a PTR record for each host
     data = {"domain": vlan["domain"]}
-    for host in vlan["dns_entries"]:
+    for host in cfg["dns_entries_by_vlan"][vlan["name"]]:
         if host["ipv4_address"] == "dhcp":
             continue
         data["hostname"] = host["hostname"]
@@ -157,7 +202,7 @@ def _configure_zones(cfg, vlan, named, zone_dir):
         zone_file = [_ZONE_TEMPLATE.format(reverse_zone_name, cfg["dns_domain"])]
 
         # add a PTR record for each host
-        for host in vlan["dns_entries"]:
+        for host in cfg["dns_entries_by_vlan"][vlan["name"]]:
             if host["ipv6_address"] is None:
                 continue
             data["hostname"] = host["hostname"]
@@ -184,12 +229,12 @@ def _zone_config(zone_name, zone_file, forward=False):
     return zone.format(zone_name, zone_file)
 
 
-def _forward_zone_file(zone_name, dns_domain, vlan, zone_file_name, zone_dir):
-    zone_file = [_ZONE_TEMPLATE.format(zone_name, dns_domain)]
+def _forward_zone_file(cfg, zone_name, vlan, zone_file_name, zone_dir):
+    zone_file = [_ZONE_TEMPLATE.format(zone_name, cfg["dns_domain"],)]
     cnames = [""]
 
     # static A / AAAA records for each host; CNAMEs for each alias (role name)
-    for host in vlan["dns_entries"]:
+    for host in cfg["dns_entries_by_vlan"][vlan["name"]]:
         if host["ipv4_address"] != "dhcp":
             zone_file.append(_A.format_map(host))
         if host["ipv6_address"] is not None:

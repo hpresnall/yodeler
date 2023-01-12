@@ -77,8 +77,16 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
     host_cfg = {**site_cfg, **host_yaml}
 
     _set_defaults(host_cfg)
+
     _configure_roles(host_cfg)
+
+    for role in host_cfg["roles"]:
+        role.configure_interfaces(host_cfg)
     interface.validate(host_cfg)
+
+    for role in host_cfg["roles"]:
+        role.additional_configuration(host_cfg)
+
     _configure_packages(site_cfg, host_yaml, host_cfg)
 
     site_cfg["hosts"][host_cfg["hostname"]] = host_cfg
@@ -151,26 +159,30 @@ def _set_defaults(cfg):
             raise KeyError(f"invalid external_dns IP address {dns}") from None
 
 
-def _configure_roles(cfg):
+def _configure_roles(cfg: dict):
     # list of role names in yaml => list of Role subclass instances
     # Common _must_ be the first so it is configured and setup first
     role_names = set(cfg["roles"] if cfg.get("roles") is not None else [])
     cfg["roles"] = [roles.common.Common()]
-    cfg["roles"][0].additional_configuration(cfg)
 
     # for each role, load the module, then the class
     # instantiate the class and add addtional config
-    for role in role_names:
-        _logger.debug("loading module for %s role on %s", role, cfg["hostname"])
+    for role_name in role_names:
+        _logger.debug("loading role '%s' for '%s'", role_name, cfg["hostname"])
 
-        role = role.lower()
+        role_name = role_name.lower()
 
-        if role != "common":
-            cfg["roles"].append(roles.role.load(role))
-            cfg["roles"][-1].additional_configuration(cfg)
+        if role_name != "common":
+            cfg["roles"].append(roles.role.load(role_name))
+
+            # assume roles_to_hostnames is shared by site and all hosts
+            if role_name not in cfg["roles_to_hostnames"]:
+                cfg["roles_to_hostnames"][role_name] = []
+
+            cfg["roles_to_hostnames"][role_name].append(cfg['hostname'])
 
 
-def _configure_packages(site_cfg, host_yaml, host_cfg):
+def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
     # manually merge packages use set for uniqueness and union/interection operations
     for key in ["packages", "remove_packages"]:
         site = site_cfg.get(key)
@@ -211,7 +223,7 @@ def _configure_packages(site_cfg, host_yaml, host_cfg):
         _logger.debug("removing packages %s", host_cfg["remove_packages"])
 
 
-def _preview_dir(output_dir, limit=sys.maxsize):
+def _preview_dir(output_dir: str, limit: int = sys.maxsize):
     if not _logger.isEnabledFor(logging.DEBUG):
         return
 

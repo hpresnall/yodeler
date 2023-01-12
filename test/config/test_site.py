@@ -47,10 +47,10 @@ class TestSite(unittest.TestCase):
 
         roles = site_cfg["roles_to_hostnames"]
         self.assertIsNotNone(roles)
-        self.assertEqual(2, len(roles))
+        self.assertEqual(3, len(roles))
         self.assertIn("router", roles)
         self.assertIn("dns", roles)
-        self.assertEqual("router.test.site.example", roles["router"])
+        self.assertEqual(["router"], roles["router"])
 
         host_cfgs = site_cfg["hosts"]
         self.assertEqual(4, len(host_cfgs))

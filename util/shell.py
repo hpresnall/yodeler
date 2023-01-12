@@ -13,7 +13,7 @@ class ShellScript():
     _script_fragments = []
 
     def __init__(self, name):
-        if (name is None) or (name == ""):
+        if not name:
             raise ValueError("name cannot be None or empty")
 
         self.name = name
@@ -54,7 +54,7 @@ class ShellScript():
         """Write the script to the given directory."""
         path = os.path.join(output_dir, self.name)
         # ensure final blank line
-        if self._script_fragments[-1] != "":
+        if self._script_fragments[-1]:
             self._script_fragments.append("")
         script = "\n".join(self._script_fragments)
         util.file.write(path, script)

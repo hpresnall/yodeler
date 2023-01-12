@@ -14,12 +14,17 @@ class Role(ABC):
     def __init__(self, name):
         self.name = name
 
-    def additional_configuration(self, cfg):
-        """Add any additional default configuration for the role."""
-
     @abstractmethod
     def additional_packages(self, cfg) -> typing.Set[str]:
         """The packages needed to implement this role."""
+
+    def configure_interfaces(self, cfg: dict):
+        """Add any addition interfaces for the role.
+        Interface validation will be run afer all roles have this function called."""
+
+    def additional_configuration(self, cfg: dict):
+        """Add any additional default configuration & run validation specific to this role.
+        This is run after configure_interfaces()."""
 
     @abstractmethod
     def create_scripts(self, cfg, output_dir) -> typing.List[str]:
@@ -37,12 +42,12 @@ def load(role_name):
     # find class for role; assume only 1 class in each module
     role_class = None
     for clazz in inspect.getmembers(mod, inspect.isclass):
-        if clazz[0].upper() == role_name.upper():
+        if clazz[0].lower() == role_name.lower():
             role_class = clazz[1]
             break
 
     if role_class is None:
-        raise KeyError(f"cannot find class for role '{role_name}' in module {mod}")
+        raise KeyError(f"cannot find class for role '{role_name}' in module '{mod}'")
 
     # instantiate the class and add to the list
     try:

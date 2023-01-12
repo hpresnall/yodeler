@@ -25,7 +25,7 @@ def validate(domain: str, vswitch, other_vswitch_vlans: set):
             raise KeyError(f"vlan {i} must be an object for vswitch '{vswitch_name}'")
 
         # name is required and must be unique
-        if not vlan.get("name") or (vlan["name"] == ""):
+        if not vlan.get("name") or (not vlan["name"]):
             raise KeyError(f"no name for vlan {i} in vswitch '{vswitch_name}'")
 
         vlan_name = vlan["name"]
@@ -183,7 +183,7 @@ def _validate_ip_address(ip_version, index, vlan, vswitch_name):
             f"invalid {ip_version}_address for host {index} in vlan '{vlan['name']}' for vswitch '{vswitch_name}'") from exp
 
     if (ip_version == "ipv6") and (vlan["ipv6_subnet"] is None):
-        _logger.warning("ipv6_address %s for host %s in vlan %s with ipv6 disabled in vswitch %s will be ignored",
+        _logger.warning("ipv6_address %s for host %s in vlan '%s' with ipv6 disabled in vswitch '%s' will be ignored",
                         address, index, vlan['name'], vswitch_name)
         vlan["ipv6_address"] = None
         return

@@ -24,7 +24,7 @@ def validate(cfg: dict):
             raise KeyError(f"vswitch {i} must be an object")
 
         # name is required and must be unique
-        if ("name" not in vswitch) or (vswitch["name"] is None) or (vswitch["name"] == ""):
+        if ("name" not in vswitch) or (not vswitch["name"]):
             raise KeyError(f"no name defined for vswitch {i}")
 
         vswitch_name = vswitch["name"]
