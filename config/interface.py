@@ -122,6 +122,9 @@ def validate_iface(iface):
         # note will not preclude using DHCP6 for options
         iface["ipv6_dhcp"] = bool(iface.get("ipv6_dhcp"))
 
+        if (iface["ipv6_dhcp"]) and vlan and (not vlan["dhcp_managed"]):
+            _logger.warning(f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'dhcp_managed' set to False")
+
         # default to False; dhcpcd will use another temporary address method
         iface["ipv6_tempaddr"] = bool(iface.get("ipv6_tempaddr"))
 

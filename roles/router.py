@@ -39,7 +39,7 @@ class Router(Role):
             if "vswitch" in uplink:
                 iface = {"vswitch": uplink["vswitch"], "vlan": uplink["vlan"]}
                 uplink_xml = util.libvirt.interface_from_config(cfg["hostname"], iface)
-            else: # macvtap
+            else:  # macvtap
                 uplink_xml = util.libvirt.macvtap_interface(cfg, uplink["macvtap"])
 
             # add an interface to the host's libvirt definition for each vswitch; order matches network_interfaces
@@ -78,14 +78,14 @@ class Router(Role):
                 vlan_iface = f"{iface_name}.{vlan['id']}"
 
                 # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
-                network = vlan.get("ipv6_pd_network")
-                if network is None:
+                network = vlan["ipv6_pd_network"]
+                if not network:
                     network = prefix_counter
                     prefix_counter += 1
-                else:
-                    _validate_vlan_pd_network(uplink["ipv6_pd_prefixlen"], vlan)
+                _validate_vlan_pd_network(uplink["ipv6_pd_prefixlen"], network)
                 delegated_prefixes.append(f"{vlan_iface}/{network}")
 
+                # AdvManagedFlag
                 radvd_config.append(radvd_template.format(vlan_iface, "on" if vlan["dhcp6_managed"] else "off"))
 
             if len(vlan_interfaces) > 0:
@@ -168,20 +168,13 @@ def _configure_uplink(cfg):
 
     return uplink
 
-def _validate_vlan_pd_network(prefixlen, vlan):
-    ipv6_pd_network = vlan.get("ipv6_pd_network")
 
-    if ipv6_pd_network is None:
-        vlan["ipv6_pd_network"] = None
-    elif not isinstance(ipv6_pd_network, int):
-        raise KeyError(f"ipv6_pd_network {ipv6_pd_network} must be an integer")
-    else:
+def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
+    if ipv6_pd_network is not None:
         maxnetworks = 2 ** (64 - prefixlen)
         if ipv6_pd_network >= maxnetworks:
-            raise KeyError((f"pd network {ipv6_pd_network} for vlan '{vlan['name']}' is larger than the {maxnetworks} networks " +
-                            f"available with the 'ipv6_pd_prefixlen' of {prefixlen}"))
-
-        vlan["ipv6_pd_network"] = ipv6_pd_network
+            raise KeyError((f"pd network {ipv6_pd_network} is larger than the {maxnetworks} " +
+                            f" networks available with the 'ipv6_pd_prefixlen' of {prefixlen}"))
 
 
 def _init_shorewall():

@@ -72,8 +72,11 @@ class TestSite(unittest.TestCase):
                 self.assertTrue(os.path.isdir(host_dir))
 
                 required_files = ["setup.sh", "common.sh", "hosts", "interfaces",
-                                  "resolv.conf", "dhcpcd.conf", "chrony.conf", "packages"]
+                                  "resolv.conf", "chrony.conf", "packages"]
                 required_dirs = []
+
+                if hostname == "router":
+                    required_files.append("dhcpcd.conf")
 
                 if host_cfg["local_firewall"]:
                     required_dirs.append("awall")

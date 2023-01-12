@@ -50,7 +50,7 @@ def load_yaml_string(yaml_str):
 
 def output_yaml(data):
     """Output the object tree to a YAML string."""
-    return yaml.dump(data)
+    return yaml.dump(data, indent=2)
 
 def load_json(path):
     """Load the given JSON file into an object tree."""

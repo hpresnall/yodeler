@@ -41,8 +41,10 @@ def from_config(interfaces):
             buffer.append("  use ipv6-ra")
             space |= True
 
-        # if "tempaddr" in iface: TODO research RFCs 7217 and 8981 along with dhcpcd's slaac private temporary setting
-        #     buffer.append("  use ipv6-privacy")
+        # TODO research RFCs 7217 and 8981 along with dhcpcd's slaac private temporary setting
+        # TODO uncomment when /usr/libexex/ifupdown-nd/ipv6-tempaddr is provided by Alpine
+        #if iface["ipv6_tempaddr"]:
+        #    buffer.append("  use ipv6-tempaddr")
 
         if space:
             buffer.append("")

@@ -32,8 +32,22 @@ class Role(ABC):
         Returns a list of the names of the scripts that need to be run to configure this role."""
 
 
+# cache loaded Role subclasses
+_role_class_by_name = {}
+
+
 def load(role_name):
     """Load an Role subclass instance using the given role name."""
+    clazz = _role_class_by_name.setdefault(role_name, _load_role_class(role_name))
+
+    # instantiate the class
+    try:
+        return clazz()
+    except TypeError:
+        raise KeyError(f"cannot instantiate class '{clazz}'")
+
+
+def _load_role_class(role_name: str):
     try:
         mod = importlib.import_module("roles." + role_name)
     except ModuleNotFoundError:
@@ -49,8 +63,5 @@ def load(role_name):
     if role_class is None:
         raise KeyError(f"cannot find class for role '{role_name}' in module '{mod}'")
 
+    return role_class
     # instantiate the class and add to the list
-    try:
-        return role_class()
-    except TypeError:
-        raise KeyError(f"cannot instantiate class '{role_class}'")

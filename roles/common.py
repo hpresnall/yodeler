@@ -37,7 +37,6 @@ class Common(Role):
             cfg["fqdn"] = cfg["hostname"] + '.' + cfg["prmary_domain"]
 
     def create_scripts(self, cfg, output_dir):
-        """Create the scripts and configuration files for the given host's configuration."""
         common = util.shell.ShellScript("common.sh")
 
         # write all packages to a file; usage depends on vm or physical server
@@ -64,15 +63,14 @@ class Common(Role):
 
         common.substitute("templates/common/common.sh", cfg)
 
-        # directly copy hosts
+        # directly copy /etc/hosts
         shutil.copyfile("templates/common/hosts", os.path.join(output_dir, "hosts"))
 
         if cfg["metrics"]:
             common.append(_SETUP_METRICS)
 
         if cfg["local_firewall"]:
-            common.append(util.awall.configure(
-                cfg["interfaces"], cfg["roles"], output_dir))
+            common.append(util.awall.configure(cfg["interfaces"], cfg["roles"], output_dir))
 
         common.write_file(output_dir)
 
@@ -122,10 +120,9 @@ def _create_chrony_conf(cfg, output_dir):
         buffer.append(f"server {server} iburst")
         buffer.append(f"initstepslew 10 {server}")
     else:
-        servers = cfg["ntp_pool_servers"]
-        for server in servers:
+        for server in cfg["external_ntp"]:
             buffer.append(f"server {server} iburst")
-        buffer.append("initstepslew 10 {}".format(" ".join(servers)))
+        buffer.append("initstepslew 10 {}".format(" ".join(cfg["external_ntp"])))
 
     buffer.append("driftfile /var/lib/chrony/chrony.drift")
     buffer.append("rtcsync")
