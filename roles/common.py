@@ -81,12 +81,8 @@ class Common(Role):
         util.dhcpcd.create_conf(cfg, output_dir)
         _create_chrony_conf(cfg, output_dir)
 
-        # different installation scripts for physical vs virtual
         if cfg["is_vm"]:
-            _create_vm(cfg, output_dir)
             util.libvirt.write_vm_xml(cfg, output_dir)
-        else:
-            _create_physical(cfg, output_dir)
 
         return [common.name]
 
@@ -128,36 +124,6 @@ def _create_chrony_conf(cfg, output_dir):
     buffer.append("rtcsync")
 
     util.file.write("chrony.conf", "\n".join(buffer), output_dir)
-
-
-def _create_physical(cfg, output_dir):
-    # boot with install media; run /media/<install_dev>/<site>/<host>/create_physical.sh
-    # setup.sh will run in the installed host via chroot
-
-    # create Alpine setup answerfile
-    # use external DNS for initial Alpine setup
-    cfg["external_dns_str"] = " ".join(cfg["external_dns"])
-    util.file.write("answerfile",
-                    util.file.substitute("templates/physical/answerfile", cfg), output_dir)
-
-    # create bootstrap wrapper script
-    bootstrap = util.shell.ShellScript("create_physical.sh")
-    bootstrap.append_self_dir()
-    bootstrap.substitute("templates/physical/create_physical.sh", cfg)
-    bootstrap.write_file(output_dir)
-
-
-def _create_vm(cfg, output_dir):
-    # setup.sh will run in the installed vm via create_vm.sh
-    create_vm = util.shell.ShellScript("create_vm.sh")
-    create_vm.append_self_dir()
-    create_vm.substitute("templates/vm/create_vm.sh", cfg)
-    create_vm.write_file(output_dir)
-
-    # helper script to delete & remove VM
-    delete_vm = util.shell.ShellScript("delete_vm.sh")
-    delete_vm.substitute("templates/vm/delete_vm.sh", cfg)
-    delete_vm.write_file(output_dir)
 
 
 _SETUP_METRICS = """echo "Configuring Prometheus"

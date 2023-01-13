@@ -1,5 +1,3 @@
-set -o errexit
-
 # ensure the drive running this script is writable
 mount -o remount,rw $$(realpath $$(df . | grep '^/' | cut -d' ' -f1))
 

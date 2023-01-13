@@ -128,10 +128,15 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
     setup_script.write_file(host_dir)
 
+    if host_cfg["is_vm"]:
+        _bootstrap_vm(host_cfg, host_dir)
+    else:
+        _bootstrap_physical(host_cfg, host_dir)
+
     _preview_dir(host_dir)
 
 
-def _set_defaults(cfg):
+def _set_defaults(cfg: dict):
     for key in _REQUIRED_PROPERTIES:
         if key not in cfg:
             raise KeyError("{0} not defined".format(key))
@@ -223,11 +228,44 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
         _logger.debug("removing packages %s", host_cfg["remove_packages"])
 
 
-def _preview_dir(output_dir: str, limit: int = sys.maxsize):
+def _bootstrap_physical(cfg: dict, output_dir: str):
+    # boot with install media; run /media/<install_dev>/<site>/<host>/yodel.sh
+    # setup.sh will run in the installed host via chroot
+    yodel = shell.ShellScript("yodel.sh")
+    yodel.append_self_dir()
+    yodel.substitute("templates/physical/create_physical.sh", cfg)
+    yodel.write_file(output_dir)
+
+    # create Alpine setup answerfile
+    # use external DNS for initial Alpine setup
+    cfg["external_dns_str"] = " ".join(cfg["external_dns"])
+    file.write("answerfile", file.substitute("templates/physical/answerfile", cfg), output_dir)
+
+
+def _bootstrap_vm(cfg: dict, output_dir: str):
+    # setup.sh will run in the VM via chroot
+    yodel = shell.ShellScript("yodel.sh")
+    yodel.append_self_dir()
+    yodel.substitute("templates/vm/create_vm.sh", cfg)
+    yodel.write_file(output_dir)
+
+    # helper script to delete VM image & remove VM
+    delete_vm = shell.ShellScript("delete_vm.sh")
+    delete_vm.substitute("templates/vm/delete_vm.sh", cfg)
+    delete_vm.write_file(output_dir)
+
+    # helper script to start VM
+    start_vm = shell.ShellScript("start_vm.sh")
+    start_vm.substitute("templates/vm/start_vm.sh", cfg)
+    start_vm.write_file(output_dir)
+
+
+def _preview_dir(output_dir: str, line_count: int = sys.maxsize):
+    """Debug function that recursively logs the content of all files in the given directory.
+    By default logs the the whole file. Use the line_count to limit the number of lines output for each file."""
     if not _logger.isEnabledFor(logging.DEBUG):
         return
 
-    """Output all files in the given directory, up to the limit number of lines per file."""
     _logger.debug(output_dir)
     _logger.debug("")
 
@@ -235,7 +273,7 @@ def _preview_dir(output_dir: str, limit: int = sys.maxsize):
         path = os.path.join(output_dir, file)
 
         if not os.path.isfile(path):
-            _preview_dir(path, limit)
+            _preview_dir(path, line_count)
             continue
 
         line_count = 0
@@ -243,7 +281,7 @@ def _preview_dir(output_dir: str, limit: int = sys.maxsize):
 
         with open(path) as file:
             for line in file:
-                if line_count > limit:
+                if line_count > line_count:
                     break
 
                 line_count += 1
@@ -276,7 +314,7 @@ DEFAULT_CONFIG = {
     "timezone": "UTC",
     "keymap": "us us",
     "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
-    "ntp_pool_servers": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
+    "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
     "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
     # top-level domain for the site
     "domain": "",

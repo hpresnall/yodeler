@@ -71,7 +71,7 @@ class TestSite(unittest.TestCase):
                 host_dir = os.path.join(config_dir, hostname)
                 self.assertTrue(os.path.isdir(host_dir))
 
-                required_files = ["setup.sh", "common.sh", "hosts", "interfaces",
+                required_files = ["yodel.sh", "setup.sh", "common.sh", "hosts", "interfaces",
                                   "resolv.conf", "chrony.conf", "packages"]
                 required_dirs = []
 
@@ -82,9 +82,9 @@ class TestSite(unittest.TestCase):
                     required_dirs.append("awall")
 
                 if host_cfg["is_vm"]:
-                    required_files.extend(["create_vm.sh", "delete_vm.sh", hostname + ".xml"])
+                    required_files.extend(["start_vm.sh", "delete_vm.sh", hostname + ".xml"])
                 else:
-                    required_files.extend(["create_physical.sh", "answerfile"])
+                    required_files.append("answerfile")
 
                 for path in required_files:
                     self.assertTrue(
