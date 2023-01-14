@@ -38,7 +38,7 @@ def validate(cfg):
 
         # host's primary domain, if set, should match one vlan
         vlan = iface["vlan"]
-        if cfg["primary_domain"] == vlan["domain"]:
+        if vlan and (cfg["primary_domain"] == vlan["domain"]):
             matching_domain = vlan["domain"]
 
     if cfg["primary_domain"]:
@@ -47,7 +47,7 @@ def validate(cfg):
                 f"invalid primary_domain: no interface's vlan domain matches primary_domain '{cfg['primary_domain']}'")
     else:
         # single interface => set host domain to vlan domain
-        if len(ifaces) == 1:
+        if vlan and (len(ifaces) == 1):
             cfg["primary_domain"] = ifaces[0]["vlan"]["domain"]
         # else leave host domain blank
 
@@ -58,7 +58,10 @@ def validate_network(iface, vswitches):
     vswitch = vswitches.get(vswitch_name)
 
     if vswitch is None:
-        raise KeyError(f"invalid vswitch '{vswitch_name}'")
+        if iface.get("vlan") is None:
+            return  # no vlan => ipv4_subnet required for non-dhcp; will be confirmed in validate_interface()
+        else:
+            raise KeyError(f"invalid vswitch '{vswitch_name}'")
 
     iface["vswitch"] = vswitch
 
@@ -79,16 +82,16 @@ def validate_iface(iface):
         raise KeyError("no ipv4_address defined for interface")
 
     if address != "dhcp":
-        _validate_ipaddress(iface, "ipv4")
-
         if vlan is None:
             # no vlan => cannot lookup subnet so it must be defined explicitly
             if "ipv4_subnet" not in iface:
                 raise KeyError("ipv4_subnet must be set when using static ipv4_address")
             try:
-                ipaddress.ip_network(iface["ipv4_subnet"])
+                iface["ipv4_subnet"] = ipaddress.ip_network(iface["ipv4_subnet"])
             except Exception as exp:
                 raise KeyError(f"invalid ipv4_subnet {iface['ipv4_subnet']}") from exp
+
+        _validate_ipaddress(iface, "ipv4")
 
     # ipv6 disabled at vlan level of interface level => ignore address
     ipv6_disable = (vlan["ipv6_disable"] or iface.get("ipv6_disable")
@@ -104,17 +107,16 @@ def validate_iface(iface):
     else:
         address = iface.get("ipv6_address")
         if address is not None:
-            _validate_ipaddress(iface, "ipv6")
-
             if vlan is None:
                 # no vlan => cannot lookup subnet so it must be defined explicitly
                 if "ipv6_subnet" not in iface:
                     raise KeyError("ipv6_subnet must be set when using static ipv6_address")
-
                 try:
-                    ipaddress.ip_network(iface["ipv6_subnet"])
+                    iface["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
                 except:
                     raise KeyError("invalid ipv6_subnet defined") from None
+
+            _validate_ipaddress(iface, "ipv6")
         else:
             iface["ipv6_address"] = None
 
@@ -131,7 +133,7 @@ def validate_iface(iface):
         # default to True
         iface["accept_ra"] = True if "accept_ra" not in iface else bool(iface.get("accept_ra"))
 
-        if iface["name"].startswith("wlan"):
+        if iface["name"].startswith("wl"):  # wlxx or wlanx
             if not ("wifi_ssid" in iface) and not ("wifi_psk" in iface):
                 raise KeyError("both 'wifi_ssd' and 'wifi_psk' must be defined for WiFi interfaces")
 
@@ -144,13 +146,16 @@ def _validate_ipaddress(iface, ip_version):
     except Exception as exp:
         raise KeyError(f"invalid {key} '{value}'") from exp
 
-    subnet = iface.get("vlan", iface).get(ip_version + "_subnet")
+    if iface.get("vlan"):
+        subnet = iface["vlan"].get(ip_version + "_subnet")
+    else:
+        subnet = iface.get(ip_version + "_subnet")
 
     if subnet is None:
         raise KeyError(f"subnet cannot be None when specifying an IP address")
 
     if address not in subnet:
-        raise KeyError(f"invalid address {address}; it is not in vlan {iface['vlan']['id']}'s subnet {subnet}")
+        raise KeyError(f"invalid address {address}; it is not in subnet {subnet}")
 
     if ip_version == "ipv4":
         iface["ipv4_prefixlen"] = subnet.prefixlen
@@ -160,8 +165,76 @@ def _validate_ipaddress(iface, ip_version):
         # gateway provided by router advertisements
 
 
-def find_by_name(cfg, iface_name):
+def find_by_name(cfg: dict, iface_name: str):
     for iface in cfg["interfaces"]:
         if iface["name"] == iface_name:
             return iface
     raise KeyError(f"cannot find interface config for '{iface_name}'")
+
+
+def find_ips_to_interfaces(cfg: dict, to_match: list[dict], prefer_routable=True, first_match_only=True):
+    """Find the IP addresses that the host configuration should use to connect to the given set of interfaces.
+
+    cfg is a fully configured host and to_match is the list of interfaces from another configured host.
+    If the interfaces are the same, localhost addresses will be returned.
+
+    By default, a single match is returned; this can be changed by setting first_match_only to False.
+    Interfaces that can be reached by routable vlans are preferred and returned first in the list unless
+    prefer_routable is set to False.
+    """
+    matches = []
+    for iface in cfg["interfaces"]:
+        match = _match_iface(iface, to_match, prefer_routable, first_match_only)
+
+        if match and first_match_only:
+            return match
+
+        matches.extend(match)
+    return matches
+
+
+def _match_iface(iface: dict, to_match: list[dict], prefer_routable=True, first_match_only=True):
+    routed = []
+    unrouted = []
+
+    for match in to_match:
+        # valid match if interfaces are on the same vlan or the same vswitch and both vlans are routable
+        # will not match across vswitches; vlan name is unique across all vswtiches
+        if iface["vlan"]["name"] != match["vlan"]["name"]:
+            if ((iface["vswitch"]["name"] == match["vswitch"]["name"])
+                    and iface["vlan"]["routable"] and match["vlan"]["routable"]):
+                candidates = routed
+            else:
+                continue
+        else:
+            candidates = unrouted
+
+        ip4 = iface["ipv4_address"]
+        ip6 = iface.get("ipv6_address")  # can be None
+
+        if (ip4 == "dhcp"):
+            ip4 = None
+        if not ip6:
+            ip6 = "noip6"  # prevent matching ipv4 dhcp and no ipv6 with localhost
+
+        if (ip4 == match["ipv4_address"]) or (ip6 == match.get("ipv6_address")):
+            # no need to match past localhost
+            return [{
+                "ipv4_address": ipaddress.ip_address("127.0.0.1"),
+                "ipv6_address": ipaddress.ip_address("::1")
+            }]
+        else:
+            candidates.append({
+                "ipv4_address": None if match["ipv4_address"] == "dhcp" else match["ipv4_address"],
+                "ipv6_address": match.get("ipv6_address")
+            })
+
+    if prefer_routable:
+        matches = routed + unrouted
+    else:
+        matches = unrouted + routed
+
+    if first_match_only:
+        del matches[1:]
+
+    return matches

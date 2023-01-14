@@ -47,14 +47,16 @@ class TestSite(unittest.TestCase):
 
         roles = site_cfg["roles_to_hostnames"]
         self.assertIsNotNone(roles)
-        self.assertEqual(3, len(roles))
+        self.assertEqual(4, len(roles))
         self.assertIn("router", roles)
         self.assertIn("dns", roles)
+        self.assertIn("dhcp", roles)
         self.assertEqual(["router"], roles["router"])
 
         host_cfgs = site_cfg["hosts"]
-        self.assertEqual(4, len(host_cfgs))
+        self.assertEqual(5, len(host_cfgs))
         self.assertIn("server", host_cfgs.keys())
+        self.assertIn("client", host_cfgs.keys())
         self.assertIn("vmhost", host_cfgs.keys())
         self.assertIn("dns", host_cfgs.keys())
         self.assertIn("router", host_cfgs.keys())
@@ -77,6 +79,9 @@ class TestSite(unittest.TestCase):
 
                 if hostname == "router":
                     required_files.append("dhcpcd.conf")
+
+                if hostname == "client":
+                    required_files.remove("resolv.conf")
 
                 if host_cfg["local_firewall"]:
                     required_dirs.append("awall")

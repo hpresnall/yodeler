@@ -3,6 +3,8 @@
 # pylint: disable=missing-function-docstring
 import os.path
 
+import copy
+
 import test.config.base as base
 
 import config.site as site
@@ -39,6 +41,30 @@ class TestHost(base.TestCfgBase):
     def test_load_config_empty_hostname(self):
         with self.assertRaises(KeyError):
             host.validate(site.validate(self._site_yaml), {"hostname": ""})
+
+    def test_validate_none_site(self):
+        with self.assertRaises(ValueError):
+            host.validate(None, self._host_yaml)
+
+    def test_validate_non_dict_site(self):
+        with self.assertRaises(ValueError):
+            host.validate("invalid", self._host_yaml)
+
+    def test_validate_empty_site(self):
+        with self.assertRaises(ValueError):
+            host.validate({}, self._host_yaml)
+
+    def test_validate_empty_host(self):
+        with self.assertRaises(ValueError):
+            host.validate(site.validate(self._site_yaml), {})
+
+    def test_validate_duplicate_host(self):
+        duplicate = copy.deepcopy(self._host_yaml)
+
+        self.build_cfg()
+
+        with self.assertRaises(ValueError):
+            host.validate(self._site_cfg, duplicate)
 
     def test_minimal(self):
         cfg = self.build_cfg()
@@ -119,7 +145,7 @@ class TestHost(base.TestCfgBase):
         self.assertNotIn("server_needs", host["remove_packages"])
 
     def test_missing_required(self):
-        del self._host_yaml["hostname"]
+        del self._site_yaml["public_ssh_key"]
         self.build_error()
 
     def test_invalid_role(self):
@@ -144,10 +170,6 @@ class TestHost(base.TestCfgBase):
 
         self.assertNotIn("explicit_add", cfg["remove_packages"])
         self.assertIn("remove", cfg["remove_packages"])
-
-    def test_invalid_local_dns(self):
-        self._host_yaml["local_dns"] = ["invalid"]
-        self.build_error()
 
     def test_no_local_firewall(self):
         self._host_yaml["local_firewall"] = False

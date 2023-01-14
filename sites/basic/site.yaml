@@ -1,9 +1,6 @@
 domain: example.com
-local_dns:
-  - 192.168.210.2
-  - fd24:87e8:06c7:10::2
 local_ntp: time.example.com
-ntp_pool_servers:
+external_ntp:
   - 0.us.pool.ntp.org
   - 1.us.pool.ntp.org
   - 2.us.pool.ntp.org
@@ -57,7 +54,7 @@ vswitches:
         allow_internet: false # firewall will restrict outbound internet access
         dhcp_min_address_ipv4: 2
         dhcp_max_address_ipv4: 252
-        # dhcp6_managed defaults to true so DHCP6 will be information only
+        # dhcp6_managed defaults to false so DHCP6 will be information only
         dhcp_reservations:
           - hostname: laptop
             ipv4_address: 192.168.220.3

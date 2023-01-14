@@ -70,6 +70,9 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
     if not host_yaml["hostname"]:
         raise KeyError("hostname cannot be empty")
 
+    if host_yaml["hostname"] in site_cfg["hosts"]:
+        raise ValueError("duplicate hostname '{host_yaml['hostname'")
+
     # silently ignore attempts to overwrite site config
     host_yaml.pop("vswitches", None)
 
@@ -82,6 +85,7 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
 
     for role in host_cfg["roles"]:
         role.configure_interfaces(host_cfg)
+
     interface.validate(host_cfg)
 
     for role in host_cfg["roles"]:
@@ -144,19 +148,11 @@ def _set_defaults(cfg: dict):
     for key in DEFAULT_CONFIG:
         if key not in cfg:
             cfg[key] = DEFAULT_CONFIG[key]
-    if "local_dns" not in cfg:
-        cfg["local_dns"] = []
-    # external_dns defined in DEFAULT_CONFIG
 
     # remove from script output if not needed
     if not cfg["install_private_ssh_key"]:
         cfg["private_ssh_key"] = ""
 
-    for dns in cfg["local_dns"]:
-        try:
-            ipaddress.ip_address(dns)
-        except:
-            raise KeyError(f"invalid local_dns IP address {dns}") from None
     for dns in cfg["external_dns"]:
         try:
             ipaddress.ip_address(dns)
@@ -290,7 +286,7 @@ def _preview_dir(output_dir: str, line_count: int = sys.maxsize):
 
 
 # properties that are unique and cannot be set as defaults
-_REQUIRED_PROPERTIES = ["site_name", "hostname", "public_ssh_key"]
+_REQUIRED_PROPERTIES = ["site_name", "public_ssh_key"]
 
 # accessible for testing
 DEFAULT_CONFIG = {

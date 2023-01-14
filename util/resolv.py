@@ -1,5 +1,7 @@
 """Utility for /etc/resolv.confg configuration."""
-import util.file
+import util.file as file
+
+import config.interface as interface
 
 
 def create_conf(cfg, output_dir):
@@ -29,18 +31,23 @@ def create_conf(cfg, output_dir):
     # manually set DNS servers
     buffer = []
 
-    local_dns = cfg["local_dns"]
-    if local_dns:
-        # set domain for server
-        if cfg["primary_domain"] != "":
-            buffer.append(f"domain {cfg['primary_domain']}")
+    # set domain for server
+    if cfg["primary_domain"] != "":
+        buffer.append(f"domain {cfg['primary_domain']}")
 
+    dns_addresses = None
+    if cfg["roles_to_hostnames"]["dns"]:
+        dns_server = cfg["hosts"][cfg["roles_to_hostnames"]["dns"][0]]
+        dns_addresses = interface.find_ips_to_interfaces(cfg, dns_server["interfaces"])
+
+    if dns_addresses:
         # can search local domains if there is local DNS
         search_domains.append(cfg["domain"])
 
         buffer.append("search {}".format(" ".join(search_domains)))
 
-        nameservers = local_dns
+        nameservers = [str(match["ipv4_address"]) for match in dns_addresses if match["ipv4_address"]]
+        nameservers.extend([str(match["ipv6_address"]) for match in dns_addresses if match["ipv6_address"]])
     else:
         nameservers = cfg["external_dns"]
 
@@ -48,4 +55,4 @@ def create_conf(cfg, output_dir):
         buffer.append("nameserver " + server)
     buffer.append("")
 
-    util.file.write("resolv.conf", "\n".join(buffer), output_dir)
+    file.write("resolv.conf", "\n".join(buffer), output_dir)

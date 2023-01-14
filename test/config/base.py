@@ -32,6 +32,7 @@ class TestCfgBase(unittest.TestCase):
         del self._site_yaml["interfaces"]
         del self._site_yaml["hostname"]
         del self._host_yaml["vswitches"]
+        del self._host_yaml["public_ssh_key"]
 
     def tearDown(self):
         self._site_yaml = None

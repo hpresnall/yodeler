@@ -8,6 +8,8 @@ import util.shell
 import util.file
 import util.address
 
+import config.interface
+
 from roles.role import Role
 
 
@@ -22,11 +24,19 @@ class Dhcp(Role):
 
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
+        dns4 = []
+        dns6 = []
+        ddns = False
+        if cfg["roles_to_hostnames"]["dns"]:
+            dns_addresses = config.interface.find_ip_addresses(
+                cfg, cfg["hosts"][cfg["roles_to_hostnames"]["dns"][0]]["interfaces"])
 
-        dns4 = [str(address) for address in cfg["local_dns"] if type(
-            ipaddress.ip_address(address)) == ipaddress.IPv4Address]
-        dns6 = [str(address) for address in cfg["local_dns"] if type(
-            ipaddress.ip_address(address)) == ipaddress.IPv6Address]
+            dns4 = [str(match["ipv4_address"]) for match in dns_addresses if match["ipv4_address"]]
+            dns6 = [str(match["ipv6_address"]) for match in dns_addresses if match["ipv6_address"]]
+
+            ddns = (len(dns4) > 0) or (len(dns6) > 0)
+        else:
+            dns4 = cfg["external_dns"] # TODO split external into 4 and 6
 
         ifaces4 = []
         ifaces6 = []
@@ -156,17 +166,20 @@ class Dhcp(Role):
 
         util.file.write("kea-dhcp4.conf", util.file.output_json(dhcp4_json), output_dir)
         util.file.write("kea-dhcp6.conf", util.file.output_json(dhcp6_json), output_dir)
-        util.file.write("kea-dhcp-ddns.conf", util.file.output_json(ddns_json), output_dir)
+        if ddns:
+            util.file.write("kea-dhcp-ddns.conf", util.file.output_json(ddns_json), output_dir)
 
         kea = util.shell.ShellScript("kea.sh")
 
         kea.append("rc-update add kea-dhcp4 default")
         kea.append("rc-update add kea-dhcp6 default")
-        kea.append("rc-update add kea-dhcp-ddns default")
+        if ddns:
+            kea.append("rc-update add kea-dhcp-ddns default")
         kea.append("")
         kea.append("rootinstall $DIR/kea-dhcp4.conf /etc/kea")
         kea.append("rootinstall $DIR/kea-dhcp6.conf /etc/kea")
-        kea.append("rootinstall $DIR/kea-dhcp-ddns.conf /etc/kea")
+        if ddns:
+            kea.append("rootinstall $DIR/kea-dhcp-ddns.conf /etc/kea")
         kea.append("")
         kea.append("sed -e \"s/{timezone}/$(tail -n1 /etc/localtime)/g\"  -i /etc/kea/kea-dhcp6.conf")
         kea.append("")

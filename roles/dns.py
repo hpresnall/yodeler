@@ -38,8 +38,6 @@ class Dns(Role):
 
         _create_dns_entries(cfg)
 
-        # for resolv.conf, force resolution to local nameserver and add all vlan domains to search
-        resolv = ["nameserver 127.0.0.1", "nameserver ::1"]
         domains = []
 
         named = _init_named(cfg)
@@ -63,8 +61,6 @@ class Dns(Role):
                 if not vlan["domain"]:
                     continue
 
-                domains.append(vlan["domain"])
-
                 named["query_acl"].append(str(vlan["ipv4_subnet"]))
                 if vlan["ipv6_subnet"] is not None:
                     named["query_acl6"].append(str(vlan["ipv6_subnet"]))
@@ -77,16 +73,10 @@ class Dns(Role):
 
                 _configure_zones(cfg, vlan, named, zone_dir)
 
-        if cfg["dns_domain"] not in domains:
-            # top level domain last in search order
-            domains.append(cfg["dns_domain"])
-            _configure_tld(cfg, named, zone_dir)
+        _configure_tld(cfg, named, zone_dir)
 
         _format_named(named)
         util.file.write("named.conf", util.file.substitute("templates/dns/named.conf", named), output_dir)
-
-        resolv.append("search " + " ".join(domains))
-        util.file.write("resolv.conf", "\n".join(resolv), output_dir)
 
         shell = util.shell.ShellScript("named.sh")
         shell.append(util.file.read("templates/dns/named.sh"))

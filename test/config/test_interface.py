@@ -1,8 +1,11 @@
 # pylint: disable=missing-module-docstring
 # pylint: disable=missing-class-docstring
 # pylint: disable=missing-function-docstring
+import copy
 
 import test.config.base as base
+
+import config.interface as interface
 
 
 class TestInterface(base.TestCfgBase):
@@ -127,6 +130,40 @@ class TestInterface(base.TestCfgBase):
         # ip address set without a subnet should error
         self.build_error()
 
+    def test_no_vlan_no_ipv4_subnet(self):
+        self._host_yaml["interfaces"][0]["vlan"] = None
+        del self._host_yaml["interfaces"][0]["vswitch"]
+        self._host_yaml["interfaces"][0]["ipv4_subnet"] = "192.168.1.0/24"
+        self._host_yaml["interfaces"][0]["ipv6_subnet"] = "2001:db8:0:1::/64"
+        self.build_cfg()
+
+        del self._host_yaml["interfaces"][0]["ipv4_subnet"]
+        self.build_error()
+
+    def test_no_vlan_no_ipv6_subnet(self):
+        self._host_yaml["interfaces"][0]["vlan"] = None
+        del self._host_yaml["interfaces"][0]["vswitch"]
+        self._host_yaml["interfaces"][0]["ipv4_subnet"] = "192.168.1.0/24"
+        self._host_yaml["interfaces"][0]["ipv6_subnet"] = "2001:db8:0:1::/64"
+        self.build_cfg()
+
+        del self._host_yaml["interfaces"][0]["ipv6_subnet"]
+        self.build_error()
+
+    def test_no_vlan_invalid_ipv4_subnet(self):
+        self._host_yaml["interfaces"][0]["vlan"] = None
+        del self._host_yaml["interfaces"][0]["vswitch"]
+        self._host_yaml["interfaces"][0]["ipv4_subnet"] = "invalid"
+        self._host_yaml["interfaces"][0]["ipv6_subnet"] = "2001:db8:0:1::/64"
+        self.build_error()
+
+    def test_no_vlan_invalid_ipv6_subnet(self):
+        self._host_yaml["interfaces"][0]["vlan"] = None
+        del self._host_yaml["interfaces"][0]["vswitch"]
+        self._host_yaml["interfaces"][0]["ipv4_subnet"] = "192.168.1.0/24"
+        self._host_yaml["interfaces"][0]["ipv6_subnet"] = "invalid"
+        self.build_error()
+
     def test_vlan_ipv6_disabled(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_disable"] = True
         cfg = self.build_cfg()
@@ -136,7 +173,38 @@ class TestInterface(base.TestCfgBase):
         self.assertFalse(cfg["interfaces"][0]["ipv6_tempaddr"])
         self.assertFalse(cfg["interfaces"][0]["accept_ra"])
 
+    def test_find_by_name(self):
+        cfg = self.build_cfg()
+
+        with self.assertRaises(KeyError):
+            interface.find_by_name(cfg, "invalid")
+
+    def test_find_ips_self(self):
+        cfg = self.build_cfg()
+
+        matches = interface.find_ips_to_interfaces(cfg, cfg["interfaces"])
+
+        self.assertIsNotNone(matches)
+        self.assertEqual(1, len(matches))
+        self.assertEqual("127.0.0.1", str(matches[0]["ipv4_address"]))
+        self.assertEqual("::1", str(matches[0]["ipv6_address"]))
+
+    def test_find_ips_other(self):
+        cfg = self.build_cfg()
+
+        matching = copy.deepcopy(cfg["interfaces"])
+
+        self._host_yaml["interfaces"][0]["ipv4_address"] = "dhcp"
+        del self._host_yaml["interfaces"][0]["ipv6_address"]
+
+        matches = interface.find_ips_to_interfaces(cfg, matching)
+
+        self.assertIsNotNone(matches)
+        self.assertEqual(1, len(matches))
+        self.assertEqual("192.168.1.1", str(matches[0]["ipv4_address"]))
+        self.assertEqual("2001:db8:0:1::1", str(matches[0]["ipv6_address"]))
+
     def test_no_wifi_config(self):
         self._host_yaml["interfaces"][0]["name"] = "wlan0"
-        # wifi without configuration should error
+        # wlan without configuration should error
         self.build_error()
