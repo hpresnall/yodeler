@@ -193,7 +193,19 @@ def find_ips_to_interfaces(cfg: dict, to_match: list[dict], prefer_routable=True
     return matches
 
 
+def find_ips_from_vlan(vswitch: dict, vlan: dict, to_match: list[dict]):
+    """Find the IP addresses that any host on the vlan should use to connect to the given set of interfaces.
+
+    vswitch and vlan are fully configured object and to_match is the list of interfaces from a configured host.
+    """
+    # fake interface that will never match localhost
+    ifaces = [{"vswitch": vswitch, "vlan": vlan, "ipv4_address": "dhcp"}]
+
+    return find_ips_to_interfaces({"interfaces": ifaces}, to_match, first_match_only=False)
+
+
 def _match_iface(iface: dict, to_match: list[dict], prefer_routable=True, first_match_only=True):
+    # split matches into addresses based on routability of the vlans
     routed = []
     unrouted = []
 
@@ -218,16 +230,20 @@ def _match_iface(iface: dict, to_match: list[dict], prefer_routable=True, first_
             ip6 = "noip6"  # prevent matching ipv4 dhcp and no ipv6 with localhost
 
         if (ip4 == match["ipv4_address"]) or (ip6 == match.get("ipv6_address")):
-            # no need to match past localhost
+            # localhost beats all other possible matches
             return [{
                 "ipv4_address": ipaddress.ip_address("127.0.0.1"),
                 "ipv6_address": ipaddress.ip_address("::1")
             }]
         else:
-            candidates.append({
-                "ipv4_address": None if match["ipv4_address"] == "dhcp" else match["ipv4_address"],
-                "ipv6_address": match.get("ipv6_address")
-            })
+            ip4 = None if match["ipv4_address"] == "dhcp" else match["ipv4_address"]
+            ip6 = match.get("ipv6_address")
+
+            if ip4 or ip6:
+                candidates.append({
+                    "ipv4_address": ip4,
+                    "ipv6_address": ip6
+                })
 
     if prefer_routable:
         matches = routed + unrouted

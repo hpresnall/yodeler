@@ -8,7 +8,7 @@ import util.shell
 import util.file
 import util.address
 
-import config.interface
+import config.interface as interface
 
 from roles.role import Role
 
@@ -24,20 +24,6 @@ class Dhcp(Role):
 
     def create_scripts(self, cfg, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
-        dns4 = []
-        dns6 = []
-        ddns = False
-        if cfg["roles_to_hostnames"]["dns"]:
-            dns_addresses = config.interface.find_ip_addresses(
-                cfg, cfg["hosts"][cfg["roles_to_hostnames"]["dns"][0]]["interfaces"])
-
-            dns4 = [str(match["ipv4_address"]) for match in dns_addresses if match["ipv4_address"]]
-            dns6 = [str(match["ipv6_address"]) for match in dns_addresses if match["ipv6_address"]]
-
-            ddns = (len(dns4) > 0) or (len(dns6) > 0)
-        else:
-            dns4 = cfg["external_dns"] # TODO split external into 4 and 6
-
         ifaces4 = []
         ifaces6 = []
         ifaces_by_vswitch = {}
@@ -52,51 +38,53 @@ class Dhcp(Role):
         dhcp4_json = util.file.load_json("templates/kea/kea-dhcp4.conf")
         dhcp4_config = dhcp4_json["Dhcp4"]
         dhcp4_config["interfaces-config"]["interfaces"] = ifaces4
-        dhcp4_config["option-data"] = [
-            {
-                "name": "domain-name-servers",
-                "data":  ", ".join(dns4)
-            }
-        ]
 
         dhcp6_json = util.file.load_json("templates/kea/kea-dhcp6.conf")
         dhcp6_config = dhcp6_json["Dhcp6"]
         dhcp6_config["interfaces-config"]["interfaces"] = ifaces6
         dhcp6_config["option-data"] = [
             {
-                "name": "dns-servers",
-                "data":  ", ".join(dns6)
-            },
-            {
                 "name": "new-posix-timezone",
                 "data": "{timezone}"  # will be replaced in setup script
             }
         ]
 
-        if not cfg["domain"]:
-            # no top-level domain => no vlans will have domains, so there is no need for DDNS updates
-            dhcp4_config["dhcp-ddns", "enable-updates"] = False
-            dhcp6_config["dhcp-ddns", "enable-updates"] = False
-        # else top-level domain will never have any DHCP hosts, so no need to configure DDNS forward / reverse zones
-
         # subnets for DHCP config
         subnets_4 = []
         subnets_6 = []
 
-        # DNS servers for DDNS config; will use IPv4 only for updates
-        # TODO use localhost if DHCP and DNS are the same host
-        dns_servers4 = []
-        for dns in dns4:
-            dns_servers4.append({"ip-address": dns})
+        dns_server_interfaces = cfg["hosts"][cfg["roles_to_hostnames"]["dns"][0]]["interfaces"]
 
-        ddns_json = util.file.load_json("templates/kea/kea-dhcp-ddns.conf")
-        ddns_config = ddns_json["DhcpDdns"]
+        if not cfg["domain"]:
+            # no top-level domain => no vlans will have domains, so there is no need for DDNS updates
+            dhcp4_config["dhcp-ddns", "enable-updates"] = False
+            dhcp6_config["dhcp-ddns", "enable-updates"] = False
+        else:
+            ddns_json = util.file.load_json("templates/kea/kea-dhcp-ddns.conf")
+            ddns_config = ddns_json["DhcpDdns"]
+            # top-level domain will never have any DHCP hosts, so no need to configure DDNS forward / reverse zones
+
+            # DNS servers for DDNS config; prefer IPv4 for updates
+            dns_addresses = interface.find_ips_to_interfaces(cfg, dns_server_interfaces)
+            ddns_dns_addresses = []
+            for match in dns_addresses:
+                if "ipv4_address" in match:
+                    ddns_dns_addresses.append(str(match["ipv4_address"]))
+                else:
+                    ddns_dns_addresses.append(str(match["ipv6_address"]))
+
+        ddns = False  # only use ddns if vlans have domain names defined
 
         # for each vlan, create a subnet configuration entry for DHCP4 & 6, along with DDNS forward and reverse zones
         for vswitch in cfg["vswitches"].values():
             for vlan in vswitch["vlans"]:
                 if not vlan["dhcp_enabled"]:
                     continue
+
+                # dns server addresses for this vlan
+                dns_addresses = interface.find_ips_from_vlan(vswitch, vlan, dns_server_interfaces)
+                dns4 = [str(match["ipv4_address"]) for match in dns_addresses if match["ipv4_address"]]
+                dns6 = [str(match["ipv6_address"]) for match in dns_addresses if match["ipv6_address"]]
 
                 domains = []
                 if vlan["domain"]:  # more specific domain first
@@ -113,13 +101,16 @@ class Dhcp(Role):
                 if vlan["domain"]:
                     subnet4["ddns-qualifying-suffix"] = vlan["domain"]  # else use top-level domain configured globally
 
+                    ddns = True
                     ddns_config["forward-ddns"]["ddns-domains"].append(
-                        {"name": vlan["domain"] + ".", "dns-servers": dns_servers4})
+                        {"name": vlan["domain"] + ".", "dns-servers": ddns_dns_addresses})
                     ddns_config["reverse-ddns"]["ddns-domains"].append(
-                        {"name": util.address.rptr_ipv4(ip4_subnet) + ".", "dns-servers": dns_servers4})
-                subnet4["option-data"] = [{"name": "routers", "data": str(ip4_subnet.network_address + 1)}]
+                        {"name": util.address.rptr_ipv4(ip4_subnet) + ".", "dns-servers": ddns_dns_addresses})
+                subnet4["option-data"] = [{"name": "dns-servers", "data":  ", ".join(dns4)}]
                 if domains:
                     subnet4["option-data"].append({"name": "domain-search", "data": ", ".join(domains)})
+                if vlan["routable"]:
+                    subnet4["option-data"].append({"name": "routers", "data": str(ip4_subnet.network_address + 1)}),
                 subnet4["reservations"] = []
                 subnets_4.append(subnet4)
 
@@ -138,9 +129,10 @@ class Dhcp(Role):
 
                         # forward dns already handled by ipv4
                         ddns_config["reverse-ddns"]["ddns-domains"].append(
-                            {"name": util.address.rptr_ipv6(ip6_subnet) + ".", "dns-servers": dns_servers4})
+                            {"name": util.address.rptr_ipv6(ip6_subnet) + ".", "dns-servers": ddns_dns_addresses})
+                    subnet6["option-data"] = [{"name": "dns-servers", "data":  ", ".join(dns6)}]
                     if domains:
-                        subnet6["option-data"] = [{"name": "domain-search", "data": ", ".join(domains)}]
+                        subnet6["option-data"].append({"name": "domain-search", "data": ", ".join(domains)})
                     if vswitch["name"] in ifaces_by_vswitch:
                         subnet6["interface"] = ifaces_by_vswitch[vswitch["name"]]
                     subnet6["reservations"] = []
