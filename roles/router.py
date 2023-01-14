@@ -74,7 +74,7 @@ class Router(Role):
                     untagged = True
 
                 vlan_interfaces.append(util.interfaces.for_vlan(vlan, iface_name))
-                _configure_shorwall(shorewall, vswitch["name"], vlan)
+                _configure_shorewall(shorewall, vswitch["name"], vlan)
                 vlan_iface = f"{iface_name}.{vlan['id']}"
 
                 # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
@@ -145,7 +145,6 @@ def _configure_uplink(cfg):
     uplink["comment"] = "internet uplink"
     uplink["name"] = "eth0"  # always the first interface on the router
     uplink["forward"] = True
-    config.interface.validate_iface(uplink)
 
     if cfg["is_vm"]:
         # uplink can be an existing vswitch or a physical iface on the host via macvtap
@@ -154,6 +153,7 @@ def _configure_uplink(cfg):
         elif "macvtap" not in uplink:
             uplink["vswitch"] = None
             raise KeyError(("invald uplink in router; it must define a vswitch+vlan or a macvtap host interface"))
+    config.interface.validate_iface(uplink)
 
     prefixlen = uplink.get("ipv6_pd_prefixlen")
 
@@ -192,7 +192,7 @@ def _init_shorewall():
     return shorewall
 
 
-def _configure_shorwall(shorewall, vswitch_name, vlan):
+def _configure_shorewall(shorewall, vswitch_name, vlan):
     vlan_name = vlan["name"]
 
     # $VSWITCH matches shorewall param that defines <VSWITCH_NAME>=ethx

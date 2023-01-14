@@ -1,5 +1,5 @@
 motd: "hello, I am a KVM host"
-primary_domain: infra.example.com
+primary_domain: infra.yodeler.internal
 is_vm: false
 interfaces:
   - ipv4_address: 192.168.210.5

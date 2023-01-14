@@ -1,0 +1,2 @@
+# this file should be ingnored since its name does not in in .yaml
+hostname: 1 # non-string hostname should error if file is loaded

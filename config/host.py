@@ -81,7 +81,7 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
 
     _set_defaults(host_cfg)
 
-    _configure_roles(host_cfg)
+    _load_roles(host_cfg)
 
     for role in host_cfg["roles"]:
         role.configure_interfaces(host_cfg)
@@ -160,14 +160,12 @@ def _set_defaults(cfg: dict):
             raise KeyError(f"invalid external_dns IP address {dns}") from None
 
 
-def _configure_roles(cfg: dict):
+def _load_roles(cfg: dict):
     # list of role names in yaml => list of Role subclass instances
     # Common _must_ be the first so it is configured and setup first
     role_names = set(cfg["roles"] if cfg.get("roles") is not None else [])
     cfg["roles"] = [roles.common.Common()]
 
-    # for each role, load the module, then the class
-    # instantiate the class and add addtional config
     for role_name in role_names:
         _logger.debug("loading role '%s' for '%s'", role_name, cfg["hostname"])
 
@@ -300,20 +298,9 @@ DEFAULT_CONFIG = {
     "root_partition": "3",  # default disk layout puts /root on /dev/sda3
     # configure a local firewall and metrics on all systems
     "local_firewall": True,
-    "metrics": True,
     "motd": "",
     # do not install private ssh key on every host
     "install_private_ssh_key": False,
-    # if not specified, no SSH access will be possible!
-    "user": "nonroot",
-    "password": "apassword",
-    "timezone": "UTC",
-    "keymap": "us us",
-    "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
-    "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
-    "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
-    # top-level domain for the site
-    "domain": "",
     # domain for the host when it has multiple interfaces; used for DNS search
     "primary_domain": "",
     # for physical servers, manually specify contents of /etc/network/interfaces

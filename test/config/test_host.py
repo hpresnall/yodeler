@@ -74,6 +74,9 @@ class TestHost(base.TestCfgBase):
         self.assertEqual("common", cfg["roles"][0].name)
 
         # has all default config
+        for key in site.DEFAULT_CONFIG:
+            self.assertIsNotNone(cfg[key])
+            self.assertEqual(site.DEFAULT_CONFIG[key], cfg[key])
         for key in host.DEFAULT_CONFIG:
             self.assertIsNotNone(cfg[key])
             self.assertEqual(host.DEFAULT_CONFIG[key], cfg[key])

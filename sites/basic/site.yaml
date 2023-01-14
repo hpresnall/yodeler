@@ -1,5 +1,4 @@
-domain: example.com
-local_ntp: time.example.com
+domain: yodeler.internal
 external_ntp:
   - 0.us.pool.ntp.org
   - 1.us.pool.ntp.org
@@ -34,7 +33,7 @@ vswitches:
     vlans:
       - name: infra
         id: 10
-        domain: infra.example.com
+        domain: infra.yodeler.internal
         ipv4_subnet: 192.168.210.0/24
         ipv6_subnet: fd24:87e8:06c7:10::/64
         # instead of defaulting to index order, set delegated prefix to the 10th /64 in the IPv6 PD
@@ -46,7 +45,7 @@ vswitches:
         allow_dns_update: true # allow this subnet to make DDNS updates
       - name: user
         id: 20
-        domain: user.example.com
+        domain: user.yodeler.internal
         ipv4_subnet: 192.168.220.0/24
         ipv6_subnet: fd24:87e8:06c7:20::/64
         ipv6_pd_network: 20
@@ -66,7 +65,7 @@ vswitches:
       - name: mgmt
         id: # default and only vlan; vswitch will not vlan tag
         routable: false # no interface and no firewall rules will be created on the router
-        domain: mgmt.example.com
+        domain: mgmt.yodeler.internal
         ipv4_subnet: 172.16.251.0/24
         ipv6_disable: true
         dhcp_min_address_ipv4: 2

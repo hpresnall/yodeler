@@ -133,12 +133,18 @@ class TestVlan(base.TestCfgBase):
 
     def test_invalid_domain_vlan(self):
         # vlan domain not in top-level domain
-        self._site_yaml["domain"] = "example.com"
+        self._site_yaml["domain"] = "yodeler.internal"
         self._site_yaml["vswitches"][0]["vlans"][0]["domain"] = "test.foo.com"
         self.build_error()
 
+    def test_same_domain_vlan(self):
+        # vlan domain == top-level domain
+        self._site_yaml["domain"] = "yodeler.internal"
+        self._site_yaml["vswitches"][0]["vlans"][0]["domain"] = "yodeler.internal"
+        self.build_error()
+
     def test_default_primary_domain(self):
-        self._site_yaml["vswitches"][0]["vlans"][0]["domain"] = "foo.example.com"
+        self._site_yaml["vswitches"][0]["vlans"][0]["domain"] = "foo.yodeler.internal"
         self._host_yaml["interfaces"].append({"vswitch": "private",
                                              "ipv4_address": "192.168.2.1",
                                              "ipv6_address": "2001:db8:0:2::1"})
@@ -149,16 +155,16 @@ class TestVlan(base.TestCfgBase):
         self.assertEqual("", cfg["primary_domain"])
 
     def test_no_primary_domain(self):
-        self._site_yaml["vswitches"][0]["vlans"][0]["domain"] = "foo.example.com"
+        self._site_yaml["vswitches"][0]["vlans"][0]["domain"] = "foo.yodeler.internal"
         cfg = self.build_cfg()
 
         # single iface, primary_domain should be the vlan's
-        self.assertEqual("foo.example.com", cfg["primary_domain"])
+        self.assertEqual("foo.yodeler.internal", cfg["primary_domain"])
 
     def test_invalid_primary_domain(self):
-        self._site_yaml["domain"] = "example.com"
-        self._site_yaml["vswitches"][0]["vlans"][0]["domain"] = "foo.example.com"
-        self._site_yaml["primary_domain"] = "bar.example.com"
+        self._site_yaml["domain"] = "yodeler.internal"
+        self._site_yaml["vswitches"][0]["vlans"][0]["domain"] = "foo.yodeler.internal"
+        self._site_yaml["primary_domain"] = "bar.yodeler.internal"
         self.build_error()
 
     def test_invalid_vlan_ipv4_subnet(self):

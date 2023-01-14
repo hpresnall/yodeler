@@ -28,10 +28,7 @@ def load(site_dir: str) -> dict:
 
     site_yaml = file.load_yaml(os.path.join(site_dir, "site.yaml"))
 
-    # TODO change to site_name
-    if "name" in site_yaml:
-        site_yaml["site_name"] = site_yaml.pop("name")
-    else:
+    if "site_name" not in site_yaml:
         site_yaml["site_name"] = os.path.basename(site_dir)
     site_yaml["site_dir"] = site_dir
 
@@ -63,7 +60,10 @@ def validate(site_yaml: dict) -> dict:
         raise KeyError("site_name cannot be empty")
 
     site_cfg = copy.deepcopy(site_yaml)
-    site_cfg["domain"] = site_cfg.get("domain", "")  # ensure set even if empty, the defaulf
+
+    for key in DEFAULT_CONFIG:
+        if key not in site_cfg:
+            site_cfg[key] = DEFAULT_CONFIG[key]
 
     vswitch.validate(site_cfg)
 
@@ -115,3 +115,18 @@ def write_host_scripts(site_cfg: dict, output_dir: str):
 
     for host_cfg in site_cfg["hosts"].values():
         host.write_scripts(host_cfg, output_dir)
+
+# accessible for testing
+DEFAULT_CONFIG = {
+    "timezone": "UTC",
+    "keymap": "us us",
+    "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
+    "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
+    "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
+    "metrics": True,
+    # top-level domain for the site; empty => no local DNS
+    "domain": "",
+    # if not specified, no SSH access will be possible!
+    "user": "nonroot",
+    "password": "apassword",
+}

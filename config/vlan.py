@@ -59,7 +59,7 @@ def validate(domain: str, vswitch, other_vswitch_vlans: set):
         _validate_vlan_dhcp_reservations(vswitch_name, vlan)
 
         # domain must be a subdomain of the top-level site
-        if vlan["domain"] and (domain not in vlan["domain"]):
+        if vlan["domain"] and ((domain not in vlan["domain"]) or (domain == vlan["domain"])):
             raise KeyError(
                 (f"vlan '{vlan_name}' domain '{vlan['domain']}' is not in top-level domain '{domain}' for vswitch '{vswitch_name}'"))
 

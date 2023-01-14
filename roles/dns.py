@@ -28,6 +28,7 @@ class Dns(Role):
             if not domain:
                 raise KeyError(("cannot configure DNS server with no primary_domain or top-level site domain"))
         cfg["dns_domain"] = domain
+        # note, no top-level domain => vlans will not have domains and DNS will only have the single, top-levle zone
 
         # add hostname information for DNS
         # each vlan will be a separate zone
@@ -37,8 +38,6 @@ class Dns(Role):
         """Create the scripts and configuration files for the given host's configuration."""
 
         _create_dns_entries(cfg)
-
-        domains = []
 
         named = _init_named(cfg)
 
@@ -73,7 +72,8 @@ class Dns(Role):
 
                 _configure_zones(cfg, vlan, named, zone_dir)
 
-        _configure_tld(cfg, named, zone_dir)
+        if cfg["dns_domain"]:
+            _configure_tld(cfg, named, zone_dir)
 
         _format_named(named)
         util.file.write("named.conf", util.file.substitute("templates/dns/named.conf", named), output_dir)
