@@ -16,19 +16,19 @@ from roles.role import Role
 class Dhcp(Role):
     """Dhcp defines the configuration needed to setup Kea DHCP."""
 
-    def __init__(self):
-        super().__init__("dhcp")
+    def __init__(self, cfg: dict):
+        super().__init__("dhcp", cfg)
 
-    def additional_packages(self, cfg):
+    def additional_packages(self):
         return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-dhcp-ddns", "kea-admin", "kea-ctrl-agent"}
 
-    def create_scripts(self, cfg, output_dir):
+    def write_config(self, setup, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
         ifaces4 = []
         ifaces6 = []
         ifaces_by_vswitch = {}
 
-        for iface in cfg["interfaces"]:
+        for iface in self._cfg["interfaces"]:
             ifaces4.append(iface["name"])
             if iface["vlan"]["ipv6_subnet"]:  # ipv6 subnets are optional
                 # add ipv6 address so kea will listen on it; this will allow dhcrelay to work without using ff02::1:2
@@ -53,9 +53,9 @@ class Dhcp(Role):
         subnets_4 = []
         subnets_6 = []
 
-        dns_server_interfaces = cfg["hosts"][cfg["roles_to_hostnames"]["dns"][0]]["interfaces"]
+        dns_server_interfaces = self._cfg["hosts"][self._cfg["roles_to_hostnames"]["dns"][0]]["interfaces"]
 
-        if not cfg["domain"]:
+        if not self._cfg["domain"]:
             # no top-level domain => no vlans will have domains, so there is no need for DDNS updates
             dhcp4_config["dhcp-ddns", "enable-updates"] = False
             dhcp6_config["dhcp-ddns", "enable-updates"] = False
@@ -65,7 +65,7 @@ class Dhcp(Role):
             # top-level domain will never have any DHCP hosts, so no need to configure DDNS forward / reverse zones
 
             # DNS servers for DDNS config; prefer IPv4 for updates
-            dns_addresses = interface.find_ips_to_interfaces(cfg, dns_server_interfaces)
+            dns_addresses = interface.find_ips_to_interfaces(self._cfg, dns_server_interfaces)
             ddns_dns_addresses = []
             for match in dns_addresses:
                 if "ipv4_address" in match:
@@ -76,7 +76,7 @@ class Dhcp(Role):
         ddns = False  # only use ddns if vlans have domain names defined
 
         # for each vlan, create a subnet configuration entry for DHCP4 & 6, along with DDNS forward and reverse zones
-        for vswitch in cfg["vswitches"].values():
+        for vswitch in self._cfg["vswitches"].values():
             for vlan in vswitch["vlans"]:
                 if not vlan["dhcp_enabled"]:
                     continue
@@ -89,8 +89,8 @@ class Dhcp(Role):
                 domains = []
                 if vlan["domain"]:  # more specific domain first
                     domains.append(vlan["domain"])
-                if cfg["domain"]:
-                    domains.append(cfg["domain"])
+                if self._cfg["domain"]:
+                    domains.append(self._cfg["domain"])
 
                 ip4_subnet = vlan["ipv4_subnet"]
 
@@ -161,21 +161,14 @@ class Dhcp(Role):
         if ddns:
             util.file.write("kea-dhcp-ddns.conf", util.file.output_json(ddns_json), output_dir)
 
-        kea = util.shell.ShellScript("kea.sh")
-
-        kea.append("rc-update add kea-dhcp4 default")
-        kea.append("rc-update add kea-dhcp6 default")
+        setup.service("kea-dhcp4")
+        setup.service("kea-dhcp6")
         if ddns:
-            kea.append("rc-update add kea-dhcp-ddns default")
-        kea.append("")
-        kea.append("rootinstall $DIR/kea-dhcp4.conf /etc/kea")
-        kea.append("rootinstall $DIR/kea-dhcp6.conf /etc/kea")
+            setup.service("kea-dhcp-ddns")
+        setup.blank()
+        setup.append("rootinstall $DIR/kea-dhcp4.conf /etc/kea")
+        setup.append("rootinstall $DIR/kea-dhcp6.conf /etc/kea")
         if ddns:
-            kea.append("rootinstall $DIR/kea-dhcp-ddns.conf /etc/kea")
-        kea.append("")
-        kea.append("sed -e \"s/{timezone}/$(tail -n1 /etc/localtime)/g\"  -i /etc/kea/kea-dhcp6.conf")
-        kea.append("")
-
-        kea.write_file(output_dir)
-
-        return [kea.name]
+            setup.append("rootinstall $DIR/kea-dhcp-ddns.conf /etc/kea")
+        setup.blank()
+        setup.append("sed -e \"s/{timezone}/$(tail -n1 /etc/localtime)/g\"  -i /etc/kea/kea-dhcp6.conf")

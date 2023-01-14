@@ -73,7 +73,7 @@ class TestSite(unittest.TestCase):
                 host_dir = os.path.join(config_dir, hostname)
                 self.assertTrue(os.path.isdir(host_dir))
 
-                required_files = ["yodel.sh", "setup.sh", "common.sh", "hosts", "interfaces",
+                required_files = ["yodel.sh", "setup.sh", "hosts", "interfaces",
                                   "resolv.conf", "chrony.conf", "packages"]
                 required_dirs = []
 

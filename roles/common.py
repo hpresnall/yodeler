@@ -16,95 +16,89 @@ from roles.role import Role
 class Common(Role):
     """Common setup required for all systems. This role _must_ be run before any other setup."""
 
-    def __init__(self):
-        super().__init__("common")
+    def __init__(self, cfg: dict):
+        super().__init__("common", cfg)
 
-    def additional_packages(self, cfg):
+    def additional_packages(self):
         # use dhcpcd for dhcp since it can also handle prefix delegation for routers
         # use better ifupdown-ng  and the Linux ip command, instead of Busybox's built-ins
         packages = {"e2fsprogs", "acpi", "doas", "openssh", "chrony", "awall", "dhcpcd", "ifupdown-ng", "iproute2"}
 
-        for iface in cfg["interfaces"]:
+        for iface in self._cfg["interfaces"]:
             if iface["name"].startswith("wlan"):
                 packages.add("ifupdown-ng-wifi")
                 break
 
         return packages
 
-    def additional_configuration(self, cfg):
-        cfg["fqdn"] = ""
-        if ("prmary_domain" in cfg) and (cfg["prmary_domain"]):
-            cfg["fqdn"] = cfg["hostname"] + '.' + cfg["prmary_domain"]
+    def additional_configuration(self):
+        self._cfg["fqdn"] = ""
+        if ("prmary_domain" in self._cfg) and (self._cfg["prmary_domain"]):
+            self._cfg["fqdn"] = self._cfg["hostname"] + '.' + self._cfg["prmary_domain"]
 
-    def create_scripts(self, cfg, output_dir):
-        common = util.shell.ShellScript("common.sh")
-
+    def write_config(self, setup, output_dir):
         # write all packages to a file; usage depends on vm or physical server
-        util.file.write("packages", " ".join(cfg["packages"]), output_dir)
+        util.file.write("packages", " ".join(self._cfg["packages"]), output_dir)
 
-        if not cfg["is_vm"]:
+        if not self._cfg["is_vm"]:
             # for physical servers, add packages manually
-            _setup_repos(cfg, common)
-            _apk_update(common)
-            common.append("echo \"Installing required packages\"")
-            common.append("apk -q --no-progress add $(cat $DIR/packages)")
-            common.append("")
+            _setup_repos(self._cfg, setup)
+            _apk_update(setup)
+            setup.append("echo \"Installing required packages\"")
+            setup.append("apk -q --no-progress add $(cat $DIR/packages)")
+            setup.blank()
         else:
             # VMs will use host's configured repo file and have packages installed as part of image creation
-            _apk_update(common)
+            _apk_update(setup)
 
             # VMs are setup without USB, so remove the library
-            cfg["remove_packages"].add("libusb")
+            self._cfg["remove_packages"].add("libusb")
 
-        if (cfg["remove_packages"]):
-            common.append("echo \"Removing unneeded packages\"")
-            common.append("apk -q del " + " ".join(cfg["remove_packages"]))
-            common.append("")
+        if (self._cfg["remove_packages"]):
+            setup.append("echo \"Removing unneeded packages\"")
+            setup.append("apk -q del " + " ".join(self._cfg["remove_packages"]))
+            setup.blank()
 
-        common.substitute("templates/common/common.sh", cfg)
+        setup.substitute("templates/common/common.sh", self._cfg)
 
         # directly copy /etc/hosts
         shutil.copyfile("templates/common/hosts", os.path.join(output_dir, "hosts"))
 
-        if cfg["metrics"]:
-            common.append(_SETUP_METRICS)
+        if self._cfg["metrics"]:
+            setup.append(_SETUP_METRICS)
 
-        if cfg["local_firewall"]:
-            common.append(util.awall.configure(cfg["interfaces"], cfg["roles"], output_dir))
+        if self._cfg["local_firewall"]:
+            util.awall.configure(self._cfg["interfaces"], self._cfg["roles"], setup, output_dir)
 
-        common.write_file(output_dir)
-
-        interfaces = [util.interfaces.loopback(), util.interfaces.from_config(cfg["interfaces"])]
+        interfaces = [util.interfaces.loopback(), util.interfaces.from_config(self._cfg["interfaces"])]
         util.file.write("interfaces", "\n".join(interfaces), output_dir)
 
-        util.resolv.create_conf(cfg, output_dir)
-        util.dhcpcd.create_conf(cfg, output_dir)
-        _create_chrony_conf(cfg, output_dir)
+        util.resolv.create_conf(self._cfg, output_dir)
+        util.dhcpcd.create_conf(self._cfg, output_dir)
+        _create_chrony_conf(self._cfg, output_dir)
 
-        if cfg["is_vm"]:
-            util.libvirt.write_vm_xml(cfg, output_dir)
-
-        return [common.name]
+        if self._cfg["is_vm"]:
+            util.libvirt.write_vm_xml(self._cfg, output_dir)
 
 
-def _setup_repos(cfg, common):
-    common.append("echo \"Configuring APK repositories\"")
-    common.append("")
+def _setup_repos(cfg, setup):
+    setup.append("echo \"Configuring APK repositories\"")
+    setup.blank()
 
     repos = cfg["alpine_repositories"]
 
     # overwrite on first, append on subsequent
-    common.append(f"echo {repos[0]} > /etc/apk/repositories")
+    setup.append(f"echo {repos[0]} > /etc/apk/repositories")
 
     for repo in repos[1:]:
-        common.append(f"echo {repo} >> /etc/apk/repositories")
+        setup.append(f"echo {repo} >> /etc/apk/repositories")
 
-    common.append("")
+    setup.blank()
 
 
-def _apk_update(common):
-    common.append("apk -q update")
-    common.append("")
+def _apk_update(setup):
+    setup.append("apk -q update")
+    setup.blank()
 
 
 def _create_chrony_conf(cfg, output_dir):

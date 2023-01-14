@@ -7,7 +7,7 @@ import util.file
 _logger = logging.getLogger(__name__)
 
 
-def configure(interfaces, roles, output_dir):
+def configure(interfaces, roles, setup, output_dir):
     """Create awall configuration for the given interfaces.
     Outputs all JSON to <output_dir>/awall.
     Returns a shell script fragment to process the JSON files and create iptables rules."""
@@ -52,28 +52,24 @@ def configure(interfaces, roles, output_dir):
     util.file.write("base.json", util.file.output_json(base), awall)
     util.file.write("custom-services.json", util.file.output_json(custom_services), awall)
 
-    buffer = ["echo \"Configuring awall\""]
-    buffer.append("rootinstall $DIR/awall/base.json /etc/awall/private")
-    buffer.append(
-        "rootinstall $DIR/awall/custom-services.json /etc/awall/private")
+    setup.append("echo \"Configuring awall\"")
+    setup.append("rootinstall $DIR/awall/base.json /etc/awall/private")
+    setup.append("rootinstall $DIR/awall/custom-services.json /etc/awall/private")
 
     for name, service in services.items():
         util.file.write(name, util.file.output_json(service), awall)
 
-        buffer.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
-        buffer.append("awall enable {}".format(
-            name[:-5]))  # name without .json
+        setup.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
+        setup.append("awall enable {}".format(name[:-5]))  # name without .json
 
-    buffer.append("")
-    buffer.append("# create iptables rules and apply at boot")
-    buffer.append("awall translate -o /tmp")
-    buffer.append("rm -f /etc/iptables/*")
-    buffer.append("rootinstall /tmp/rules-save /tmp/rules6-save /etc/iptables")
+    setup.blank()
+    setup.append("# create iptables rules and apply at boot")
+    setup.append("awall translate -o /tmp")
+    setup.append("rm -f /etc/iptables/*")
+    setup.append("rootinstall /tmp/rules-save /tmp/rules6-save /etc/iptables")
 
-    buffer.append("rc-update add iptables boot")
-    buffer.append("rc-update add ip6tables boot")
-
-    return "\n".join(buffer)
+    setup.service("iptables", "boot")
+    setup.service("ip6tables", "boot")
 
 
 def _load_templates(services, template_dir):

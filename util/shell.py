@@ -7,7 +7,7 @@ import util.file
 
 class ShellScript():
     """ShellScript encapsulates a single, named shell script.
-    Scripts can have code appended and then output to the filesystem when complete.
+    Scripts can have code and comments appended and then the script can be output to the filesystem when complete.
     """
     name = ""
     _script_fragments = []
@@ -21,6 +21,14 @@ class ShellScript():
         shell_header = """#!/bin/sh\nset -o errexit\n"""
 
         self._script_fragments = [shell_header]
+
+    def blank(self):
+        """Add a blank line to the script."""
+        self._script_fragments.append("")
+
+    def comment(self, comment):
+        """Add a comment to the script."""
+        self._script_fragments.append("# " + comment)
 
     def append(self, fragment):
         """Add code to the script."""
@@ -37,11 +45,14 @@ class ShellScript():
     def append_rootinstall(self):
         """Append a rootinstall shell function.
         This ensures the install command copies as root with 644 perms."""
-        self._script_fragments.append("""rootinstall()
-{
+        self._script_fragments.append("""rootinstall() {
   install -o root -g root -m 644 $@
 }
 """)
+
+    def service(self, service: str, runlevel: str = "default"):
+        """Adds a service to system startup at the given runlevel."""
+        self.append(f"rc-update add {service} {runlevel}")
 
     def setup_logging(self, hostname):
         """Make this script log to /root/yodeler/logs/<hostname>.

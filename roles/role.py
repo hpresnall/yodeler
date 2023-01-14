@@ -1,48 +1,51 @@
-"""Defines the abstract Role class. A role represents various configurations that can be applied to a host."""
-import typing
+"""Defines the abstract Role class.
+A role represents various configurations that can be applied to a host to implement a specific functionality."""
 import importlib
 import inspect
 
 from abc import ABC, abstractmethod
 
+import util.shell as shell;
 
 class Role(ABC):
     """Role is the abstract base class that defines how to configure a specific set of
     functionality on a server.
     """
 
-    def __init__(self, name):
+    def __init__(self, name: str, cfg: dict):
         self.name = name
+        self._cfg = cfg
 
     @abstractmethod
-    def additional_packages(self, cfg) -> typing.Set[str]:
+    def additional_packages(self) -> set[str]:
         """The packages needed to implement this role."""
 
-    def configure_interfaces(self, cfg: dict):
-        """Add any addition interfaces for the role.
+    def configure_interfaces(self):
+        """Add any additional interfaces for the role.
         Interface validation will be run afer all roles have this function called."""
 
-    def additional_configuration(self, cfg: dict):
+    def additional_configuration(self):
         """Add any additional default configuration & run validation specific to this role.
         This is run after configure_interfaces()."""
 
     @abstractmethod
-    def create_scripts(self, cfg, output_dir) -> typing.List[str]:
-        """Create the shell scripts and other configuration files that implement this role.
-        Returns a list of the names of the scripts that need to be run to configure this role."""
+    def write_config(self, setup: shell.ShellScript, output_dir: str):
+        """Write any necessary shell script commands to setup.
+        Create the configuration files that implement this role.
+        """
 
 
 # cache loaded Role subclasses
 _role_class_by_name = {}
 
 
-def load(role_name):
+def load(role_name: str, host_cfg: dict) -> Role:
     """Load an Role subclass instance using the given role name."""
     clazz = _role_class_by_name.setdefault(role_name, _load_role_class(role_name))
 
     # instantiate the class
     try:
-        return clazz()
+        return clazz(host_cfg)
     except TypeError:
         raise KeyError(f"cannot instantiate class '{clazz}'")
 

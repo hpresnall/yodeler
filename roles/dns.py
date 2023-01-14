@@ -12,34 +12,34 @@ from roles.role import Role
 class Dns(Role):
     """Dns defines the configuration needed to setup BIND9 DNS."""
 
-    def __init__(self):
-        super().__init__("dns")
+    def __init__(self, cfg: dict):
+        super().__init__("dns", cfg)
 
-    def additional_packages(self, cfg):
+    def additional_packages(self):
         return {"bind", "bind-tools"}
 
-    def additional_configuration(self, cfg):
-        if len(cfg["external_dns"]) == 0:
+    def additional_configuration(self):
+        if len(self._cfg["external_dns"]) == 0:
             raise KeyError("cannot configure DNS server with no external_dns addresses defined")
 
-        domain = cfg["domain"]
+        domain = self._cfg["domain"]
         if not domain:
-            domain = cfg["primary_domain"]
+            domain = self._cfg["primary_domain"]
             if not domain:
                 raise KeyError(("cannot configure DNS server with no primary_domain or top-level site domain"))
-        cfg["dns_domain"] = domain
+        self._cfg["dns_domain"] = domain
         # note, no top-level domain => vlans will not have domains and DNS will only have the single, top-levle zone
 
         # add hostname information for DNS
         # each vlan will be a separate zone
-        cfg["dns_entries_by_vlan"] = {}
+        self._cfg["dns_entries_by_vlan"] = {}
 
-    def create_scripts(self, cfg, output_dir):
+    def write_config(self, setup, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
 
-        _create_dns_entries(cfg)
+        _create_dns_entries(self._cfg)
 
-        named = _init_named(cfg)
+        named = _init_named(self._cfg)
 
         zone_dir = os.path.join(output_dir, "zones")
         os.mkdir(zone_dir)
@@ -47,7 +47,7 @@ class Dns(Role):
         # note walking interfaces, then vlans in the interface's vswitch
         # if an interface is not defined for a vswitch, its vlans
         #  _will not_ be able to resolve DNS queries unless the router routes DNS queries correctly
-        for iface in cfg["interfaces"]:
+        for iface in self._cfg["interfaces"]:
             if iface["ipv4_address"] == "dhcp":
                 raise KeyError("cannot configure DNS server with a DHCP ipv4 address")
 
@@ -70,19 +70,17 @@ class Dns(Role):
                     if vlan["ipv6_subnet"] is not None:
                         named["update_acl6"].append(str(vlan["ipv6_subnet"]))
 
-                _configure_zones(cfg, vlan, named, zone_dir)
+                _configure_zones(self._cfg, vlan, named, zone_dir)
 
-        if cfg["dns_domain"]:
-            _configure_tld(cfg, named, zone_dir)
+        if self._cfg["dns_domain"]:
+            _configure_tld(self._cfg, named, zone_dir)
 
         _format_named(named)
         util.file.write("named.conf", util.file.substitute("templates/dns/named.conf", named), output_dir)
 
-        shell = util.shell.ShellScript("named.sh")
-        shell.append(util.file.read("templates/dns/named.sh"))
-        shell.write_file(output_dir)
-
-        return [shell.name]
+        setup.service("named")
+        setup.append("rootinstall $DIR/named.conf /etc/bind/")
+        setup.append("rootinstall -t /var/bind $DIR/zones/*")
 
 
 def _create_dns_entries(cfg):

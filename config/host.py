@@ -84,12 +84,12 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
     _load_roles(host_cfg)
 
     for role in host_cfg["roles"]:
-        role.configure_interfaces(host_cfg)
+        role.configure_interfaces()
 
     interface.validate(host_cfg)
 
     for role in host_cfg["roles"]:
-        role.additional_configuration(host_cfg)
+        role.additional_configuration()
 
     _configure_packages(site_cfg, host_yaml, host_cfg)
 
@@ -113,24 +113,24 @@ def write_scripts(host_cfg: dict, output_dir: str):
     os.mkdir(host_dir)
 
     # create a setup script that sources all the other scripts
-    setup_script = shell.ShellScript("setup.sh")
-    setup_script.append_self_dir()
-    setup_script.append_rootinstall()
+    setup = shell.ShellScript("setup.sh")
+    setup.append_self_dir()
+    setup.append_rootinstall()
 
-    setup_script.append(f"echo \"Setting up '{host_cfg['hostname']}'\"\n")
+    setup.append(f"echo \"Setting up '{host_cfg['hostname']}'\"\n")
 
     # add all scripts from each role
     for role in host_cfg["roles"]:
+        setup.append(f"########## {role.name} ##########")
+        setup.blank()
         try:
-            for script in role.create_scripts(host_cfg, host_dir):
-                setup_script.append(". $DIR/" + script)
+            role.write_config(setup, host_dir)
         except (TypeError, AttributeError):
-            _logger.fatal(("cannot run create_scripts on class %s; "
-                           "it should have a create_scripts(cfg, output_dir) function "
-                           "that returns an iterable list of scripts"), role)
+            _logger.fatal(("cannot run write_config on class %s"), role)
             raise
+        setup.blank()
 
-    setup_script.write_file(host_dir)
+    setup.write_file(host_dir)
 
     if host_cfg["is_vm"]:
         _bootstrap_vm(host_cfg, host_dir)
@@ -164,7 +164,7 @@ def _load_roles(cfg: dict):
     # list of role names in yaml => list of Role subclass instances
     # Common _must_ be the first so it is configured and setup first
     role_names = set(cfg["roles"] if cfg.get("roles") is not None else [])
-    cfg["roles"] = [roles.common.Common()]
+    cfg["roles"] = [roles.common.Common(cfg)]
 
     for role_name in role_names:
         _logger.debug("loading role '%s' for '%s'", role_name, cfg["hostname"])
@@ -172,7 +172,7 @@ def _load_roles(cfg: dict):
         role_name = role_name.lower()
 
         if role_name != "common":
-            cfg["roles"].append(roles.role.load(role_name))
+            cfg["roles"].append(roles.role.load(role_name, cfg))
 
             # assume roles_to_hostnames is shared by site and all hosts
             if role_name not in cfg["roles_to_hostnames"]:
@@ -199,7 +199,7 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
             host_cfg[key] |= set(host)
 
     for role in host_cfg["roles"]:
-        host_cfg["packages"] |= role.additional_packages(host_cfg)
+        host_cfg["packages"] |= role.additional_packages()
 
     # update packages based on config
     if host_cfg["metrics"]:
