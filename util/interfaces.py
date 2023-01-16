@@ -3,88 +3,92 @@
 Files created by this module are usable by the ifupdown-ng package.
 It _will not_ be usable by the Alpine's default BusyBox ifupdown command or by
 the Debian's version from the ifupdown package."""
+import config.interface
 
 
-def loopback():
-    """Create the loopback interface."""
-    return """auto lo
-iface lo
-"""
-
-
-def from_config(interfaces):
+def from_config(cfg):
     """Convert the interfaces to a form for use in /etc/network/interfaces.
 
     The interfaces must be from a validated host configuration."""
-    all_interfaces = []
+    # loopback is first
+    all_interfaces = ["""auto lo
+# iface lo
+# """]
 
-    for iface in interfaces:
-        if "type" in iface:
-            match iface["type"]:
-                case "port":
-                    all_interfaces.append(port(iface))
-                    continue
-                case "vlan":
-                    all_interfaces.append(_for_vlan(iface))
-                    continue
+    for iface in cfg["interfaces"]:
+        match iface["type"]:
+            case "std":
+                interface = _standard(iface)
+            case "port":
+                interface = _port(cfg, iface)
+            case "vlan":
+                interface = _vlan(iface)
+            case "uplink":
+                interface = _standard(iface)
+            case _:
+                raise ValueError(f"unknown interface type '{iface['type']}'")
 
-        buffer = []
-        if "comment" in iface:
-            buffer.append("# {comment}")
-
-        buffer.append("auto {name}")
-        buffer.append("iface {name}")
-
-        if iface.get("parent"):
-            buffer.append("  requires {parent}")
-            buffer.append("")
-
-        if iface.get("forward"):
-            buffer.append("  use forward")  # enable IPv4 and IPv6 forwarding
-
-        space = dhcp = (iface["ipv4_address"] == "dhcp") or iface["ipv6_dhcp"]
-        if dhcp:
-            buffer.append("  use dhcp")
-
-        if iface["accept_ra"]:
-            buffer.append("  use ipv6-ra")
-            space |= True
-
-        # TODO research RFCs 7217 and 8981 along with dhcpcd's slaac private temporary setting
-        # TODO uncomment when /usr/libexex/ifupdown-nd/ipv6-tempaddr is provided by Alpine
-        # if iface["ipv6_tempaddr"]:
-        #    buffer.append("  use ipv6-tempaddr")
-
-        if space:
-            buffer.append("")
-            space = False
-
-        if not dhcp:
-            buffer.append("  address {ipv4_address}/{ipv4_prefixlen}")
-            if iface["vlan"]["routable"]:
-                buffer.append("  gateway {ipv4_gateway}")
-            space = True
-
-        if space:
-            buffer.append("")
-            space = False
-
-        # assume interface validation removes the ipv6_address if disabled by vlan
-        if iface["ipv6_address"] is not None:
-            buffer.append("  address {ipv6_address}")
-            space = True
-
-        if space:
-            buffer.append("")
-
-        _output_wifi(iface, buffer)
-
-        all_interfaces.append("\n".join(buffer).format_map(iface))
+        all_interfaces.append(interface)
 
     return "\n".join(all_interfaces)
 
 
-def port(iface):
+def _standard(iface):
+    buffer = []
+    if "comment" in iface:
+        buffer.append("# {comment}")
+
+    buffer.append("auto {name}")
+    buffer.append("iface {name}")
+
+    if iface.get("parent"):
+        buffer.append("  requires {parent}")
+        buffer.append("")
+
+    if iface.get("forward"):
+        buffer.append("  use forward")  # enable IPv4 and IPv6 forwarding
+
+    space = dhcp = (iface["ipv4_address"] == "dhcp") or iface["ipv6_dhcp"]
+    if dhcp:
+        buffer.append("  use dhcp")
+
+    if iface["accept_ra"]:
+        buffer.append("  use ipv6-ra")
+        space |= True
+
+    # TODO research RFCs 7217 and 8981 along with dhcpcd's slaac private temporary setting
+    # TODO uncomment when /usr/libexex/ifupdown-nd/ipv6-tempaddr is provided by Alpine
+    # if iface["ipv6_tempaddr"]:
+    #    buffer.append("  use ipv6-tempaddr")
+
+    if space:
+        buffer.append("")
+        space = False
+
+    if not dhcp:
+        buffer.append("  address {ipv4_address}/{ipv4_prefixlen}")
+        if iface["vlan"]["routable"]:
+            buffer.append("  gateway {ipv4_gateway}")
+        space = True
+
+    if space:
+        buffer.append("")
+        space = False
+
+    # assume interface validation removes the ipv6_address if disabled by vlan
+    if iface["ipv6_address"] is not None:
+        buffer.append("  address {ipv6_address}")
+        space = True
+
+    if space:
+        buffer.append("")
+
+    _output_wifi(iface, buffer)
+
+    return "\n".join(buffer).format_map(iface)
+
+
+def _port(cfg, iface):
     """ Create an interface configuration for "port" interfaces like vswitches and vlan parents.
 
     # <comment>
@@ -103,15 +107,16 @@ def port(iface):
     buffer.append(f"auto {name}")
     buffer.append(f"iface {name}")
 
-    if "parent" in iface:
+    if iface["parent"]:
         buffer.append(f"  requires {iface['parent']}")
 
     buffer.append("")
 
     # no ipv4 address and no ipv6 SLAAC or DHCP
 
-    if "uplink" in iface:
-        uplink = iface["uplink"]
+    # move wifi config from uplink to this interface
+    if iface["uplink"]:
+        uplink = config.interface.find_by_name(cfg, iface["uplink"])
         _output_wifi(uplink, buffer)
         port = "\n".join(buffer).format_map(uplink)
 
@@ -124,7 +129,7 @@ def port(iface):
     return "\n".join(buffer)
 
 
-def _for_vlan(iface):
+def _vlan(iface):
     """ Create a router interface for the given vlan.
 
     # <name> vlan, id <id>
@@ -148,8 +153,8 @@ def _for_vlan(iface):
     if vlan["id"] is not None:
         buffer.append(f"  requires {iface['parent']}")
         buffer.append("")
-    buffer.append("  address " + str(vlan["ipv4_subnet"].network_address + 1) +
-                  "/" + str(vlan["ipv4_subnet"].prefixlen))
+    buffer.append("  address " + str(iface["ipv4_address"])
+                  + "/" + str(vlan["ipv4_subnet"].prefixlen))
     # this interface _is_ the gateway, so gateway is not needed
 
     # disable autoconf
@@ -157,8 +162,8 @@ def _for_vlan(iface):
        # add IPv6 address for subnet
         if vlan.get("ipv6_subnet") is not None:
             # manually set the IPv6 address
-            buffer.append("\n  address " + str(vlan["ipv6_subnet"].network_address +
-                          1) + "/" + str(vlan["ipv6_subnet"].prefixlen))
+            buffer.append("\n  address " + str(iface["ipv6_address"])
+                          + "/" + str(vlan["ipv6_subnet"].prefixlen))
 
     buffer.append("")
 

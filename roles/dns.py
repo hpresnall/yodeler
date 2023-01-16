@@ -87,7 +87,8 @@ def _create_dns_entries(cfg):
     # create dns entries for all hosts
     for host_cfg in cfg["hosts"].values():
         for iface in host_cfg["interfaces"]:
-            if iface["type"]:  # skip port, vlan and uplink interfaces
+            # skip port, vlan and uplink interfaces
+            if iface["type"] != "std":
                 continue
 
             vlan = iface.get("vlan")

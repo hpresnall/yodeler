@@ -58,5 +58,3 @@ echo "Configuring libvirt networks"
 # remove default DHCP network
 virsh net-destroy default
 virsh net-undefine default
-
-DIR=/root/$SITE_NAME/$HOSTNAME

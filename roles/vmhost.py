@@ -3,16 +3,10 @@ import os.path
 
 import xml.etree.ElementTree as xml
 
-import util.shell
-import util.file
-import util.interfaces
-import util.awall
-import util.resolv
-import util.dhcpcd
-
 from roles.role import Role
 
-import config.interface
+import config.interface as interface
+import config.vlan as vlan
 
 
 class VmHost(Role):
@@ -27,78 +21,124 @@ class VmHost(Role):
                 "libvirt", "libvirt-daemon", "libvirt-qemu", "ovmf", "dbus", "polkit",
                 "e2fsprogs", "rsync", "sfdisk", "git"}
 
+    def configure_interfaces(self):
+        vswitch_interfaces = []
+
+        for vswitch in self._cfg["vswitches"].values():
+            vswitch_name = vswitch["name"]
+
+            # iface for switch itself
+            vswitch_interfaces.append(interface.for_port(vswitch_name, "vswitch"))
+
+            vswitch_interfaces.extend(_create_uplink_ports(vswitch))
+
+        # change original interface names to the open vswitch port name
+        for iface in self._cfg["interfaces"]:
+            # ifaces not net validated; manually look up vlan name
+            iface_vswitch = self._cfg["vswitches"].get(iface.get("vswitch"))
+            if not iface_vswitch:
+                iface_vlan = "error" # interface validate will error before exposing this name in config files
+            else:
+                iface_vlan = vlan.lookup(iface.get(vlan), iface_vswitch)["name"]
+
+            iface["name"] = f"{self._cfg['hostname']}-{iface_vlan}"
+            iface["comment"] = "host interface"
+            iface["parent"] = iface_vswitch["name"]
+
+        self._cfg["interfaces"] = vswitch_interfaces + self._cfg["interfaces"]
+
     def write_config(self, setup, output_dir):
-        _setup_open_vswitch(self._cfg, setup, output_dir)
+        _setup_open_vswitch(self._cfg, setup,)
         _setup_libvirt(self._cfg, setup, output_dir)
-        _setup_vms(self._cfg, setup, output_dir)
+
+        # call yodel.sh for each VM
+        setup.comment("run yodel.sh for each VM for this site")
+        setup.append("cd $DIR/..") # site dir
+        setup.blank()
+
+        for _, host in self._cfg["hosts"].items():
+            hostname = host["hostname"]
+
+            if not host["is_vm"] or hostname == self._cfg["hostname"]:
+                continue
+
+            setup.append("echo \"Setting up VM '" + hostname + "'...\"")
+            setup.append("cd ..")
+            setup.append("cd " + hostname)
+            setup.append("./yodel.sh")
+            setup.blank()
 
 
-def _setup_open_vswitch(cfg, setup, output_dir):
+def _create_uplink_ports(vswitch: dict) -> list[dict]:
+    uplink = vswitch["uplink"]
+    vswitch_name = vswitch["name"]
+
+    if uplink is None:
+        return []
+
+    if isinstance(uplink, str):
+        return [interface.for_port(uplink, f"uplink for vswitch {vswitch_name}", vswitch_name, uplink)]
+    else:
+        ifaces = []
+        for n, iface in enumerate(uplink):
+            ifaces.append(interface.for_port(
+                iface, f"uplink {n+1} of {len(uplink)} for vswitch {vswitch_name}", vswitch_name, iface))
+        return ifaces
+
+
+def _setup_open_vswitch(cfg, setup):
     setup.substitute("templates/vmhost/openvswitch.sh", cfg)
 
-    # create new entries in /etc/network/interfaces for each switch
-    vswitch_interfaces = []
-    uplink_interfaces = []
-
-    # create Open vswitches for each configuration
-    # create interfaces for each switch
+    # create Open vswitches for each definiation
     # add uplink ports with correct tagging where specified
     for vswitch in cfg["vswitches"].values():
         vswitch_name = vswitch["name"]
+
         setup.comment(f"setup {vswitch_name} vswitch")
         setup.append(f"ovs-vsctl add-br {vswitch_name}")
 
-        # iface for switch itself
-        iface = util.interfaces.port({"name": vswitch_name, "comment": "vswitch"})
-        vswitch_interfaces.append(iface)
+        _create_vswitch_uplink(vswitch, setup)
 
-        uplink_interfaces.extend(_configure_uplinks(cfg, setup, vswitch))
+    # each host interface needs a port on the vswitch
+    for iface in cfg["interfaces"]:
+        if iface["type"] != "std":
+            continue
 
-    _reconfigure_interfaces(cfg, setup, output_dir)
+        port = f"{cfg['hostname']}-{iface['vlan']['name']}"
 
-    # overwrite the original interfaces file from common setup
-    # vswitch & uplink ifaces first
-    interfaces = [util.interfaces.loopback()]
-    interfaces.extend(vswitch_interfaces)
-    interfaces.extend(uplink_interfaces)
-    interfaces.append(util.interfaces.from_config(cfg["interfaces"]))
+        setup.comment(f"setup switch port for host interface on vswitch {vswitch_name}")
+        setup.append(
+            f"ovs-vsctl add-port {vswitch_name} {port} -- set interface {port} type=internal")
 
-    util.file.write("interfaces", "\n".join(interfaces), output_dir)
+        if iface["vlan"]["id"] is not None:
+            setup.append(f"ovs-vsctl set port {port} tag={iface['vlan']['id']}")
+            setup.append(f"ovs-vsctl set port {port} vlan_mode=access")
 
-    # rewrite dhcpcd.conf with new interface names
-    util.dhcpcd.create_conf(cfg, output_dir)
-
-
-def _configure_uplinks(cfg, setup, vswitch):
-    # for each uplink, create a port on the vswitch and an iface definition
-    uplink = vswitch["uplink"]
-    if uplink is None:
         setup.blank()
+
+
+def _create_vswitch_uplink(vswitch, setup):
+    # for each uplink, create a port on the vswitch
+    uplink = vswitch["uplink"]
+
+    if uplink is None:
         return []
 
+    setup.blank()
     vswitch_name = vswitch["name"]
-    uplink_interfaces = []
 
     if not isinstance(uplink, str):
         # multiple uplink interfaces; create a bond named 'uplink'
         bond_ifaces = " ".join(uplink)
         bond_name = f"{vswitch_name}-uplink"
+
         setup.comment("bonded uplink")
         setup.append(f"ovs-vsctl add-bond {vswitch_name} {bond_name} {bond_ifaces} lacp=active")
 
-        for n, iface in enumerate(uplink):
-            bond = util.interfaces.port({"name": iface, "parent": vswitch_name,
-                                         "comment": f"uplink {n+1} of {len(uplink)} for vswitch {vswitch_name}",
-                                         "uplink": config.interface.find_by_name(cfg, iface)})
-            uplink_interfaces.append(bond)
         uplink = bond_name  # use new uplink name for tagging, if needed
     else:
         setup.comment("uplink")
         setup.append(f"ovs-vsctl add-port {vswitch_name} {uplink}")
-        iface = util.interfaces.port({"name": uplink, "parent": vswitch_name,
-                                      "comment": "uplink for vswitch " + vswitch_name,
-                                     "uplink": config.interface.find_by_name(cfg, uplink)})
-        uplink_interfaces.append(iface)
 
     # tag the uplink port
     vlans_by_id = vswitch["vlans_by_id"].keys()
@@ -110,7 +150,7 @@ def _configure_uplinks(cfg, setup, vswitch):
             setup.append(f"ovs-vsctl set port {uplink} vlan_mode=access")
         # else no tagging needed
     elif len(vlans_by_id) > 1:  # multiple vlans => trunk port
-        trunks = [str(vlan_id) for vlan_id in vlans_by_id if vlan_id != "None"]
+        trunks = [str(vlan_id) for vlan_id in vlans_by_id if vlan_id != None]
         trunks = ",".join(trunks)
         setup.append(f"ovs-vsctl set port {uplink} trunks={trunks}")
 
@@ -120,41 +160,6 @@ def _configure_uplinks(cfg, setup, vswitch):
         setup.append(f"ovs-vsctl set port {uplink} vlan_mode={vlan_mode}")
 
     setup.blank()
-
-    return uplink_interfaces
-
-
-def _reconfigure_interfaces(cfg, setup, output_dir):
-    if cfg["local_firewall"]:
-        # replace existing interfaces with new vswitch port names
-        awall_base = util.file.read("awall/base.json", output_dir)
-
-    # change original interface name to the port name
-    for iface in cfg["interfaces"]:
-        vswitch_name = iface["vswitch"]["name"]
-        port = f"{cfg['hostname']}-{iface['vlan']['name']}"
-
-        if cfg["local_firewall"]:
-            awall_base = awall_base.replace(iface["name"], port)
-
-        iface["name"] = port
-        iface["comment"] = "host interface"
-        iface["parent"] = vswitch_name
-
-        # each host interface needs a port on the vswitch too
-        setup.comment(f"setup switch port for host interface on vswitch {vswitch_name}")
-        setup.append(
-            f"ovs-vsctl add-port {vswitch_name} {port} -- set interface {port} type=internal")
-
-        if iface["vlan"]["id"] is not None:
-            setup.append(f"ovs-vsctl set port {port} tag={iface['vlan']['id']}")
-            setup.append(f"ovs-vsctl set port {port} vlan_mode=access")
-
-        setup.blank()
-
-    # overwrite the original awall base config
-    if cfg["local_firewall"]:
-        util.file.write("awall/base.json", awall_base, output_dir)
 
 
 def _setup_libvirt(cfg, setup, output_dir):
@@ -214,22 +219,4 @@ def _setup_libvirt(cfg, setup, output_dir):
         setup.append(f"virsh net-define $DIR/{network_xml}")
         setup.append(f"virsh net-start {name}")
         setup.append(f"virsh net-autostart {name}")
-        setup.blank()
-
-
-def _setup_vms(cfg, setup, output_dir):
-    setup.comment("run create_vm.sh for each VM for this site")
-    setup.append("cd $DIR")
-    setup.blank()
-
-    for _, host in cfg["hosts"].items():
-        hostname = host["hostname"]
-
-        if not host["is_vm"] or hostname == cfg["hostname"]:
-            continue
-
-        setup.append("echo \"Setting up VM '" + hostname + "'...\"")
-        setup.append("cd ..")
-        setup.append("cd " + hostname)
-        setup.append("./create_vm.sh")
         setup.blank()

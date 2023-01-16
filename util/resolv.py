@@ -16,14 +16,14 @@ def create_conf(cfg, output_dir):
     interfaces = cfg["interfaces"]
 
     for iface in interfaces:
-        if "type" in iface:
+        if iface["type"] != "std":
             continue
 
         dhcp |= iface["ipv4_address"] == "dhcp"
         dhcp |= iface["ipv6_dhcp"]
 
         # possibly search vlan domains
-        domain = iface["vlan"].get("domain") if "vlan" in iface else None
+        domain = iface["vlan"]["domain"] if "vlan" in iface else None
         if domain:
             search_domains.append(domain)
 

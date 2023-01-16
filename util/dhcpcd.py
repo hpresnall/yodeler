@@ -10,7 +10,8 @@ def create_conf(cfg, output_dir):
     interfaces = {}
 
     for iface in cfg["interfaces"]:
-        if ("type" in iface) and (iface["type"] in {"port", "vlan"}):
+        # process uplink interfaces for dhcp and prefix delegation
+        if iface["type"] in {"port", "vlan"}:
             continue
  
         buffer = []

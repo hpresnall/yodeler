@@ -142,40 +142,6 @@ class TestInterface(base.TestCfgBase):
         # ip address set without a subnet should error
         self.build_error()
 
-    def test_no_vlan_no_ipv4_subnet(self):
-        self._host_yaml["interfaces"][0]["vlan"] = None
-        del self._host_yaml["interfaces"][0]["vswitch"]
-        self._host_yaml["interfaces"][0]["ipv4_subnet"] = "192.168.1.0/24"
-        self._host_yaml["interfaces"][0]["ipv6_subnet"] = "2001:db8:0:1::/64"
-        self.build_cfg()
-
-        del self._host_yaml["interfaces"][0]["ipv4_subnet"]
-        self.build_error()
-
-    def test_no_vlan_no_ipv6_subnet(self):
-        self._host_yaml["interfaces"][0]["vlan"] = None
-        del self._host_yaml["interfaces"][0]["vswitch"]
-        self._host_yaml["interfaces"][0]["ipv4_subnet"] = "192.168.1.0/24"
-        self._host_yaml["interfaces"][0]["ipv6_subnet"] = "2001:db8:0:1::/64"
-        self.build_cfg()
-
-        del self._host_yaml["interfaces"][0]["ipv6_subnet"]
-        self.build_error()
-
-    def test_no_vlan_invalid_ipv4_subnet(self):
-        self._host_yaml["interfaces"][0]["vlan"] = None
-        del self._host_yaml["interfaces"][0]["vswitch"]
-        self._host_yaml["interfaces"][0]["ipv4_subnet"] = "invalid"
-        self._host_yaml["interfaces"][0]["ipv6_subnet"] = "2001:db8:0:1::/64"
-        self.build_error()
-
-    def test_no_vlan_invalid_ipv6_subnet(self):
-        self._host_yaml["interfaces"][0]["vlan"] = None
-        del self._host_yaml["interfaces"][0]["vswitch"]
-        self._host_yaml["interfaces"][0]["ipv4_subnet"] = "192.168.1.0/24"
-        self._host_yaml["interfaces"][0]["ipv6_subnet"] = "invalid"
-        self.build_error()
-
     def test_vlan_ipv6_disabled(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_disable"] = True
         cfg = self.build_cfg()

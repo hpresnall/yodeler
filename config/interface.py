@@ -34,24 +34,20 @@ def validate(cfg):
 
         try:
             if ("type" not in iface):
-                iface["type"] = None
-                validate_network(iface, vswitches)
-                validate_iface(iface)
+                iface["type"] = "std"
             # ports have no configuration; vlan ifaces are defined by the vlan config
             else:
                 if iface["type"] not in {"vlan", "port", "uplink"}:
                     raise KeyError("only 'vlan' and 'port' types are supported")
-                if iface["type"] == "uplink":
-                    validate_iface(iface)
-                    if "vswitch" in iface:
-                        validate_network(iface, vswitches)
+            validate_network(iface, vswitches)
+            validate_iface(iface)
         except KeyError as err:
             msg = err.args[0]
             raise KeyError(f"{msg} for interface {i} on host '{cfg['hostname']}': '{iface['name']}'") from err
 
         # host's primary domain, if set, should match one vlan
-        vlan = iface.get("vlan")
-        if vlan and (cfg["primary_domain"] == vlan["domain"]):
+        vlan = iface["vlan"]
+        if cfg["primary_domain"] == vlan["domain"]:
             matching_domain = vlan["domain"]
 
     if cfg["primary_domain"]:
@@ -67,15 +63,38 @@ def validate(cfg):
 
 def validate_network(iface, vswitches):
     """Validate the interface's vswitch and vlan."""
-    vswitch_name = iface.get("vswitch")
-    vswitch = vswitches.get(vswitch_name)
+    match iface["type"]:
+        # ports and macvtap and non-vm uplinks do not have any network to validate
+        case "port":
+            return
+        case "uplink":
+            vswitch_name = iface.get("vswitch")
+            if vswitch_name == "__unknown__":
+                iface["vswitch"] = _unknown_vswitch
+                return
+            else:
+                vswitch = vswitches.get(vswitch_name)
+                if iface["vswitch"] is None:
+                    raise KeyError(f"invalid vswitch '{vswitch_name}'")
+        case "vlan":
+            # vlan ifaces should already have vswitch and vlan objects set
+            if ("vswitch" not in iface) and not iface["vswitch"]:
+                raise KeyError("vswitch must be specified")
+            if ("vlan" not in iface) and not iface["vlan"]:
+                raise KeyError("vlan must be specified")
+            vswitch = iface["vswitch"]
+            if iface["vlan"]["id"] not in iface["vswitch"]["vlans_by_id"]:
+                raise KeyError(f"invalid vlan '{iface['vlan']['id']}'; not defined in vswitch '{vswitch['name']}'")
+            return
+        case _:
+            vswitch_name = iface.get("vswitch")
+            vswitch = vswitches.get(vswitch_name)
 
+    # for std and uplinks on vswitches, confirm the vlan
     if vswitch is None:
-        if iface.get("vlan") is None:
-            return  # no vlan => ipv4_subnet required for non-dhcp; will be confirmed in validate_interface()
-        else:
-            raise KeyError(f"invalid vswitch '{vswitch_name}'")
+        raise KeyError(f"invalid vswitch '{vswitch_name}'")
 
+    # check vlan for uplink and standard ifaces
     iface["vswitch"] = vswitch
 
     vlan_id = iface.get("vlan")
@@ -107,8 +126,7 @@ def validate_iface(iface):
         _validate_ipaddress(iface, "ipv4")
 
     # ipv6 disabled at vlan level of interface level => ignore address
-    ipv6_disable = (vlan["ipv6_disable"] or iface.get("ipv6_disable")
-                    if vlan is not None else iface.get("ipv6_disable"))
+    ipv6_disable = vlan["ipv6_disable"] or iface.get("ipv6_disable")
 
     if ipv6_disable:
         iface["ipv6_address"] = None
@@ -137,8 +155,8 @@ def validate_iface(iface):
         # note will not preclude using DHCP6 for options
         iface["ipv6_dhcp"] = bool(iface.get("ipv6_dhcp"))
 
-        if (iface["ipv6_dhcp"]) and vlan and (not vlan["dhcp_managed"]):
-            _logger.warning(f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'dhcp_managed' set to False")
+        if iface["ipv6_dhcp"] and not vlan["dhcp6_managed"]:
+            _logger.warning(f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'dhcp6_managed' set to False")
 
         # default to False; dhcpcd will use another temporary address method
         iface["ipv6_tempaddr"] = bool(iface.get("ipv6_tempaddr"))
@@ -159,7 +177,7 @@ def _validate_ipaddress(iface, ip_version):
     except Exception as exp:
         raise KeyError(f"invalid {key} '{value}'") from exp
 
-    if iface.get("vlan"):
+    if ip_version + "_subnet" in iface["vlan"]:
         subnet = iface["vlan"].get(ip_version + "_subnet")
     else:
         subnet = iface.get(ip_version + "_subnet")
@@ -197,9 +215,6 @@ def find_ips_to_interfaces(cfg: dict, to_match: list[dict], prefer_routable=True
     """
     matches = []
     for iface in cfg["interfaces"]:
-        if ("type" in iface) and iface["type"]:
-            continue
-
         match = _match_iface(iface, to_match, prefer_routable, first_match_only)
 
         if match and first_match_only:
@@ -270,3 +285,108 @@ def _match_iface(iface: dict, to_match: list[dict], prefer_routable=True, first_
         del matches[1:]
 
     return matches
+
+
+def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:
+    iface = {
+        "type": "vlan",
+        "vswitch": vswitch,
+        "vlan": vlan,
+        "ipv4_address": str(vlan["ipv4_subnet"].network_address + 1),
+        "accept_ra": False,
+        "ipv6_dhcp": False
+    }
+
+    if not vswitch:
+        raise KeyError("vswitch must be specified")
+    if not vlan:
+        raise KeyError("vlan must be specified")
+
+    if vlan["id"] is None:
+        iface["name"] = parent
+    else:
+        iface["name"] = f"{parent}.{vlan['id']}"
+        iface["parent"] = parent
+    if not vlan["ipv6_disable"]:
+       # add IPv6 address for subnet
+        if vlan.get("ipv6_subnet") is not None:
+            # manually set the IPv6 address
+            iface["ipv6_address"] = str(vlan["ipv6_subnet"].network_address + 1)
+
+    return iface
+
+
+# set the minimal set of properties tht allow all functions to accept the objects, but not match by any criteria
+_unknown_vswitch = {"name": "__none__", "vlans_by_name": {}, "vlans_by_id": {}}
+_unknown_vlan = {"id": -1, "name": "__none__",
+                 "domain": "__unknown__", "routable": False, "ipv6_disable": True,
+                 "ipv4_subnet": ipaddress.ip_network("255.255.255.0/24")
+                 }
+
+
+def for_port(name: str, comment: str, parent=None, uplink=None) -> dict:
+    """ Create an interface configuration for "port" interfaces like vswitches and vlan parents.
+    Ports must be configured but will never have IP addressed assigned.
+    """
+
+    return {
+        "type": "port",
+        "name": name,
+        "comment": comment,
+        "parent": parent,
+        "uplink": uplink,
+        "ipv4_address": ipaddress.ip_address("255.255.255.255"),
+        "vlan": _unknown_vlan,
+        "vswitch": _unknown_vswitch
+    }
+
+
+def configure_uplink(cfg: dict):
+    """Configure the interface definition for a wan uplink.
+    Allows partial configuration of IP addresses, including DHCP.
+    For VMs, requires either a 'macvtap' interface or a 'vswitch' + 'vlan' to use for connectivity."""
+    uplink = cfg.get("uplink")
+
+    if uplink is None:
+        raise KeyError("must define an uplink")
+
+    # default to the first interface
+    if "name" in uplink:
+        name = uplink["name"]
+        if name:
+            uplink["name"] = "eth0"
+    else:
+        uplink["name"] = "eth0"
+
+    # allow some end user configuration of the uplink interface YAML
+    # but it will always forwarding
+    uplink["type"] = "uplink"
+    uplink["comment"] = "internet uplink"
+    uplink["forward"] = True
+    # delegated prefixes for ipv6; used by dhcpcd
+    uplink["ipv6_delegated_prefixes"] = []
+
+    if cfg["is_vm"]:
+        # uplink can be an existing vswitch or a physical iface on the host via macvtap
+        if "macvtap" in uplink:
+            if not isinstance(uplink["macvtap"], str):
+                raise KeyError(("invald uplink; 'macvtap' must be a string"))
+            uplink["vswitch"] = "__unknown__"  # set name here to distinguish macvtap; validate will covert to full object
+            uplink["vlan"] = {"name": "__none__", "domain": "__unknown__",
+                              "routable": False, "ipv6_disable": False, "dhcp6_managed": True}
+        elif "vswitch" not in uplink:
+            raise KeyError(("invald uplink; it must define a vswitch+vlan or a macvtap host interface"))
+
+    prefixlen = uplink.get("ipv6_pd_prefixlen")
+
+    if prefixlen is None:
+        uplink["ipv6_pd_prefixlen"] = 56
+    elif not isinstance(prefixlen, int):
+        raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be an integer")
+    elif prefixlen >= 64:
+        raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be < 64")
+    elif prefixlen < 48:
+        raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be >= 48")
+
+    # validate will check IP addresses
+    return uplink

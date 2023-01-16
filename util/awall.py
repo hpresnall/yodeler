@@ -28,6 +28,9 @@ def configure(interfaces, roles, setup, output_dir):
     base = {"description": "base zones and policies", "zone": {}, "policy": []}
 
     for iface in interfaces:
+        if iface["type"] != "std":
+            continue
+
         zone = iface["firewall_zone"]
         name = iface["name"]
 

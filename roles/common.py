@@ -70,8 +70,7 @@ class Common(Role):
         if self._cfg["local_firewall"]:
             util.awall.configure(self._cfg["interfaces"], self._cfg["roles"], setup, output_dir)
 
-        interfaces = [util.interfaces.loopback(), util.interfaces.from_config(self._cfg["interfaces"])]
-        util.file.write("interfaces", "\n".join(interfaces), output_dir)
+        util.file.write("interfaces", util.interfaces.from_config(self._cfg), output_dir)
 
         util.resolv.create_conf(self._cfg, output_dir)
         util.dhcpcd.create_conf(self._cfg, output_dir)
