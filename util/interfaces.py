@@ -19,6 +19,15 @@ def from_config(interfaces):
     all_interfaces = []
 
     for iface in interfaces:
+        if "type" in iface:
+            match iface["type"]:
+                case "port":
+                    all_interfaces.append(port(iface))
+                    continue
+                case "vlan":
+                    all_interfaces.append(_for_vlan(iface))
+                    continue
+
         buffer = []
         if "comment" in iface:
             buffer.append("# {comment}")
@@ -43,7 +52,7 @@ def from_config(interfaces):
 
         # TODO research RFCs 7217 and 8981 along with dhcpcd's slaac private temporary setting
         # TODO uncomment when /usr/libexex/ifupdown-nd/ipv6-tempaddr is provided by Alpine
-        #if iface["ipv6_tempaddr"]:
+        # if iface["ipv6_tempaddr"]:
         #    buffer.append("  use ipv6-tempaddr")
 
         if space:
@@ -75,7 +84,7 @@ def from_config(interfaces):
     return "\n".join(all_interfaces)
 
 
-def port(name, parent, comment, uplink=None):
+def port(iface):
     """ Create an interface configuration for "port" interfaces like vswitches and vlan parents.
 
     # <comment>
@@ -86,21 +95,23 @@ def port(name, parent, comment, uplink=None):
     If uplink is specified, WiFi configuration will be moved from the uplink to the new port.
     """
     buffer = []
+    name = iface["name"]
 
-    if comment:
-        buffer.append("# " + comment)
+    if "comment" in iface:
+        buffer.append("# " + iface["comment"])
 
     buffer.append(f"auto {name}")
     buffer.append(f"iface {name}")
 
-    if parent:
-        buffer.append(f"  requires {parent}")
+    if "parent" in iface:
+        buffer.append(f"  requires {iface['parent']}")
 
     buffer.append("")
 
     # no ipv4 address and no ipv6 SLAAC or DHCP
 
-    if uplink:
+    if "uplink" in iface:
+        uplink = iface["uplink"]
         _output_wifi(uplink, buffer)
         port = "\n".join(buffer).format_map(uplink)
 
@@ -113,7 +124,7 @@ def port(name, parent, comment, uplink=None):
     return "\n".join(buffer)
 
 
-def for_vlan(vlan, iface_name):
+def _for_vlan(iface):
     """ Create a router interface for the given vlan.
 
     # <name> vlan, id <id>
@@ -124,17 +135,18 @@ def for_vlan(vlan, iface_name):
     address <ipv4_subnet>.1/<prefixlen>
     address <ipv6_subnet>::1/<prefixlen> # if <ipv6_disable> != False
     """
+    vlan = iface["vlan"]
+    iface_name = iface["name"]
+
     if vlan["id"] is None:
-        name = iface_name
         buffer = [f"# {vlan['name']} vlan"]
     else:
-        name = f"{iface_name}.{vlan['id']}"
         buffer = [f"# {vlan['name']} vlan, id {vlan['id']}"]
 
-    buffer.append(f"auto {name}")
-    buffer.append(f"iface {name}")
+    buffer.append(f"auto {iface_name}")
+    buffer.append(f"iface {iface_name}")
     if vlan["id"] is not None:
-        buffer.append(f"  requires {iface_name}")
+        buffer.append(f"  requires {iface['parent']}")
         buffer.append("")
     buffer.append("  address " + str(vlan["ipv4_subnet"].network_address + 1) +
                   "/" + str(vlan["ipv4_subnet"].prefixlen))

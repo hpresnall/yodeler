@@ -10,6 +10,9 @@ def create_conf(cfg, output_dir):
     interfaces = {}
 
     for iface in cfg["interfaces"]:
+        if ("type" in iface) and (iface["type"] in {"port", "vlan"}):
+            continue
+ 
         buffer = []
         if iface["ipv4_address"] == "dhcp":
             buffer.append("  ipv4")
@@ -19,6 +22,7 @@ def create_conf(cfg, output_dir):
 
         if iface["accept_ra"]:
             ra = True
+            # on by default with ipv6; no addition config needed
 
         if iface["ipv6_dhcp"]:
             buffer.append("  ipv6")

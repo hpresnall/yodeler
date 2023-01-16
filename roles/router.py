@@ -9,8 +9,6 @@ import util.libvirt
 import util.shell
 import util.dhcpcd
 
-import config.vlan
-
 from roles.role import Role
 
 
@@ -21,47 +19,37 @@ class Router(Role):
     def __init__(self, cfg: dict):
         super().__init__("router", cfg)
 
-    def additional_configuration(self):
-        # router will use Shorewall instead
-        self._cfg["local_firewall"] = False
-
-        _configure_uplink(self._cfg)
-
     def additional_packages(self):
         return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "iptables", "ip6tables"}
 
-    def write_config(self, setup, output_dir):
-        """Create the scripts and configuration files for the given host's configuration."""
-        uplink = self._cfg["uplink"]
+    def configure_interfaces(self):
+        uplink = _configure_uplink(self._cfg)
 
-        if self._cfg["is_vm"]:
-            # uplink can be an existing vswitch or a physical iface on the host via macvtap
-            if "vswitch" in uplink:
-                iface = {"vswitch": uplink["vswitch"], "vlan": uplink["vlan"]}
-                uplink_xml = util.libvirt.interface_from_config(self._cfg["hostname"], iface)
-            else:  # macvtap
-                uplink_xml = util.libvirt.macvtap_interface(self._cfg, uplink["macvtap"])
+        # add an interface for each vswitch that has routable vlans
+        iface_counter = 1 if uplink["name"] == "eth0" else 0  # start at eth1 when uplink is eth0
+        used_interfaces = {uplink["name"]}
 
-            # add an interface to the host's libvirt definition for each vswitch; order matches network_interfaces
-            libvirt_interfaces = [uplink_xml]
-
-        # add interfaces for each vswitch that has routable vlans
-        iface_counter = 1  # start at eth1
-        new_interfaces = []
-
-        shorewall = _init_shorewall()
-
-        # delegate IPv6 delegated prefixes across all switches
+        # delegate IPv6 delegated prefixes across all vswitches
         # network for each vlan is in the order they are defined unless vlan['ipv6_pd_network'] is set
         # start at 1 => do not delegate the 0 network
-        delegated_prefixes = []
         prefix_counter = 1
 
-        radvd_template = util.file.read("templates/router/radvd.conf")
-        radvd_config = []
+        vswitch_interfaces = []
 
         for vswitch in self._cfg["vswitches"].values():
-            iface_name = f"eth{iface_counter}"
+            # create a unique interface for each vswitch
+            if self._cfg["is_vm"]:
+                iface_name = f"eth{iface_counter}"
+                while iface_name in used_interfaces:
+                    iface_counter += 1
+                    iface_name = f"eth{iface_counter}"
+
+                used_interfaces.add(iface_name)
+            else:
+                iface_name = vswitch["uplink"]
+                # vswitch validation already confirmed uplink uniqueness
+
+            vswitch["router_iface"] = iface_name
 
             vlan_interfaces = []
             untagged = False
@@ -70,12 +58,17 @@ class Router(Role):
                 if not vlan["routable"]:
                     continue
 
-                if vlan["id"] is None:
-                    untagged = True
+                vlan_iface = {"type": "vlan", "vlan": vlan}
 
-                vlan_interfaces.append(util.interfaces.for_vlan(vlan, iface_name))
-                _configure_shorewall(shorewall, vswitch["name"], vlan)
-                vlan_iface = f"{iface_name}.{vlan['id']}"
+                if vlan["id"] is None:
+                    vlan_iface["name"] = iface_name
+                    untagged = True
+                else:
+                    vlan_iface["name"] = f"{iface_name}.{vlan['id']}"
+                    vlan_iface["parent"] = iface_name
+
+                vlan["router_iface"] = vlan_iface["name"]
+                vlan_interfaces.append(vlan_iface)
 
                 # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
                 network = vlan["ipv6_pd_network"]
@@ -83,47 +76,73 @@ class Router(Role):
                     network = prefix_counter
                     prefix_counter += 1
                 _validate_vlan_pd_network(uplink["ipv6_pd_prefixlen"], network)
-                delegated_prefixes.append(f"{vlan_iface}/{network}")
+                uplink["ipv6_delegated_prefixes"].append(f"{vlan_iface['name']}/{network}")
 
-                # AdvManagedFlag
-                radvd_config.append(radvd_template.format(vlan_iface, "on" if vlan["dhcp6_managed"] else "off"))
-
-            if len(vlan_interfaces) > 0:
+            if vlan_interfaces:
                 # create the parent interface for the vlan interfaces
                 comment = f"vlans on '{vswitch['name']}' vswitch"
 
-                if untagged:  # interface with no vlan tag already created; just output the comment
-                    vlan_interfaces.insert(0, "# " + comment)
-                else:  # create parent interface with the comment as the first in the list
-                    vlan_interfaces.insert(0, util.interfaces.port(iface_name, None, comment))
+                if untagged:  # interface with no vlan tag already created; add the comment on the first interface
+                    vlan_interfaces[0]["comment"] = comment
+                else:  # add the base interface as a port
+                    vswitch_interfaces = [{"type": "port", "name": iface_name, "comment": comment}]
+                vswitch_interfaces.extend(vlan_interfaces)
 
+        if "interfaces" not in self._cfg:
+            self._cfg["interfaces"] = []
+
+        # re-number config defined interfaces
+        for iface in self._cfg["interfaces"]:
+            if "name" in iface:
+                iface["name"] = f"eth{iface_counter}"
+                iface_counter += 1
+
+        # set uplink then vswitch interfaces first in /etc/interfaces
+        self._cfg["interfaces"] = [uplink] + vswitch_interfaces + self._cfg["interfaces"]
+
+    def additional_configuration(self):
+        # router will use Shorewall instead
+        self._cfg["local_firewall"] = False
+
+    def write_config(self, setup, output_dir):
+        """Create the scripts and configuration files for the given host's configuration."""
+        uplink = self._cfg["uplink"]
+
+        if self._cfg["is_vm"]:
+            # uplink can be an existing vswitch or a physical iface on the host via macvtap
+            if "vswitch" in uplink:
+                uplink_xml = util.libvirt.interface_from_config(self._cfg["hostname"], uplink)
+            else:  # macvtap
+                uplink_xml = util.libvirt.macvtap_interface(self._cfg, uplink["macvtap"])
+
+            # add an interface to the host's libvirt definition for each vswitch; order matches network_interfaces
+            libvirt_interfaces = [uplink_xml]
+
+        shorewall = _init_shorewall()
+
+        radvd_template = util.file.read("templates/router/radvd.conf")
+        radvd_config = []
+
+        for vswitch in self._cfg["vswitches"].values():
+            routable_vlans = False
+
+            for vlan in vswitch["vlans"]:
+                if not vlan["routable"]:
+                    continue
+
+                routable_vlans = True
+                _configure_shorewall(shorewall, vswitch["name"], vlan)
+                # AdvManagedFlag
+                radvd_config.append(radvd_template.format(
+                    vlan["router_iface"], "on" if vlan["dhcp6_managed"] else "off"))
+
+            if routable_vlans:
                 # shorewall param to associate vswitch with interface
-                shorewall["params"].append(vswitch["name"].upper() + "=" + iface_name)
+                shorewall["params"].append(vswitch["name"].upper() + "=" + vswitch["router_iface"])
 
                 if self._cfg["is_vm"]:
                     # new libvirt interface to trunk the vlans
                     libvirt_interfaces.append(util.libvirt.router_interface(self._cfg['hostname'], vswitch))
-
-                new_interfaces.extend(vlan_interfaces)
-                iface_counter += 1
-            # else no routable vlans, no need to create any matching libvirt interface
-        # end for all vswitches
-
-        # re-number config defined interfaces and make uplink (eth0) first
-        # TODO explicitly defined interfaces should not be renumbered or used for vlans; need to mark in config/interface.py
-        for iface in self._cfg["interfaces"]:
-            iface["name"] = f"eth{iface_counter}"
-            iface_counter += 1
-
-        uplink["ipv6_delegated_prefixes"] = delegated_prefixes
-        self._cfg["interfaces"].insert(0, uplink)
-
-        # recreate the interfaces file; loopback and uplink first
-        interfaces = [util.interfaces.loopback(), util.interfaces.from_config(self._cfg["interfaces"]), *new_interfaces]
-        util.file.write("interfaces", "\n".join(interfaces), output_dir)
-
-        # create dhcpcd.conf with the uplink and prefix delegations
-        util.dhcpcd.create_conf(self._cfg, output_dir)
 
         if self._cfg["is_vm"]:
             util.libvirt.update_interfaces(self._cfg['hostname'], libvirt_interfaces, output_dir)
@@ -133,7 +152,7 @@ class Router(Role):
         _write_shorewall_config(self._cfg, shorewall, setup, output_dir)
 
 
-def _configure_uplink(cfg):
+def _configure_uplink(cfg) -> dict:
     # create interface definition for uplink
     uplink = cfg.get("uplink")
 
@@ -142,18 +161,27 @@ def _configure_uplink(cfg):
 
     # allow some end user configuration of the uplink interface YAML
     # but it will always be eth0 and allow forwarding
+    uplink["type"] = "uplink"
     uplink["comment"] = "internet uplink"
-    uplink["name"] = "eth0"  # always the first interface on the router
     uplink["forward"] = True
+    # delegated prefixes for ipv6; used by dhcpcd
+    uplink["ipv6_delegated_prefixes"] = []
+
+    # default to the first interface on the router
+    if "name" in uplink:
+        name = uplink["name"]
+        if name:
+            uplink["name"] = "eth0"
+    else:
+        uplink["name"] = "eth0"
 
     if cfg["is_vm"]:
         # uplink can be an existing vswitch or a physical iface on the host via macvtap
-        if "vswitch" in uplink:
-            config.interface.validate_network(uplink, cfg["vswitches"])
-        elif "macvtap" not in uplink:
-            uplink["vswitch"] = None
+        if "macvtap" in uplink:
+            if not isinstance(uplink["macvtap"], str):
+                raise KeyError(("invald uplink in router; 'macvtap' must be a string"))
+        elif "vswitch" not in uplink:
             raise KeyError(("invald uplink in router; it must define a vswitch+vlan or a macvtap host interface"))
-    config.interface.validate_iface(uplink)
 
     prefixlen = uplink.get("ipv6_pd_prefixlen")
 
@@ -247,14 +275,14 @@ def _write_shorewall_config(cfg, shorewall, setup, output_dir):
 
     template = """
 # drop everything coming in from the internet
-inet all DROP    NFLOG({log})
+inet all DROP    NFLOG({0})
 
 # reject everything else
-all all REJECT  NFLOG({log})
+all all REJECT  NFLOG({0})
 """
     shorewall["policy6"] = list(shorewall["policy"])
-    shorewall["policy"].append(template.format(log=4))
-    shorewall["policy6"].append(template.format(log=6))
+    shorewall["policy"].append(template.format(4))
+    shorewall["policy6"].append(template.format(6))
 
     util.file.write("policy", "\n".join(shorewall["policy"]), shorewall4)
     util.file.write("policy", "\n".join(shorewall["policy6"]), shorewall6)
@@ -265,7 +293,6 @@ all all REJECT  NFLOG({log})
     shutil.copyfile("templates/router/shorewall/rules", os.path.join(shorewall4, "rules"))
     shutil.copyfile("templates/router/shorewall/rules6", os.path.join(shorewall6, "rules"))
 
-    shutil.copy("templates/router/ipsets.save", output_dir)
     shutil.copy("templates/router/ulogd.conf", output_dir)
     shutil.copy("templates/router/ulogd", output_dir)
 

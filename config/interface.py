@@ -11,12 +11,12 @@ def validate(cfg):
     """Validate all the interfaces defined in the host."""
     ifaces = cfg.get("interfaces")
 
-    if (ifaces is None) or (len(ifaces) == 0):
-        for role in cfg["roles"]:
-            if role.name == "router":
-                cfg["interfaces"] = []
-                return  # router role defines all required interfaces
-        raise KeyError("no interfaces defined")
+    if ifaces is None:
+        raise KeyError(f"no interfaces defined for host '{cfg['hostname']}'")
+    if not isinstance(ifaces, list):
+        raise KeyError(f"interfaces must be an array for host '{cfg['hostname']}'")
+    if len(ifaces) == 0:
+        raise KeyError(f"interfaces cannot be empty for host '{cfg['hostname']}'")
 
     vswitches = cfg["vswitches"]
 
@@ -25,19 +25,32 @@ def validate(cfg):
     iface_counter = 0
 
     for i, iface in enumerate(ifaces):
+        if not isinstance(iface, dict):
+            raise KeyError(f"iface {i} must be an object for host '{cfg['hostname']}'")
+
         if "name" not in iface:
             iface["name"] = f"eth{iface_counter}"
             iface_counter += 1
 
         try:
-            validate_network(iface, vswitches)
-            validate_iface(iface)
+            if ("type" not in iface):
+                iface["type"] = None
+                validate_network(iface, vswitches)
+                validate_iface(iface)
+            # ports have no configuration; vlan ifaces are defined by the vlan config
+            else:
+                if iface["type"] not in {"vlan", "port", "uplink"}:
+                    raise KeyError("only 'vlan' and 'port' types are supported")
+                if iface["type"] == "uplink":
+                    validate_iface(iface)
+                    if "vswitch" in iface:
+                        validate_network(iface, vswitches)
         except KeyError as err:
             msg = err.args[0]
-            raise KeyError(f"{msg} for interface {i}: '{iface['name']}'") from err
+            raise KeyError(f"{msg} for interface {i} on host '{cfg['hostname']}': '{iface['name']}'") from err
 
         # host's primary domain, if set, should match one vlan
-        vlan = iface["vlan"]
+        vlan = iface.get("vlan")
         if vlan and (cfg["primary_domain"] == vlan["domain"]):
             matching_domain = vlan["domain"]
 
@@ -79,7 +92,7 @@ def validate_iface(iface):
     # required ipv4 address, but allow special 'dhcp' value
     address = iface.get("ipv4_address")
     if address is None:
-        raise KeyError("no ipv4_address defined for interface")
+        raise KeyError("no ipv4_address defined")
 
     if address != "dhcp":
         if vlan is None:
@@ -184,6 +197,9 @@ def find_ips_to_interfaces(cfg: dict, to_match: list[dict], prefer_routable=True
     """
     matches = []
     for iface in cfg["interfaces"]:
+        if ("type" in iface) and iface["type"]:
+            continue
+
         match = _match_iface(iface, to_match, prefer_routable, first_match_only)
 
         if match and first_match_only:

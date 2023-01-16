@@ -49,7 +49,7 @@ def _setup_open_vswitch(cfg, setup, output_dir):
         setup.append(f"ovs-vsctl add-br {vswitch_name}")
 
         # iface for switch itself
-        iface = util.interfaces.port(vswitch_name, None, "vswitch")
+        iface = util.interfaces.port({"name": vswitch_name, "comment": "vswitch"})
         vswitch_interfaces.append(iface)
 
         uplink_interfaces.extend(_configure_uplinks(cfg, setup, vswitch))
@@ -87,15 +87,17 @@ def _configure_uplinks(cfg, setup, vswitch):
         setup.append(f"ovs-vsctl add-bond {vswitch_name} {bond_name} {bond_ifaces} lacp=active")
 
         for n, iface in enumerate(uplink):
-            bond = util.interfaces.port(iface, vswitch_name, f"uplink {n+1} of {len(uplink)} for vswitch {vswitch_name}",
-                                        config.interface.find_by_name(cfg, iface))
+            bond = util.interfaces.port({"name": iface, "parent": vswitch_name,
+                                         "comment": f"uplink {n+1} of {len(uplink)} for vswitch {vswitch_name}",
+                                         "uplink": config.interface.find_by_name(cfg, iface)})
             uplink_interfaces.append(bond)
         uplink = bond_name  # use new uplink name for tagging, if needed
     else:
         setup.comment("uplink")
         setup.append(f"ovs-vsctl add-port {vswitch_name} {uplink}")
-        iface = util.interfaces.port(uplink, vswitch_name, "uplink for vswitch " + vswitch_name,
-                                     config.interface.find_by_name(cfg, uplink))
+        iface = util.interfaces.port({"name": uplink, "parent": vswitch_name,
+                                      "comment": "uplink for vswitch " + vswitch_name,
+                                     "uplink": config.interface.find_by_name(cfg, uplink)})
         uplink_interfaces.append(iface)
 
     # tag the uplink port

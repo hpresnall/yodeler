@@ -26,6 +26,18 @@ class TestInterface(base.TestCfgBase):
         self._host_yaml["interfaces"] = []
         self.build_error()
 
+    def test_string_interfaces(self):
+        self._host_yaml["interfaces"] = "invalid"
+        self.build_error()
+
+    def test_num_interfaces(self):
+        self._host_yaml["interfaces"] = 123
+        self.build_error()
+
+    def test_nonobject_interface(self):
+        self._host_yaml["interfaces"] = ["invalid"]
+        self.build_error()
+
     def test_no_interface_vswitch(self):
         del self._host_yaml["interfaces"][0]["vswitch"]
         self.build_error()

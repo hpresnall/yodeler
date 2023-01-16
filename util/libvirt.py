@@ -17,6 +17,8 @@ def write_vm_xml(cfg, output_dir):
     devices.find("disk/source").attrib["file"] = f"{cfg['vm_images_path']}/{cfg['hostname']}.img"
 
     for iface in cfg["interfaces"]:
+        if "type" in iface:
+            continue
         devices.append(interface_from_config(cfg["hostname"], iface))
 
     xml.indent(template, space="  ")

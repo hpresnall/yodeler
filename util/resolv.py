@@ -16,6 +16,9 @@ def create_conf(cfg, output_dir):
     interfaces = cfg["interfaces"]
 
     for iface in interfaces:
+        if "type" in iface:
+            continue
+
         dhcp |= iface["ipv4_address"] == "dhcp"
         dhcp |= iface["ipv6_dhcp"]
 

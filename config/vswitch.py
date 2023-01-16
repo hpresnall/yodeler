@@ -30,8 +30,7 @@ def validate(cfg: dict):
         vswitch_name = vswitch["name"]
 
         if vswitches_by_name.get(vswitch_name) is not None:
-            raise KeyError(
-                f"duplicate name {vswitch_name} defined for vswitch {i}")
+            raise KeyError(f"duplicate name {vswitch_name} defined for vswitch {i}")
         vswitches_by_name[vswitch_name] = vswitch
 
         uplink = vswitch.get("uplink")
