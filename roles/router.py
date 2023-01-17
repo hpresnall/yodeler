@@ -111,6 +111,9 @@ class Router(Role):
         radvd_template = util.file.read("templates/router/radvd.conf")
         radvd_config = []
 
+        dhrelay4_ifaces = []
+        dhrelay6_ifaces = []
+
         for vswitch in self._cfg["vswitches"].values():
             routable_vlans = False
 
@@ -120,9 +123,15 @@ class Router(Role):
 
                 routable_vlans = True
                 _configure_shorewall(shorewall, vswitch["name"], vlan)
-                # AdvManagedFlag
-                radvd_config.append(radvd_template.format(
-                    vlan["router_iface"], "on" if vlan["dhcp6_managed"] else "off"))
+
+                if vlan["dhcp_enabled"]:
+                    dhrelay4_ifaces.append(vlan["router_iface"])
+
+                if not vlan["ipv6_disable"]:
+                    # dhcp_managed== True => AdvManagedFlag on
+                    radvd_config.append(radvd_template.format(
+                        vlan["router_iface"], "on" if vlan["dhcp6_managed"] else "off"))
+                    dhrelay6_ifaces.append(vlan["router_iface"])
 
             if routable_vlans:
                 # shorewall param to associate vswitch with interface
@@ -135,8 +144,13 @@ class Router(Role):
         if self._cfg["is_vm"]:
             util.libvirt.update_interfaces(self._cfg['hostname'], libvirt_interfaces, output_dir)
 
-        util.file.write("radvd.conf", "\n".join(radvd_config), output_dir)
+        if radvd_config:
+            util.file.write("radvd.conf", "\n".join(radvd_config), output_dir)
 
+            setup.service("radvd", "boot")
+            setup.append("rootinstall radvd.conf /etc")
+
+        _write_dhcrelay_config(self._cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces)
         _write_shorewall_config(self._cfg, shorewall, setup, output_dir)
 
 
@@ -146,6 +160,71 @@ def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
         if ipv6_pd_network >= maxnetworks:
             raise KeyError((f"pd network {ipv6_pd_network} is larger than the {maxnetworks} " +
                             f" networks available with the 'ipv6_pd_prefixlen' of {prefixlen}"))
+
+
+def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
+    dhcp_server = cfg["hosts"][cfg["roles_to_hostnames"]["dhcp"][0]]
+    dhcp_addresses = interface.find_ips_to_interfaces(cfg, dhcp_server["interfaces"])
+
+    if not dhcp_addresses:
+        raise ValueError("router needs to relay DHCP but cannot find any reachable DHCP servers")
+
+    dhcp_addresses = dhcp_addresses[0]
+
+    if dhrelay4_ifaces or dhrelay6_ifaces:
+        setup.blank()
+        setup.comment("configure dhcrelay")
+
+    if dhrelay6_ifaces:
+        if not dhcp_addresses["ipv6_address"]:
+            raise ValueError("router needs to relay DHCP but cannot find any reachable IPv6 addresses")
+
+        # dhrelay requires setting the upper interface _and_ ipaddress
+        # find the router interface that is in the same subnet as the dhcp server
+        upper_iface = None
+        for iface in cfg["interfaces"]:
+            if ((iface["type"] == "vlan") and
+                    (dhcp_addresses["ipv6_address"] in iface["vlan"]["ipv6_subnet"])):
+                upper_iface = iface["name"]
+
+        setup.comment("create dhrelay6 service")
+        setup.append("cp /etc/conf.d/dhcrelay /etc/conf.d/dhcrelay6")
+        setup.append("echo 'DHCRELAY_OPTS=\"-6\"' >> /etc/conf.d/dhcrelay6")
+        setup.comment("change command line flags & service name; set program name back to just dhcrelay")
+        setup.append(
+            "sed -e \"s/-i/-l/g\" -e \"s/dhcrelay/dhcrelay6/g\" -e \"s|sbin/dhcrelay6|sbin/dhcrelay|g\" /etc/init.d/dhcrelay > /etc/init.d/dhcrelay6")
+        setup.append("chmod 755 /etc/init.d/dhcrelay6")
+
+        setup.blank()
+        setup.comment("setup dhcrelay6.conf")
+        setup.append("echo 'IFACE=\"" + " ".join(dhrelay6_ifaces) + "\"' >> /etc/conf.d/dhcrelay")
+        setup.append("echo 'DHCRELAY_SERVERS=\"-u " +
+                     str(dhcp_addresses["ipv6_address"]) + "%" + upper_iface +
+                     "\"' >> /etc/conf.d/dhcrelay")
+        setup.service("dhcrelay6")
+        setup.blank()
+
+    if dhrelay4_ifaces:
+        if not dhcp_addresses["ipv4_address"]:
+            raise ValueError("router needs to relay DHCP but cannot find any reachable IPv4 addresses")
+
+        upper_iface = None
+        for iface in cfg["interfaces"]:
+            if ((iface["type"] == "vlan") and
+                    (dhcp_addresses["ipv4_address"] in iface["vlan"]["ipv4_subnet"])):
+                upper_iface = iface["name"]
+
+        # dhrelay requires listening on the interface that is on the dhcp server's vlan
+        # make sure it is setup, even if that vlan does not have dhcp enabled
+        if upper_iface not in dhrelay4_ifaces:
+            dhrelay4_ifaces.insert(0, upper_iface)
+
+        setup.comment("setup dhcrelay.conf")
+        setup.append("echo 'IFACE=\"" + " ".join(dhrelay4_ifaces) + "\"' >> /etc/conf.d/dhcrelay")
+        setup.append("echo 'DHCRELAY_SERVERS=\"" +
+                     str(dhcp_addresses["ipv4_address"]) + "\"' >> /etc/conf.d/dhcrelay")
+        setup.service("dhcrelay")
+        setup.blank()
 
 
 def _init_shorewall():
@@ -240,4 +319,6 @@ all all REJECT  NFLOG({0})
     shutil.copy("templates/router/ulogd", output_dir)
 
     # TODO add correct vlan ifaces and DHCP servers to cfg for substitution
+
+    setup.comment("# shorewall config")
     setup.substitute("templates/router/shorewall.sh", cfg)

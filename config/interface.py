@@ -90,7 +90,7 @@ def validate_network(iface, vswitches):
             vswitch_name = iface.get("vswitch")
             vswitch = vswitches.get(vswitch_name)
 
-    # for std and uplinks on vswitches, confirm the vlan
+    # for std interfaces and uplinks for vswitches, confirm the vlan
     if vswitch is None:
         raise KeyError(f"invalid vswitch '{vswitch_name}'")
 

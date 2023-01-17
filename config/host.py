@@ -125,7 +125,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
         setup.blank()
         try:
             role.write_config(setup, host_dir)
-        except (TypeError, AttributeError):
+        except:
             _logger.fatal(("cannot run write_config on class %s"), role)
             raise
         setup.blank()

@@ -13,36 +13,33 @@ def create_conf(cfg, output_dir):
         # process uplink interfaces for dhcp and prefix delegation
         if iface["type"] in {"port", "vlan"}:
             continue
- 
+
         buffer = []
+
         if iface["ipv4_address"] == "dhcp":
             buffer.append("  ipv4")
 
         ipv6 = False
-        ra = False
 
-        if iface["accept_ra"]:
-            ra = True
-            # on by default with ipv6; no addition config needed
-
-        if iface["ipv6_dhcp"]:
+        if not iface["vlan"]["ipv6_disable"] and not iface.get("ipv6_disable"):
+            ipv6 = True
             buffer.append("  ipv6")
-            if not ra:
+            if not iface["accept_ra"]:
                 buffer.append("  noipv6rs")
+            # on by default with ipv6; no additional config needed
 
+        if iface["ipv6_dhcp"]: # will not be set if ipv6_disable is true
             buffer.append(" ")
             buffer.append("  # request a dhcp address")
             buffer.append("  ia_na 0")
-            ipv6 = True
 
         prefixes = iface.get("ipv6_delegated_prefixes")
 
         if (prefixes is not None) and (len(prefixes) > 0):
             if not ipv6:
                 buffer.append("  ipv6")
-                if not ra:
+                if not iface["accept_ra"]:
                     buffer.append("  noipv6rs")
-                ipv6 = True
 
             prefixes.insert(0, f"  ia_pd 1/::{iface['ipv6_pd_prefixlen']}")
 

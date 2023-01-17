@@ -35,24 +35,6 @@ mkdir -p /var/log/firewall
 chown root:wheel /var/log/firewall
 chmod 640 /var/log/firewall
 
-# configure dhcrelay and add IPv6 service
-# TODO add all vlan interfaces; remove upper iface from dhcrelay6 config
-echo 'IFACE="eth1.10 eth1.20"' >> /etc/conf.d/dhcrelay
-cp /etc/conf.d/dhcrelay /etc/conf.d/dhcrelay6
-echo 'DHCRELAY_OPTS="-6"' >> /etc/conf.d/dhcrelay6
-sed -e "s/-i/-l/g" -e "s/dhcrelay/dhcrelay6/g" -e "s|sbin/dhcrelay6|sbin/dhcrelay|g" /etc/init.d/dhcrelay > /etc/init.d/dhcrelay6
-chmod 755 /etc/init.d/dhcrelay6
-# TODO determine ipv4 dhcp IPs
-echo 'DHCRELAY_SERVERS="192.168.210.2"' >> /etc/conf.d/dhcrelay
-echo 'DHCRELAY_SERVERS="-u fd24:87e8:06c7:10::2%eth1.10"' >> /etc/conf.d/dhcrelay6
-
-rootinstall radvd.conf /etc
-
 rc-update add shorewall boot
 rc-update add shorewall6 boot
 rc-update add ulogd boot
-
-rc-update add dhcrelay default
-rc-update add dhcrelay6 default
-
-rc-update add radvd boot
