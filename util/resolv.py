@@ -9,29 +9,27 @@ def create_conf(cfg, output_dir):
 
     If DHCP or DHCP6 is used on any interfaces, no file is created.
     """
-   # determine if any interface is using DHCP
-    dhcp = False
+    resolv_conf = "resolv.conf"
+    head = False  # for uplinks using dhcp, write to resolv.conf.head
+
     search_domains = []
 
-    interfaces = cfg["interfaces"]
+    for iface in cfg["interfaces"]:
+        if iface["ipv4_address"] == "dhcp" or iface["ipv6_dhcp"]:
+            if iface["type"] == "std":
+                return  # dhcp will handle
+            if iface["type"] == "uplink":
+                head = True  # let uplink dhcp create resolv.conf but add site content
 
-    for iface in interfaces:
-        if iface["type"] != "std":
-            continue
+        if iface["type"] == "std":
+            # possibly search vlan domains
+            if iface["vlan"]["domain"]:
+                search_domains.append(iface["vlan"]["domain"])
 
-        dhcp |= iface["ipv4_address"] == "dhcp"
-        dhcp |= iface["ipv6_dhcp"]
+    if head:
+        # write to head so this config is combined with what dhcp returns
+        resolv_conf = "resolv.conf.head"
 
-        # possibly search vlan domains
-        domain = iface["vlan"]["domain"] if "vlan" in iface else None
-        if domain:
-            search_domains.append(domain)
-
-    if dhcp:
-        # do not write resolv.conf; assume DHCP will setup resolv.conf
-        return
-
-    # manually set DNS servers
     buffer = []
 
     # set domain for server
@@ -58,4 +56,4 @@ def create_conf(cfg, output_dir):
         buffer.append("nameserver " + server)
     buffer.append("")
 
-    file.write("resolv.conf", "\n".join(buffer), output_dir)
+    file.write(resolv_conf, "\n".join(buffer), output_dir)

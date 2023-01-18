@@ -216,7 +216,7 @@ class TestVlan(base.TestCfgBase):
         self.build_error()
 
     def test_vlan_ipv6_disabled(self):
-        self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_disable"] = True
+        self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_disabled"] = True
         cfg = self.build_cfg()
 
         self.assertIsNone(cfg["vswitches"]["public"]["vlans"][0]["ipv6_subnet"])
@@ -256,7 +256,7 @@ class TestVlan(base.TestCfgBase):
         self.build_error()
 
     def test_vlan_dhcpres_disabled_ivp6(self):
-        self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_disable"] = True
+        self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_disabled"] = True
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
             {"hostname": "pub_test", "mac_address": "00:11:22:33:44:55", "ipv6_address": "2001:db8:0:1::5"}]
         self.build_cfg()  # should build with warning logged

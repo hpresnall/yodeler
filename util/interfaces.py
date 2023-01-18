@@ -138,7 +138,7 @@ def _vlan(iface):
     requires <iface_name>
 
     address <ipv4_subnet>.1/<prefixlen>
-    address <ipv6_subnet>::1/<prefixlen> # if <ipv6_disable> != False
+    address <ipv6_subnet>::1/<prefixlen> # if vlan has an ipv6_subnet
     """
     vlan = iface["vlan"]
     iface_name = iface["name"]
@@ -153,17 +153,14 @@ def _vlan(iface):
     if vlan["id"] is not None:
         buffer.append(f"  requires {iface['parent']}")
         buffer.append("")
-    buffer.append("  address " + str(iface["ipv4_address"])
-                  + "/" + str(vlan["ipv4_subnet"].prefixlen))
+    subnet = vlan["ipv4_subnet"] if "ipv4_subnet" else iface["ipv4_subnet"]
+    buffer.append("  address " + str(iface["ipv4_address"]) + "/" + str(subnet.prefixlen))
     # this interface _is_ the gateway, so gateway is not needed
 
-    # disable autoconf
-    if not vlan["ipv6_disable"]:
-       # add IPv6 address for subnet
-        if vlan.get("ipv6_subnet") is not None:
-            # manually set the IPv6 address
-            buffer.append("\n  address " + str(iface["ipv6_address"])
-                          + "/" + str(vlan["ipv6_subnet"].prefixlen))
+    # add IPv6 address for subnet
+    if vlan.get("ipv6_subnet"):
+        # manually set the IPv6 address
+        buffer.append("\n  address " + str(iface["ipv6_address"]) + "/" + str(vlan["ipv6_subnet"].prefixlen))
 
     buffer.append("")
 

@@ -1,5 +1,5 @@
 memory_mb: 256
 uplink:
   ipv4_address: dhcp
-  vswitch: public
+  macvtap: eth0
 roles: [router]

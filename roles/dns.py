@@ -88,10 +88,10 @@ def _create_dns_entries(cfg):
     for host_cfg in cfg["hosts"].values():
         for iface in host_cfg["interfaces"]:
             # skip port, vlan and uplink interfaces
-            if iface["type"] != "std":
+            if iface["type"] not in [ "std", "vlan"] :
                 continue
 
-            vlan = iface.get("vlan")
+            vlan = iface["vlan"]
 
             # no domain name => no DNS
             if not vlan["domain"]:
@@ -105,23 +105,6 @@ def _create_dns_entries(cfg):
                 "ipv4_address": iface["ipv4_address"],
                 "ipv6_address": iface["ipv6_address"],
                 "aliases": [role.name for role in host_cfg["roles"] if role.name != "common"]})
-
-    # manually add host entries for router interfaces since they are defined based on routable vlans
-    router = cfg["roles_to_hostnames"]["router"][0]
-
-    for vswitch in cfg["vswitches"].values():
-        for vlan in vswitch["vlans"]:
-            if (not vlan["routable"]) or (not vlan["domain"]):
-                continue
-
-            if vlan["name"] not in cfg["dns_entries_by_vlan"]:
-                cfg["dns_entries_by_vlan"][vlan["name"]] = []
-
-            cfg["dns_entries_by_vlan"][vlan["name"]].append({
-                "hostname": router,
-                "ipv4_address": vlan["ipv4_subnet"].network_address + 1,
-                "ipv6_address": vlan["ipv6_subnet"].network_address + 1,
-                "aliases": ["router"]})
 
 
 def _init_named(cfg):

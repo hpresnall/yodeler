@@ -39,7 +39,7 @@ vswitches:
         # instead of defaulting to index order, set delegated prefix to the 10th /64 in the IPv6 PD
         # assumes 'ipv6_pd_prefixlen' of 56 defined in the router uplink
         ipv6_pd_network: 10
-        dhcp_enabled: false # DHCP server will not be configured
+        dhcp4_enabled: false # DHCP server will not be configured
         access_vlans: all # firewall will allow any access to all vlans, including the internet
         allow_access_stopped_firewall: true # allow internet access when firewall is stopped
         allow_dns_update: true # allow this subnet to make DDNS updates
@@ -67,6 +67,6 @@ vswitches:
         routable: false # no interface and no firewall rules will be created on the router
         domain: mgmt.yodeler.internal
         ipv4_subnet: 172.16.251.0/24
-        ipv6_disable: true
+        ipv6_disabled: true
         dhcp_min_address_ipv4: 2
         dhcp_max_address_ipv4: 16

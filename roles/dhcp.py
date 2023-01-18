@@ -78,7 +78,7 @@ class Dhcp(Role):
         # for each vlan, create a subnet configuration entry for DHCP4 & 6, along with DDNS forward and reverse zones
         for vswitch in self._cfg["vswitches"].values():
             for vlan in vswitch["vlans"]:
-                if not vlan["dhcp_enabled"]:
+                if not vlan["dhcp4_enabled"]:
                     continue
 
                 # dns server addresses for this vlan

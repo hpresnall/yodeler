@@ -143,7 +143,7 @@ class TestInterface(base.TestCfgBase):
         self.build_error()
 
     def test_vlan_ipv6_disabled(self):
-        self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_disable"] = True
+        self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_disabled"] = True
         cfg = self.build_cfg()
 
         self.assertIsNone(cfg["vswitches"]["public"]["vlans"][0]["ipv6_subnet"])

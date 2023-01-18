@@ -79,6 +79,8 @@ class TestSite(unittest.TestCase):
 
                 if hostname == "router":
                     required_files.append("dhcpcd.conf")
+                    required_files.remove("resolv.conf")
+                    required_files.append("resolv.conf.head")
 
                 if hostname == "client":
                     required_files.remove("resolv.conf")

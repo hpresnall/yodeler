@@ -47,9 +47,9 @@ class Router(Role):
             else:
                 # note that this assumes ethernet layout of non-vm hosts
                 iface_name = f"eth{iface_counter}"
+            iface_counter += 1
 
             vswitch["router_iface"] = iface_name
-
             vlan_interfaces = []
             untagged = False
 
@@ -79,7 +79,7 @@ class Router(Role):
                 if untagged:  # interface with no vlan tag already created; add the comment on the first interface
                     vlan_interfaces[0]["comment"] = comment
                 else:  # add the base interface as a port
-                    vswitch_interfaces = [interface.for_port(iface_name, comment)]
+                    vswitch_interfaces.append(interface.for_port(iface_name, comment))
                 vswitch_interfaces.extend(vlan_interfaces)
 
         if "interfaces" not in self._cfg:
@@ -98,10 +98,10 @@ class Router(Role):
 
         if self._cfg["is_vm"]:
             # uplink can be an existing vswitch or a physical iface on the host via macvtap
-            if uplink["vswitch"]["name"] != "__none__":
-                uplink_xml = util.libvirt.interface_from_config(self._cfg["hostname"], uplink)
-            else:  # macvtap
+            if "macvtap" in uplink:
                 uplink_xml = util.libvirt.macvtap_interface(self._cfg, uplink["macvtap"])
+            else:  # use vswitch+vlan
+                uplink_xml = util.libvirt.interface_from_config(self._cfg["hostname"], uplink)
 
             # add an interface to the host's libvirt definition for each vswitch; order matches network_interfaces
             libvirt_interfaces = [uplink_xml]
@@ -124,13 +124,14 @@ class Router(Role):
                 routable_vlans = True
                 _configure_shorewall(shorewall, vswitch["name"], vlan)
 
-                if vlan["dhcp_enabled"]:
+                if vlan["dhcp4_enabled"]:
                     dhrelay4_ifaces.append(vlan["router_iface"])
 
-                if not vlan["ipv6_disable"]:
+                if not vlan["ipv6_disabled"]:
                     # dhcp_managed== True => AdvManagedFlag on
                     radvd_config.append(radvd_template.format(
                         vlan["router_iface"], "on" if vlan["dhcp6_managed"] else "off"))
+
                     dhrelay6_ifaces.append(vlan["router_iface"])
 
             if routable_vlans:
@@ -187,15 +188,7 @@ def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
                     (dhcp_addresses["ipv6_address"] in iface["vlan"]["ipv6_subnet"])):
                 upper_iface = iface["name"]
 
-        setup.comment("create dhrelay6 service")
-        setup.append("cp /etc/conf.d/dhcrelay /etc/conf.d/dhcrelay6")
-        setup.append("echo 'DHCRELAY_OPTS=\"-6\"' >> /etc/conf.d/dhcrelay6")
-        setup.comment("change command line flags & service name; set program name back to just dhcrelay")
-        setup.append(
-            "sed -e \"s/-i/-l/g\" -e \"s/dhcrelay/dhcrelay6/g\" -e \"s|sbin/dhcrelay6|sbin/dhcrelay|g\" /etc/init.d/dhcrelay > /etc/init.d/dhcrelay6")
-        setup.append("chmod 755 /etc/init.d/dhcrelay6")
-
-        setup.blank()
+        setup.append(util.file.read("templates/router/dhcrelay6.sh"))
         setup.comment("setup dhcrelay6.conf")
         setup.append("echo 'IFACE=\"" + " ".join(dhrelay6_ifaces) + "\"' >> /etc/conf.d/dhcrelay")
         setup.append("echo 'DHCRELAY_SERVERS=\"-u " +

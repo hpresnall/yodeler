@@ -75,6 +75,9 @@ rootinstall $$DIR/dhcpcd.conf /etc
 if [ -f $$DIR/resolv.conf ]; then
   rootinstall $$DIR/resolv.conf /etc
 fi
+if [ -f $$DIR/resolv.conf.head ]; then
+  rootinstall $$DIR/resolv.conf.head /etc
+fi
 # prevent dhcpcd starting as a service; let ifupdown-ng start it, if needed
 sed -i -e "s/provide net/# provide net/g" /etc/init.d/dhcpcd
 # remove dhcpcd messages to stdout

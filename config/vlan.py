@@ -90,7 +90,7 @@ def _validate_vlan_subnet(vswitch_name, vlan, ip_version):
             return
 
     # remove the subnet if the vlan disables ipv6
-    if ip_version == "ipv6" and vlan["ipv6_disable"]:
+    if ip_version == "ipv6" and vlan["ipv6_disabled"]:
         vlan["ipv6_subnet"] = None
         return
 
@@ -183,9 +183,8 @@ def _validate_ip_address(ip_version, index, vlan, vswitch_name):
             f"invalid {ip_version}_address for host {index} in vlan '{vlan['name']}' for vswitch '{vswitch_name}'") from exp
 
     if (ip_version == "ipv6") and (vlan["ipv6_subnet"] is None):
-        _logger.warning("ipv6_address %s for host %s in vlan '%s' with ipv6 disabled in vswitch '%s' will be ignored",
+        _logger.warning("ipv6_address %s for host %s in vlan '%s' with no ipv6_subnet in vswitch '%s' will be ignored",
                         address, index, vlan['name'], vswitch_name)
-        vlan["ipv6_address"] = None
         return
 
     if address not in vlan[ip_version + "_subnet"]:
@@ -272,8 +271,8 @@ def lookup(vlan_id, vswitch):
 DEFAULT_VLAN_CONFIG = {
     "routable": True,  # vlan will have an interface assigned on the router
     "domain": "",
-    "ipv6_disable": False,
-    "dhcp_enabled": True,  # DHCP server will be configured
+    "ipv6_disabled": False,
+    "dhcp4_enabled": True,  # DHCP server will be configured
     "allow_internet": False,  # firewall will restrict outbound internet access
     # do not allow internet access when firewall is stopped
     "allow_access_stopped_firewall": False,

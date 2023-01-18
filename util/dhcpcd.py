@@ -21,14 +21,14 @@ def create_conf(cfg, output_dir):
 
         ipv6 = False
 
-        if not iface["vlan"]["ipv6_disable"] and not iface.get("ipv6_disable"):
+        if not iface["vlan"]["ipv6_disabled"] and not iface["ipv6_disabled"]:
             ipv6 = True
             buffer.append("  ipv6")
             if not iface["accept_ra"]:
                 buffer.append("  noipv6rs")
             # on by default with ipv6; no additional config needed
 
-        if iface["ipv6_dhcp"]: # will not be set if ipv6_disable is true
+        if iface["ipv6_dhcp"]:  # will not be set if ipv6_disabled is true
             buffer.append(" ")
             buffer.append("  # request a dhcp address")
             buffer.append("  ia_na 0")
