@@ -5,7 +5,8 @@ import inspect
 
 from abc import ABC, abstractmethod
 
-import util.shell as shell;
+import util.shell as shell
+
 
 class Role(ABC):
     """Role is the abstract base class that defines how to configure a specific set of
@@ -27,6 +28,25 @@ class Role(ABC):
     def additional_configuration(self):
         """Add any additional default configuration & run validation specific to this role.
         This is run after configure_interfaces()."""
+
+    @staticmethod
+    def minimum_instances(site_cfg: dict) -> int:
+        """What is the minimum number of hosts that can have this role for a single site?"""
+        # default to required
+        return 1
+
+    @staticmethod
+    def maximum_instances(site_cfg: dict) -> int:
+        """What is the maximum number of hosts that can have this role for a single site?"""
+        # default to a single instance
+        return 1
+
+    @abstractmethod
+    def validate(self):
+        """Run any additional validation needed for this role.
+
+        This will be called before write_config(). All hosts for the site will be loaded so the total site
+        layout can be checked, if needed."""
 
     @abstractmethod
     def write_config(self, setup: shell.ShellScript, output_dir: str):
@@ -58,6 +78,7 @@ def _load_role_class(role_name: str):
 
     # find class for role; assume only 1 class in each module
     role_class = None
+
     for clazz in inspect.getmembers(mod, inspect.isclass):
         if clazz[0].lower() == role_name.lower():
             role_class = clazz[1]
@@ -67,4 +88,3 @@ def _load_role_class(role_name: str):
         raise KeyError(f"cannot find class for role '{role_name}' in module '{mod}'")
 
     return role_class
-    # instantiate the class and add to the list

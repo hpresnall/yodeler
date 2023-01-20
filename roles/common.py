@@ -1,4 +1,5 @@
 """Common configuration & setup for all Alpine hosts."""
+import sys
 import os.path
 import shutil
 
@@ -36,20 +37,53 @@ class Common(Role):
         if ("prmary_domain" in self._cfg) and (self._cfg["prmary_domain"]):
             self._cfg["fqdn"] = self._cfg["hostname"] + '.' + self._cfg["prmary_domain"]
 
+    @staticmethod
+    def minimum_instances(site_cfg: dict) -> int:
+        return 0
+
+    @staticmethod
+    def maximum_instances(site_cfg: dict) -> int:
+        return sys.maxsize
+
+    def validate(self):
+        # ensure each vlan is only used once
+        # do not allow multiple routable vlans on the same switch
+        vswitches_used = set()
+        vlans_used = set()
+
+        for iface in self._cfg["interfaces"]:
+            if iface["type"] != "std":
+                continue
+
+            vlan = iface["vlan"]
+            vlan_name = vlan["name"]
+
+            if vlan_name in vlans_used:
+                raise ValueError(f"host '{self._cfg['hostname']} defines multiple interfaces on vlan '{vlan_name}'")
+            vlans_used.add(vlan_name)
+
+            vswitch_name = iface["vswitch"]["name"]
+
+            if vlan["routable"] and (vswitch_name in vswitches_used):
+                raise ValueError(
+                    f"host '{self._cfg['hostname']} defines interfaces on multiple routable vlans for switch '{vswitch_name}'")
+
+            vswitches_used.add(vswitch_name)
+
     def write_config(self, setup, output_dir):
         # write all packages to a file; usage depends on vm or physical server
         util.file.write("packages", " ".join(self._cfg["packages"]), output_dir)
 
-        if not self._cfg["is_vm"]:
+        if self._cfg["is_vm"]:
+            # VMs will use host's configured repo file and have packages installed as part of image creation
+            _apk_update(setup)
+        else:
             # for physical servers, add packages manually
             _setup_repos(self._cfg, setup)
             _apk_update(setup)
             setup.append("echo \"Installing required packages\"")
             setup.append("apk -q --no-progress add $(cat $DIR/packages)")
             setup.blank()
-        else:
-            # VMs will use host's configured repo file and have packages installed as part of image creation
-            _apk_update(setup)
 
             # VMs are setup without USB, so remove the library
             self._cfg["remove_packages"].add("libusb")

@@ -38,6 +38,11 @@ class TestVlan(base.TestCfgBase):
         self._site_yaml["vswitches"][0]["vlans"][0]["name"] = None
         self.build_error()
 
+    def test_non_unique_vlan_name(self):
+        self._site_yaml["vswitches"][0]["vlans"][0]["name"] = "dup"
+        self._site_yaml["vswitches"][1]["vlans"][0]["name"] = "dup"
+        self.build_error()
+
     def test_duplicate_vlan_name(self):
         vlan2 = {"name": "pub_test", "id": 20, "ipv4_subnet": "192.168.2.0/24",
                  "ipv6_subnet": "2001:db8:0:2::/64"}
@@ -286,7 +291,7 @@ class TestVlan(base.TestCfgBase):
             {"hostname": "pub_test", "ipv4_address": "192.168.1.5", "mac_address": "00:11:22:33:44:55", "aliases": [123]}]
         self.build_error()
 
-    def test_vlan_host(self):
+    def test_vlan_dhcpres(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
             {"hostname": "pub_test", "mac_address": "00:11:22:33:44:55", "ipv4_address": "192.168.1.5"}]
         self.build_cfg()

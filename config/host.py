@@ -164,21 +164,22 @@ def _load_roles(cfg: dict):
     # list of role names in yaml => list of Role subclass instances
     # Common _must_ be the first so it is configured and setup first
     role_names = set(cfg["roles"] if cfg.get("roles") is not None else [])
-    cfg["roles"] = [roles.common.Common(cfg)]
+    role_names.discard("common")
+    cfg["roles"] = [roles.role.load("common", cfg)]
 
     for role_name in role_names:
         _logger.debug("loading role '%s' for '%s'", role_name, cfg["hostname"])
 
         role_name = role_name.lower()
 
-        if role_name != "common":
-            cfg["roles"].append(roles.role.load(role_name, cfg))
+        cfg["roles"].append(roles.role.load(role_name, cfg))
 
-            # assume roles_to_hostnames is shared by site and all hosts
-            if role_name not in cfg["roles_to_hostnames"]:
-                cfg["roles_to_hostnames"][role_name] = []
+        # assume roles_to_hostnames is shared by site and all hosts
+        # note common role is _not_ added to this dict
+        if role_name not in cfg["roles_to_hostnames"]:
+            cfg["roles_to_hostnames"][role_name] = []
 
-            cfg["roles_to_hostnames"][role_name].append(cfg['hostname'])
+        cfg["roles_to_hostnames"][role_name].append(cfg['hostname'])
 
 
 def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):

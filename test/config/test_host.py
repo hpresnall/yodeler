@@ -174,10 +174,24 @@ class TestHost(base.TestCfgBase):
         self.assertNotIn("explicit_add", cfg["remove_packages"])
         self.assertIn("remove", cfg["remove_packages"])
 
-    def test_no_local_firewall(self):
-        self._host_yaml["local_firewall"] = False
+    def test_duplicate_vlans(self):
+        self._host_yaml["interfaces"].append(copy.deepcopy(self._host_yaml["interfaces"][0]))
         cfg = self.build_cfg()
 
-        # remove iptables when no firewall
-        self.assertIn("iptables", cfg["remove_packages"])
-        self.assertIn("ip6tables", cfg["remove_packages"])
+        with self.assertRaises(ValueError):
+            cfg["roles"][0].validate()
+
+    def test_duplicate_routable_vlans_on_switch(self):
+        vlan = copy.deepcopy(self._site_yaml["vswitches"][0]["vlans"][0])
+        vlan["name"] = "test"
+        vlan["id"] = 123
+        self._site_yaml["vswitches"][0]["vlans"].append(vlan)
+
+        iface = copy.deepcopy(self._host_yaml["interfaces"][0])
+        iface["vlan"] = "test"
+        self._host_yaml["interfaces"].append(iface)
+
+        cfg = self.build_cfg()
+
+        with self.assertRaises(ValueError):
+            cfg["roles"][0].validate()

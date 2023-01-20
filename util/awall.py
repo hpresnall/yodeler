@@ -82,6 +82,9 @@ def _load_templates(services, template_dir):
     for path in os.listdir(template_dir):
         service = util.file.load_json(os.path.join(template_dir, path))
 
+        if os.path.isdir(path):
+            continue
+
         if path == "custom-services.json":
             # consolidate custom service definitions into a single entry
             if "service" in service and service["service"]:

@@ -21,6 +21,14 @@ class VmHost(Role):
                 "libvirt", "libvirt-daemon", "libvirt-qemu", "ovmf", "dbus", "polkit",
                 "e2fsprogs", "rsync", "sfdisk", "git"}
 
+    @staticmethod
+    def minimum_instances(site_cfg: dict) -> int:
+        # vm host needed if any other systems are vms
+        for host_cfg in site_cfg["hosts"].values():
+            if host_cfg["is_vm"]:
+                return 1
+        return 0
+
     def configure_interfaces(self):
         vswitch_interfaces = []
 
@@ -46,6 +54,13 @@ class VmHost(Role):
             iface["parent"] = iface_vswitch["name"]
 
         self._cfg["interfaces"] = vswitch_interfaces + self._cfg["interfaces"]
+
+    def additional_configuration(self):
+        # do not support nested vms
+        self._cfg["is_vm"] = False
+
+    def validate(self):
+        pass
 
     def write_config(self, setup, output_dir):
         _setup_open_vswitch(self._cfg, setup,)

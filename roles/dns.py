@@ -34,6 +34,9 @@ class Dns(Role):
         # each vlan will be a separate zone
         self._cfg["dns_entries_by_vlan"] = {}
 
+    def validate(self):
+        pass
+
     def write_config(self, setup, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
 

@@ -22,6 +22,9 @@ class Dhcp(Role):
     def additional_packages(self):
         return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-dhcp-ddns", "kea-admin", "kea-ctrl-agent"}
 
+    def validate(self):
+        pass
+
     def write_config(self, setup, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
         ifaces4 = []
@@ -78,9 +81,6 @@ class Dhcp(Role):
         # for each vlan, create a subnet configuration entry for DHCP4 & 6, along with DDNS forward and reverse zones
         for vswitch in self._cfg["vswitches"].values():
             for vlan in vswitch["vlans"]:
-                if not vlan["dhcp4_enabled"]:
-                    continue
-
                 # dns server addresses for this vlan
                 dns_addresses = interface.find_ips_from_vlan(vswitch, vlan, dns_server_interfaces)
                 dns4 = [str(match["ipv4_address"]) for match in dns_addresses if match["ipv4_address"]]
@@ -92,29 +92,31 @@ class Dhcp(Role):
                 if self._cfg["domain"]:
                     domains.append(self._cfg["domain"])
 
-                ip4_subnet = vlan["ipv4_subnet"]
+                if vlan["dhcp4_enabled"]:
+                    ip4_subnet = vlan["ipv4_subnet"]
 
-                subnet4 = {}
-                subnet4["subnet"] = str(ip4_subnet)
-                subnet4["pools"] = [{"pool": str(ip4_subnet.network_address + vlan["dhcp_min_address_ipv4"]) +
-                                     " - " + str(ip4_subnet.network_address + vlan["dhcp_max_address_ipv4"])}]
-                if vlan["domain"]:
-                    subnet4["ddns-qualifying-suffix"] = vlan["domain"]  # else use top-level domain configured globally
+                    subnet4 = {}
+                    subnet4["subnet"] = str(ip4_subnet)
+                    subnet4["pools"] = [{"pool": str(ip4_subnet.network_address + vlan["dhcp_min_address_ipv4"]) +
+                                        " - " + str(ip4_subnet.network_address + vlan["dhcp_max_address_ipv4"])}]
+                    if vlan["domain"]:
+                        # else use top-level domain configured globally
+                        subnet4["ddns-qualifying-suffix"] = vlan["domain"]
 
-                    ddns = True
-                    ddns_config["forward-ddns"]["ddns-domains"].append(
-                        {"name": vlan["domain"] + ".", "dns-servers": ddns_dns_addresses})
-                    ddns_config["reverse-ddns"]["ddns-domains"].append(
-                        {"name": util.address.rptr_ipv4(ip4_subnet) + ".", "dns-servers": ddns_dns_addresses})
-                subnet4["option-data"] = [{"name": "dns-servers", "data":  ", ".join(dns4)}]
-                if domains:
-                    subnet4["option-data"].append({"name": "domain-search", "data": ", ".join(domains)})
-                if vlan["routable"]:
-                    subnet4["option-data"].append({"name": "routers", "data": str(ip4_subnet.network_address + 1)}),
-                subnet4["reservations"] = []
-                subnets_4.append(subnet4)
+                        ddns = True
+                        ddns_config["forward-ddns"]["ddns-domains"].append(
+                            {"name": vlan["domain"] + ".", "dns-servers": ddns_dns_addresses})
+                        ddns_config["reverse-ddns"]["ddns-domains"].append(
+                            {"name": util.address.rptr_ipv4(ip4_subnet) + ".", "dns-servers": ddns_dns_addresses})
+                    subnet4["option-data"] = [{"name": "dns-servers", "data":  ", ".join(dns4)}]
+                    if domains:
+                        subnet4["option-data"].append({"name": "domain-search", "data": ", ".join(domains)})
+                    if vlan["routable"]:
+                        subnet4["option-data"].append({"name": "routers", "data": str(ip4_subnet.network_address + 1)}),
+                    subnet4["reservations"] = []
+                    subnets_4.append(subnet4)
 
-                if vlan["ipv6_subnet"]:  # ipv6 subnets are optional
+                if vlan["ipv6_subnet"]:
                     ip6_subnet = vlan["ipv6_subnet"]
 
                     subnet6 = {}
@@ -127,6 +129,10 @@ class Dhcp(Role):
                     if vlan["domain"]:
                         subnet6["ddns-qualifying-suffix"] = vlan["domain"]
 
+                        if not vlan["dhcp4_enabled"]:
+                            ddns = True
+                            ddns_config["forward-ddns"]["ddns-domains"].append(
+                                {"name": vlan["domain"] + ".", "dns-servers": ddns_dns_addresses})
                         # forward dns already handled by ipv4
                         ddns_config["reverse-ddns"]["ddns-domains"].append(
                             {"name": util.address.rptr_ipv6(ip6_subnet) + ".", "dns-servers": ddns_dns_addresses})
@@ -143,32 +149,33 @@ class Dhcp(Role):
                     reservation = {"hostname":  res["hostname"],
                                    "hw-address": res["mac_address"].replace("-", ":").lower(), }
 
-                    r = reservation.copy()
-                    if res["ipv4_address"]:
-                        r["ip-address"] = str(res["ipv4_address"])
-                    subnet4["reservations"].append(r)
+                    if vlan["dhcp4_enabled"]:
+                        r = reservation.copy()
+                        if res["ipv4_address"]:
+                            r["ip-address"] = str(res["ipv4_address"])
+                        subnet4["reservations"].append(r)
 
-                    r = reservation.copy()
-                    if res["ipv6_address"]:
-                        r["ip-addresses"] = [str(res["ipv6_address"])]  # note array for ipv6
-                    subnet6["reservations"].append(r)
+                    if vlan["ipv6_subnet"]:
+                        r = reservation.copy()
+                        if res["ipv6_address"]:
+                            r["ip-addresses"] = [str(res["ipv6_address"])]  # note array for ipv6
+                        subnet6["reservations"].append(r)
 
-        dhcp4_config["subnet4"] = subnets_4
-        dhcp6_config["subnet6"] = subnets_6
-
-        util.file.write("kea-dhcp4.conf", util.file.output_json(dhcp4_json), output_dir)
-        util.file.write("kea-dhcp6.conf", util.file.output_json(dhcp6_json), output_dir)
+        if subnets_4:
+            dhcp4_config["subnet4"] = subnets_4
+            util.file.write("kea-dhcp4.conf", util.file.output_json(dhcp4_json), output_dir)
+            setup.service("kea-dhcp4")
+            setup.append("rootinstall $DIR/kea-dhcp4.conf /etc/kea")
+            setup.blank()
+        if subnets_6:
+            dhcp6_config["subnet6"] = subnets_6
+            util.file.write("kea-dhcp6.conf", util.file.output_json(dhcp6_json), output_dir)
+            setup.service("kea-dhcp6")
+            setup.append("rootinstall $DIR/kea-dhcp6.conf /etc/kea")
+            setup.append("sed -e \"s/{timezone}/$(tail -n1 /etc/localtime)/g\"  -i /etc/kea/kea-dhcp6.conf")
+            setup.blank()
         if ddns:
             util.file.write("kea-dhcp-ddns.conf", util.file.output_json(ddns_json), output_dir)
-
-        setup.service("kea-dhcp4")
-        setup.service("kea-dhcp6")
-        if ddns:
             setup.service("kea-dhcp-ddns")
-        setup.blank()
-        setup.append("rootinstall $DIR/kea-dhcp4.conf /etc/kea")
-        setup.append("rootinstall $DIR/kea-dhcp6.conf /etc/kea")
-        if ddns:
             setup.append("rootinstall $DIR/kea-dhcp-ddns.conf /etc/kea")
-        setup.blank()
-        setup.append("sed -e \"s/{timezone}/$(tail -n1 /etc/localtime)/g\"  -i /etc/kea/kea-dhcp6.conf")
+            setup.blank()

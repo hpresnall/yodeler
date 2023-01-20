@@ -92,6 +92,18 @@ class Router(Role):
         # router will use Shorewall instead
         self._cfg["local_firewall"] = False
 
+    @staticmethod
+    def minimum_instances(site_cfg: dict) -> int:
+        # router needed if there are routable vlans
+        for vswitch in site_cfg["vswitches"].values():
+            for vlan in vswitch["vlans"]:
+                if vlan["routable"]:
+                    return 1
+        return 0
+
+    def validate(self):
+        pass
+
     def write_config(self, setup, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
         uplink = self._cfg["uplink"]
@@ -165,58 +177,70 @@ def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
 
 def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
     dhcp_server = cfg["hosts"][cfg["roles_to_hostnames"]["dhcp"][0]]
-    dhcp_addresses = interface.find_ips_to_interfaces(cfg, dhcp_server["interfaces"])
+    dhcp_addresses = interface.find_ips_to_interfaces(cfg, dhcp_server["interfaces"], first_match_only=False)
 
     if not dhcp_addresses:
         raise ValueError("router needs to relay DHCP but cannot find any reachable DHCP servers")
 
     dhcp_addresses = dhcp_addresses[0]
 
+    # dhrelay requires setting the upper interface _and_ ipaddress
+    # find the router interface that is in the same subnet as the dhcp server
+    upper_iface4 = None
+    upper_iface6 = None
+
+    for iface in cfg["interfaces"]:
+        if (iface["type"] != "vlan"):
+            continue
+
+        if dhcp_addresses["ipv4_address"] in iface["vlan"]["ipv4_subnet"]:
+            upper_iface4 = iface["name"]
+        if ((iface["vlan"]["ipv6_subnet"] is not None)
+                and (dhcp_addresses["ipv6_address"] in iface["vlan"]["ipv6_subnet"])):
+            upper_iface6 = iface["name"]
+
+    # TODO move setup6 read file to top, then 4 then 6
+    # probably easier to find dhcp server's vlans then compare rather than addresses
+    # if dhcp address is in same vlan as host, then require is still false
+    # only add non routable if dhcp server is on different vlan from the host
+    # for all non routable, error if router does not have an interface with the same vlan
+
     if dhrelay4_ifaces or dhrelay6_ifaces:
         setup.blank()
-        setup.comment("configure dhcrelay")
+        setup.comment("configure dhcp relay for routable vlans")
 
     if dhrelay6_ifaces:
         if not dhcp_addresses["ipv6_address"]:
             raise ValueError("router needs to relay DHCP but cannot find any reachable IPv6 addresses")
 
-        # dhrelay requires setting the upper interface _and_ ipaddress
-        # find the router interface that is in the same subnet as the dhcp server
-        upper_iface = None
-        for iface in cfg["interfaces"]:
-            if ((iface["type"] == "vlan") and
-                    (dhcp_addresses["ipv6_address"] in iface["vlan"]["ipv6_subnet"])):
-                upper_iface = iface["name"]
-
         setup.append(util.file.read("templates/router/dhcrelay6.sh"))
-        setup.comment("setup dhcrelay6.conf")
-        setup.append("echo 'IFACE=\"" + " ".join(dhrelay6_ifaces) + "\"' >> /etc/conf.d/dhcrelay")
-        setup.append("echo 'DHCRELAY_SERVERS=\"-u " +
-                     str(dhcp_addresses["ipv6_address"]) + "%" + upper_iface +
-                     "\"' >> /etc/conf.d/dhcrelay")
-        setup.service("dhcrelay6")
-        setup.blank()
 
     if dhrelay4_ifaces:
         if not dhcp_addresses["ipv4_address"]:
             raise ValueError("router needs to relay DHCP but cannot find any reachable IPv4 addresses")
 
-        upper_iface = None
-        for iface in cfg["interfaces"]:
-            if ((iface["type"] == "vlan") and
-                    (dhcp_addresses["ipv4_address"] in iface["vlan"]["ipv4_subnet"])):
-                upper_iface = iface["name"]
-
         # dhrelay requires listening on the interface that is on the dhcp server's vlan
         # make sure it is setup, even if that vlan does not have dhcp enabled
-        if upper_iface not in dhrelay4_ifaces:
-            dhrelay4_ifaces.insert(0, upper_iface)
+        if upper_iface4 not in dhrelay4_ifaces:
+            dhrelay4_ifaces.insert(0, upper_iface4)
 
         setup.comment("setup dhcrelay.conf")
         setup.append("echo 'IFACE=\"" + " ".join(dhrelay4_ifaces) + "\"' >> /etc/conf.d/dhcrelay")
         setup.append("echo 'DHCRELAY_SERVERS=\"" +
                      str(dhcp_addresses["ipv4_address"]) + "\"' >> /etc/conf.d/dhcrelay")
         setup.service("dhcrelay")
+        setup.blank()
+
+    if dhrelay6_ifaces:
+        # remove upper iface from list; no need to relay traffic already being broadcast
+        # dhrelay6 does require it to be explicitly set with the ip address
+        dhrelay6_ifaces = [iface for iface in dhrelay6_ifaces if iface != upper_iface6]
+
+        setup.comment("setup dhcrelay6.conf")
+        setup.append("echo 'IFACE=\"" + " ".join(dhrelay6_ifaces) + "\"' >> /etc/conf.d/dhcrelay")
+        setup.append("echo 'DHCRELAY_SERVERS=\"-u " +
+                     str(dhcp_addresses["ipv6_address"]) + "%" + upper_iface6 + "\"' >> /etc/conf.d/dhcrelay")
+        setup.service("dhcrelay6")
         setup.blank()
 
 
@@ -226,8 +250,7 @@ def _init_shorewall():
     shorewall["params"] = ["INTERNET=eth0"]
     shorewall["zones"] = ["fw\tfirewall\ninet\tipv4"]
     shorewall["zones6"] = ["fw\tfirewall\ninet\tipv6"]
-    shorewall["interfaces"] = [
-        "inet\t$INTERNET\ttcpflags,dhcp,nosmurfs,routefilter,logmartians"]
+    shorewall["interfaces"] = ["inet\t$INTERNET\ttcpflags,dhcp,nosmurfs,routefilter,logmartians"]
     shorewall["interfaces6"] = ["inet\t$INTERNET\ttcpflags,dhcp,rpfilter,accept_ra=2"]
     shorewall["policy"] = []
     shorewall["snat"] = []

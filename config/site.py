@@ -10,6 +10,8 @@ import util.file as file
 import config.vswitch as vswitch
 import config.host as host
 
+import roles.role
+
 _logger = logging.getLogger(__name__)
 
 
@@ -113,8 +115,33 @@ def write_host_scripts(site_cfg: dict, output_dir: str):
     """Create the configuration scripts and files for the site's hosts and write them to the given directory."""
     _logger.info("writing setup scripts for site to '%s'", output_dir)
 
+    _validate_site(site_cfg)
+
     for host_cfg in site_cfg["hosts"].values():
         host.write_scripts(host_cfg, output_dir)
+
+def _validate_site(site_cfg: dict):
+    # confirm site contains all necessary roles
+    for role_class in roles.role.Role.__subclasses__():
+        role_name = role_class.__name__.lower()
+
+        if role_name == "common":
+            hostnames = site_cfg["hosts"].keys()
+        else:
+            hostnames = site_cfg["roles_to_hostnames"][role_name]
+
+        count = len(hostnames)
+
+        if count < role_class.minimum_instances(site_cfg):
+            raise ValueError((f"role '{role_name}' requires at least {role_class.minimum_instances()} host defined;"
+                              f" site '{site_cfg['site_name']}' has {count} hosts: {hostnames}"))
+        if count > role_class.maximum_instances(site_cfg):
+            raise ValueError((f"role '{role_name}' cannot have more than {role_class.minimum_instances()} host defined;"
+                              f" site '{site_cfg['site_name']}' has {count} hosts: {hostnames}"))
+
+    for host_cfg in site_cfg["hosts"].values():
+        for role in host_cfg["roles"]:
+            role.validate()
 
 # accessible for testing
 DEFAULT_CONFIG = {
