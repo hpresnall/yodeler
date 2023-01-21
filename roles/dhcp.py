@@ -77,9 +77,9 @@ class Dhcp(Role):
             ddns_dns_addresses = []
             for match in dns_addresses:
                 if "ipv4_address" in match:
-                    ddns_dns_addresses.append(str(match["ipv4_address"]))
+                    ddns_dns_addresses.append({"ip-address": str(match["ipv4_address"])})
                 else:
-                    ddns_dns_addresses.append(str(match["ipv6_address"]))
+                    ddns_dns_addresses.append({"ip-address": str(match["ipv6_address"])})
 
         ddns = False  # only use ddns if vlans have domain names defined
 
@@ -113,7 +113,7 @@ class Dhcp(Role):
                             {"name": vlan["domain"] + ".", "dns-servers": ddns_dns_addresses})
                         ddns_config["reverse-ddns"]["ddns-domains"].append(
                             {"name": util.address.rptr_ipv4(ip4_subnet) + ".", "dns-servers": ddns_dns_addresses})
-                    subnet4["option-data"] = [{"name": "dns-servers", "data":  ", ".join(dns4)}]
+                    subnet4["option-data"] = [{"name": "domain-name-servers", "data":  ", ".join(dns4)}]
                     if domains:
                         subnet4["option-data"].append({"name": "domain-search", "data": ", ".join(domains)})
                     if vlan["routable"]:

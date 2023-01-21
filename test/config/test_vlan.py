@@ -75,6 +75,13 @@ class TestVlan(base.TestCfgBase):
                           ["vlans_by_name"]["pub_test"]["id"])
         self.assertIsNotNone(cfg["vswitches"]["public"]["vlans_by_id"][None])
 
+    def test_invalid_vlan_id(self):
+        self._site_yaml["vswitches"][0]["vlans"][0]["id"] = 0
+        self.build_error()
+
+        self._site_yaml["vswitches"][0]["vlans"][0]["id"] = 4094
+        self.build_error()
+
     def test_string_vlan_id(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["id"] = "invalid"
         self.build_error()
@@ -82,7 +89,7 @@ class TestVlan(base.TestCfgBase):
     def test_float_vlan_id(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["id"] = 1.0
         self.build_error()
-    
+
     def test_default_vlan(self):
         vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
                  "ipv6_subnet": "2001:db8:0:2::/64", "default": True}
@@ -152,7 +159,7 @@ class TestVlan(base.TestCfgBase):
         self._site_yaml["vswitches"][0]["vlans"][0]["domain"] = "foo.yodeler.internal"
         self._host_yaml["interfaces"].append({"vswitch": "private",
                                              "ipv4_address": "192.168.2.1",
-                                             "ipv6_address": "2001:db8:0:2::1"})
+                                              "ipv6_address": "2001:db8:0:2::1"})
 
         cfg = self.build_cfg()
 

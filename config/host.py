@@ -105,7 +105,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
     host_dir = os.path.join(output_dir, host_cfg["hostname"])
 
-    _logger.info("creating setup scripts for '%s'", host_cfg["hostname"])
+    _logger.info("writing setup scripts for '%s'", host_cfg["hostname"])
 
     if os.path.exists(host_dir):
         _logger.debug("removing existing host configuration scripts from '%s'", host_dir)

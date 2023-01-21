@@ -46,6 +46,8 @@ def validate(domain: str, vswitch, other_vswitch_vlans: set):
 
         if vlan_id and not isinstance(vlan_id, int):
             raise KeyError(f"non-integer id '{vlan_id}' for vlan '{vlan_name}' in vswitch '{vswitch_name}'")
+        if vlan_id and ((vlan_id < 1) or (vlan_id > 4094)):
+            raise KeyError(f"invalid id '{vlan_id}' for vlan '{vlan_name}' in vswitch '{vswitch_name}'")
 
         # add default values
         for key in DEFAULT_VLAN_CONFIG:

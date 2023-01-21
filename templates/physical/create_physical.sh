@@ -1,5 +1,6 @@
 # ensure the drive running this script is writable
-mount -o remount,rw $$(realpath $$(df . | grep '^/' | cut -d' ' -f1))
+YODELER_DEV=$$(realpath $$(df $$DIR | grep '^/' | cut -d' ' -f1))
+mount -o remount,rw $$YODELER_DEV
 
 # use site-level APK cache for this boot
 # will be partially populated by Alpine install
@@ -70,6 +71,9 @@ echo "Running setup for '$HOSTNAME' inside chroot"
 set +o errexit # copy cached APKs even if setup fails
 chroot "$$INSTALLED" /bin/sh -c "cd /root/$SITE_NAME/$HOSTNAME && ./setup.sh"
 RESULT=$$?
+
+# mount status gets reset sometimes; ensure still writable
+mount -o remount,rw $$YODELER_DEV
 
 echo "Synching $HOSTNAME's APK cache back to site-level cache"
 # copy any new APKS back to the site APK cache

@@ -45,9 +45,9 @@ class VmHost(Role):
             # ifaces not net validated; manually look up vlan name
             iface_vswitch = self._cfg["vswitches"].get(iface.get("vswitch"))
             if not iface_vswitch:
-                iface_vlan = "error" # interface validate will error before exposing this name in config files
+                iface_vlan = "error"  # interface validation will error before exposing this name in config files
             else:
-                iface_vlan = vlan.lookup(iface.get(vlan), iface_vswitch)["name"]
+                iface_vlan = vlan.lookup(iface.get("vlan"), iface_vswitch)["name"]
 
             iface["name"] = f"{self._cfg['hostname']}-{iface_vlan}"
             iface["comment"] = "host interface"
@@ -68,7 +68,8 @@ class VmHost(Role):
 
         # call yodel.sh for each VM
         setup.comment("run yodel.sh for each VM for this site")
-        setup.append("cd $DIR/..") # site dir
+        setup.comment("site directory")
+        setup.append("cd $DIR/..")  # site dir
         setup.blank()
 
         for _, host in self._cfg["hosts"].items():
@@ -78,9 +79,7 @@ class VmHost(Role):
                 continue
 
             setup.append("echo \"Setting up VM '" + hostname + "'...\"")
-            setup.append("cd ..")
-            setup.append("cd " + hostname)
-            setup.append("./yodel.sh")
+            setup.append(hostname + "/yodel.sh")
             setup.blank()
 
 
@@ -94,11 +93,11 @@ def _create_uplink_ports(vswitch: dict) -> list[dict]:
     if isinstance(uplink, str):
         return [interface.for_port(uplink, f"uplink for vswitch {vswitch_name}", vswitch_name, uplink)]
     else:
-        ifaces = []
+        ports = []
         for n, iface in enumerate(uplink):
-            ifaces.append(interface.for_port(
+            ports.append(interface.for_port(
                 iface, f"uplink {n+1} of {len(uplink)} for vswitch {vswitch_name}", vswitch_name, iface))
-        return ifaces
+        return ports
 
 
 def _setup_open_vswitch(cfg, setup):
@@ -123,11 +122,10 @@ def _setup_open_vswitch(cfg, setup):
 
         setup.comment(f"setup switch port for host interface on vswitch {vswitch_name}")
         setup.append(
-            f"ovs-vsctl add-port {vswitch_name} {port} -- set interface {port} type=internal")
+            f"ovs-vsctl add-port {iface['vswitch']['name']} {port} -- set interface {port} type=internal")
 
         if iface["vlan"]["id"] is not None:
-            setup.append(f"ovs-vsctl set port {port} tag={iface['vlan']['id']}")
-            setup.append(f"ovs-vsctl set port {port} vlan_mode=access")
+            setup.append(f"ovs-vsctl set port {port} tag={iface['vlan']['id']} vlan_mode=access")
 
         setup.blank()
 
@@ -161,18 +159,16 @@ def _create_vswitch_uplink(vswitch, setup):
         # single vlan with id => access port
         if None not in vlans_by_id:
             tag = list(vlans_by_id)[0]
-            setup.append(f"ovs-vsctl set port {uplink} tag={tag}")
-            setup.append(f"ovs-vsctl set port {uplink} vlan_mode=access")
+            setup.append(f"ovs-vsctl set port {uplink} tag={tag} vlan_mode=access")
         # else no tagging needed
     elif len(vlans_by_id) > 1:  # multiple vlans => trunk port
         trunks = [str(vlan_id) for vlan_id in vlans_by_id if vlan_id != None]
         trunks = ",".join(trunks)
-        setup.append(f"ovs-vsctl set port {uplink} trunks={trunks}")
 
         # native or PVID vlan => native_untagged
         # see http://www.openvswitch.org/support/dist-docs/ovs-vswitchd.conf.db.5.txt
         vlan_mode = "native_untagged" if None in vlans_by_id else "trunk"
-        setup.append(f"ovs-vsctl set port {uplink} vlan_mode={vlan_mode}")
+        setup.append(f"ovs-vsctl set port {uplink} trunks={trunks} vlan_mode={vlan_mode}")
 
     setup.blank()
 

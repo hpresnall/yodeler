@@ -21,7 +21,7 @@ def create_conf(cfg, output_dir):
             if iface["type"] == "uplink":
                 head = True  # let uplink dhcp create resolv.conf but add site content
 
-        if iface["type"] == "std":
+        if iface["type"] in {"std", "vlan"}:
             # possibly search vlan domains
             if iface["vlan"]["domain"]:
                 search_domains.append(iface["vlan"]["domain"])

@@ -231,9 +231,9 @@ def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
         dhrelay6_ifaces = [iface for iface in dhrelay6_ifaces if iface != upper_iface6]
 
         setup.comment("setup dhcrelay6.conf")
-        setup.append("echo 'IFACE=\"" + " ".join(dhrelay6_ifaces) + "\"' >> /etc/conf.d/dhcrelay")
+        setup.append("echo 'IFACE=\"" + " ".join(dhrelay6_ifaces) + "\"' >> /etc/conf.d/dhcrelay6")
         setup.append("echo 'DHCRELAY_SERVERS=\"-u " +
-                     str(dhcp_addresses["ipv6_address"]) + "%" + upper_iface6 + "\"' >> /etc/conf.d/dhcrelay")
+                     str(dhcp_addresses["ipv6_address"]) + "%" + upper_iface6 + "\"' >> /etc/conf.d/dhcrelay6")
         setup.service("dhcrelay6")
         setup.blank()
 
