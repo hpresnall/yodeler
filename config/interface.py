@@ -194,14 +194,14 @@ def _validate_ipaddress(iface, ip_version):
         # gateway provided by router advertisements
 
 
-def find_by_name(cfg: dict, iface_name: str):
+def find_by_name(cfg: dict, iface_name: str) -> dict:
     for iface in cfg["interfaces"]:
         if iface["name"] == iface_name:
             return iface
     raise KeyError(f"cannot find interface config for '{iface_name}'")
 
 
-def find_ips_to_interfaces(cfg: dict, to_match: list[dict], prefer_routable=True, first_match_only=True):
+def find_ips_to_interfaces(cfg: dict, to_match: list[dict], prefer_routable: bool = True, first_match_only: bool = True) -> list[dict]:
     """Find the IP addresses that the host configuration should use to connect to the given set of interfaces.
 
     cfg is a fully configured host and to_match is the list of interfaces from another configured host.
@@ -283,6 +283,36 @@ def _match_iface(iface: dict, to_match: list[dict], prefer_routable=True, first_
         del matches[1:]
 
     return matches
+
+
+def check_accessiblity(to_check: list[dict], vswitches: list[dict], ignore_vlan: callable(dict)=lambda *_: False) -> set[str]:
+    """Check if the the given list of interfaces can reach all the vlans on the given vswitches.
+    Returns an empty set if all vlans or accessible. Otherwise returns a set of vlan names, as strings.
+
+    Optionally accepts an additional check function that can remove a vlan from consideration. This function will be
+    passed a single vlan. If the vlan should be removed, even if it is not accessible by the given interfactions, the
+    function should return 'True'."""
+    # find all the vlans this host can access
+    accessible_vlans = set()
+
+    for iface in to_check:
+        if iface["type"] not in {"std", "vlan"}:
+            continue
+
+        if iface["vlan"]["routable"]:
+            for vlan in iface["vswitch"]["vlans"]:
+                if vlan["routable"]:  # router will make all routable vlans accessible
+                    accessible_vlans.add(vlan["name"])
+        else:  # non-routable vlans must have an interface on the vlan
+            accessible_vlans.add(iface["vlan"]["name"])
+
+    # look for missing vlans
+    for vswitch in vswitches:
+        for vlan in vswitch["vlans"]:
+            if (vlan["name"] in accessible_vlans) or ignore_vlan(vlan):
+                accessible_vlans.remove(vlan["name"])
+
+    return accessible_vlans
 
 
 def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:

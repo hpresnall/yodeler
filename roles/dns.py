@@ -6,6 +6,8 @@ import util.shell
 import util.file
 import util.address
 
+import config.interface as interface
+
 from roles.role import Role
 
 
@@ -35,7 +37,15 @@ class Dns(Role):
         self._cfg["dns_entries_by_vlan"] = {}
 
     def validate(self):
-        pass
+        for iface in self._cfg["interfaces"]:
+            if iface["ipv4_address"] == "dhcp":
+                raise KeyError("cannot configure DNS server with a DHCP ipv4 address")
+
+        accessible_vlans = interface.check_accessiblity(self._cfg["interfaces"],
+                                                        self._cfg["vswitches"].values())
+
+        if accessible_vlans:
+            raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {accessible_vlans}")
 
     def write_config(self, setup, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
@@ -51,9 +61,6 @@ class Dns(Role):
         # if an interface is not defined for a vswitch, its vlans
         #  _will not_ be able to resolve DNS queries unless the router routes DNS queries correctly
         for iface in self._cfg["interfaces"]:
-            if iface["ipv4_address"] == "dhcp":
-                raise KeyError("cannot configure DNS server with a DHCP ipv4 address")
-
             named["listen"].append(str(iface["ipv4_address"]))
             if iface["ipv6_address"] is not None:
                 named["listen6"].append(str(iface["ipv6_address"]))
@@ -91,7 +98,7 @@ def _create_dns_entries(cfg):
     for host_cfg in cfg["hosts"].values():
         for iface in host_cfg["interfaces"]:
             # skip port, vlan and uplink interfaces
-            if iface["type"] not in [ "std", "vlan"] :
+            if iface["type"] not in ["std", "vlan"]:
                 continue
 
             vlan = iface["vlan"]

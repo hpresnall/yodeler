@@ -190,7 +190,7 @@ def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
     upper_iface6 = None
 
     for iface in cfg["interfaces"]:
-        if (iface["type"] != "vlan"):
+        if iface["type"] != "vlan":
             continue
 
         if dhcp_addresses["ipv4_address"] in iface["vlan"]["ipv4_subnet"]:
@@ -198,12 +198,6 @@ def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
         if ((iface["vlan"]["ipv6_subnet"] is not None)
                 and (dhcp_addresses["ipv6_address"] in iface["vlan"]["ipv6_subnet"])):
             upper_iface6 = iface["name"]
-
-    # TODO move setup6 read file to top, then 4 then 6
-    # probably easier to find dhcp server's vlans then compare rather than addresses
-    # if dhcp address is in same vlan as host, then require is still false
-    # only add non routable if dhcp server is on different vlan from the host
-    # for all non routable, error if router does not have an interface with the same vlan
 
     if dhrelay4_ifaces or dhrelay6_ifaces:
         setup.blank()

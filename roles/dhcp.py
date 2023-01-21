@@ -23,7 +23,12 @@ class Dhcp(Role):
         return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-dhcp-ddns", "kea-admin", "kea-ctrl-agent"}
 
     def validate(self):
-        pass
+        accessible_vlans = interface.check_accessiblity(self._cfg["interfaces"],
+                                                        self._cfg["vswitches"].values(),
+                                                        lambda vlan: not vlan["dhcp4_enabled"] and not vlan["ipv6_subnet"])
+
+        if accessible_vlans:
+            raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {accessible_vlans}")
 
     def write_config(self, setup, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
