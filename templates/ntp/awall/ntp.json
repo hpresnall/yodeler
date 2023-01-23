@@ -1,0 +1,10 @@
+{
+  "description": "allow NTP",
+  "filter": [
+    {
+      "in": [],
+      "service": "ntp",
+      "action": "accept"
+    }
+  ]
+}

@@ -120,7 +120,7 @@ def _setup_open_vswitch(cfg, setup):
 
         port = f"{cfg['hostname']}-{iface['vlan']['name']}"
 
-        setup.comment(f"setup switch port for host interface on vswitch {vswitch_name}")
+        setup.comment(f"setup switch port for host interface on vswitch {iface['vswitch']['name']}")
         setup.append(
             f"ovs-vsctl add-port {iface['vswitch']['name']} {port} -- set interface {port} type=internal")
 

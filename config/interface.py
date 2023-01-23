@@ -56,7 +56,7 @@ def validate(cfg):
                 f"invalid primary_domain: no interface's vlan domain matches primary_domain '{cfg['primary_domain']}'")
     else:
         # single interface => set host domain to vlan domain
-        if vlan and (len(ifaces) == 1):
+        if len(ifaces) == 1:
             cfg["primary_domain"] = ifaces[0]["vlan"]["domain"]
         # else leave host domain blank
 
@@ -169,8 +169,8 @@ def validate_iface(iface):
 
 def _validate_ipaddress(iface, ip_version):
     key = ip_version + "_address"
+    value = iface.get(key)
     try:
-        value = iface.get(key)
         iface[key] = address = ipaddress.ip_address(value)
     except Exception as exp:
         raise KeyError(f"invalid {key} '{value}'") from exp

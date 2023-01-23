@@ -23,12 +23,12 @@ class Dhcp(Role):
         return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-dhcp-ddns", "kea-admin", "kea-ctrl-agent"}
 
     def validate(self):
-        accessible_vlans = interface.check_accessiblity(self._cfg["interfaces"],
-                                                        self._cfg["vswitches"].values(),
-                                                        lambda vlan: not vlan["dhcp4_enabled"] and not vlan["ipv6_subnet"])
+        missing_vlans = interface.check_accessiblity(self._cfg["interfaces"],
+                                                     self._cfg["vswitches"].values(),
+                                                     lambda vlan: not vlan["dhcp4_enabled"] and not vlan["ipv6_subnet"])
 
-        if accessible_vlans:
-            raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {accessible_vlans}")
+        if missing_vlans:
+            raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {missing_vlans}")
 
     def write_config(self, setup, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
@@ -45,6 +45,16 @@ class Dhcp(Role):
 
         dhcp4_json = util.file.load_json("templates/kea/kea-dhcp4.conf")
         dhcp4_config = dhcp4_json["Dhcp4"]
+        dhcp4_config["option-data"] = [
+            {
+                "name": "pcode",
+                "data": "{tzposix}"  # will be replaced in setup script
+            },
+            {
+                "name": "tcode",
+                "data": "{tzname}"  # will be replaced in setup script
+            }
+        ]
         dhcp4_config["interfaces-config"]["interfaces"] = ifaces4
 
         dhcp6_json = util.file.load_json("templates/kea/kea-dhcp6.conf")
@@ -53,7 +63,11 @@ class Dhcp(Role):
         dhcp6_config["option-data"] = [
             {
                 "name": "new-posix-timezone",
-                "data": "{timezone}"  # will be replaced in setup script
+                "data": "{tzposix}"  # will be replaced in setup script
+            },
+            {
+                "name": "new-tzdb-timezone",
+                "data": "{tzname}"  # will be replaced in setup script
             }
         ]
 
@@ -62,11 +76,19 @@ class Dhcp(Role):
         subnets_6 = []
 
         dns_server_interfaces = self._cfg["hosts"][self._cfg["roles_to_hostnames"]["dns"][0]]["interfaces"]
+        if "ntp" in self._cfg["roles_to_hostnames"]:
+            ntp_hosts = self._cfg["roles_to_hostnames"]["ntp"][0]
+            ntp_server_interfaces = self._cfg["hosts"][ntp_hosts]["interfaces"]
+        else:
+            ntp_server_interfaces = None
 
         if not self._cfg["domain"]:
             # no top-level domain => no vlans will have domains, so there is no need for DDNS updates
             dhcp4_config["dhcp-ddns", "enable-updates"] = False
             dhcp6_config["dhcp-ddns", "enable-updates"] = False
+
+            ddns_config = {}
+            ddns_dns_addresses = []
         else:
             ddns_json = util.file.load_json("templates/kea/kea-dhcp-ddns.conf")
             ddns_config = ddns_json["DhcpDdns"]
@@ -90,6 +112,15 @@ class Dhcp(Role):
                 dns_addresses = interface.find_ips_from_vlan(vswitch, vlan, dns_server_interfaces)
                 dns4 = [str(match["ipv4_address"]) for match in dns_addresses if match["ipv4_address"]]
                 dns6 = [str(match["ipv6_address"]) for match in dns_addresses if match["ipv6_address"]]
+
+                if ntp_server_interfaces:
+                    # ntp server addresses for this vlan
+                    ntp_addresses = interface.find_ips_from_vlan(vswitch, vlan, ntp_server_interfaces)
+                    ntp4 = [str(match["ipv4_address"]) for match in ntp_addresses if match["ipv4_address"]]
+                    ntp6 = [str(match["ipv6_address"]) for match in ntp_addresses if match["ipv6_address"]]
+                else:
+                    ntp4 = None
+                    ntp6 = None
 
                 domains = []
                 if vlan["domain"]:  # more specific domain first
@@ -118,6 +149,8 @@ class Dhcp(Role):
                         subnet4["option-data"].append({"name": "domain-search", "data": ", ".join(domains)})
                     if vlan["routable"]:
                         subnet4["option-data"].append({"name": "routers", "data": str(ip4_subnet.network_address + 1)}),
+                    if ntp4:
+                        subnet4["option-data"].append({"name": "time-servers", "data":  ", ".join(ntp4)})
                     subnet4["reservations"] = []
                     subnets_4.append(subnet4)
 
@@ -144,6 +177,8 @@ class Dhcp(Role):
                     subnet6["option-data"] = [{"name": "dns-servers", "data":  ", ".join(dns6)}]
                     if domains:
                         subnet6["option-data"].append({"name": "domain-search", "data": ", ".join(domains)})
+                    if ntp6:
+                        subnet6["option-data"].append({"name": "sntp-servers", "data":  ", ".join(ntp6)})
                     if vswitch["name"] in ifaces_by_vswitch:
                         subnet6["interface"] = ifaces_by_vswitch[vswitch["name"]]
                     subnet6["reservations"] = []
@@ -171,13 +206,18 @@ class Dhcp(Role):
             util.file.write("kea-dhcp4.conf", util.file.output_json(dhcp4_json), output_dir)
             setup.service("kea-dhcp4")
             setup.append("rootinstall $DIR/kea-dhcp4.conf /etc/kea")
+            setup.append("tz=$(find /etc/zoneinfo | tail -n 1)")
+            setup.append(
+                "sed -e \"s/{tzposix}/$(tail -n1 $tz)/g\" -e \"s#{tzname}#${tz:14}#g\" -i /etc/kea/kea-dhcp4.conf")
             setup.blank()
         if subnets_6:
             dhcp6_config["subnet6"] = subnets_6
             util.file.write("kea-dhcp6.conf", util.file.output_json(dhcp6_json), output_dir)
             setup.service("kea-dhcp6")
             setup.append("rootinstall $DIR/kea-dhcp6.conf /etc/kea")
-            setup.append("sed -e \"s/{timezone}/$(tail -n1 /etc/localtime)/g\"  -i /etc/kea/kea-dhcp6.conf")
+            setup.append("tz=$(find /etc/zoneinfo | tail -n 1)")
+            setup.append(
+                "sed -e \"s/{tzposix}/$(tail -n1 $tz)/g\" -e \"s#{tzname}#${tz:14}#g\" -i /etc/kea/kea-dhcp6.conf")
             setup.blank()
         if ddns:
             util.file.write("kea-dhcp-ddns.conf", util.file.output_json(ddns_json), output_dir)

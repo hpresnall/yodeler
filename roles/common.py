@@ -12,6 +12,7 @@ import util.resolv
 import util.dhcpcd
 
 from roles.role import Role
+import roles.ntp
 
 
 class Common(Role):
@@ -34,8 +35,8 @@ class Common(Role):
 
     def additional_configuration(self):
         self._cfg["fqdn"] = ""
-        if ("prmary_domain" in self._cfg) and (self._cfg["prmary_domain"]):
-            self._cfg["fqdn"] = self._cfg["hostname"] + '.' + self._cfg["prmary_domain"]
+        if ("primary_domain" in self._cfg) and self._cfg["primary_domain"]:
+            self._cfg["fqdn"] = self._cfg["hostname"] + '.' + self._cfg["primary_domain"]
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -108,7 +109,7 @@ class Common(Role):
 
         util.resolv.create_conf(self._cfg, output_dir)
         util.dhcpcd.create_conf(self._cfg, output_dir)
-        _create_chrony_conf(self._cfg, output_dir)
+        roles.ntp.create_chrony_conf(self._cfg, output_dir)
 
         if self._cfg["is_vm"]:
             util.libvirt.write_vm_xml(self._cfg, output_dir)
@@ -132,25 +133,6 @@ def _setup_repos(cfg, setup):
 def _apk_update(setup):
     setup.append("apk -q update")
     setup.blank()
-
-
-def _create_chrony_conf(cfg, output_dir):
-    buffer = []
-
-    # use local NTP server if there is one defined
-    if "local_ntp" in cfg:
-        server = cfg["local_ntp"]
-        buffer.append(f"server {server} iburst")
-        buffer.append(f"initstepslew 10 {server}")
-    else:
-        for server in cfg["external_ntp"]:
-            buffer.append(f"server {server} iburst")
-        buffer.append("initstepslew 10 {}".format(" ".join(cfg["external_ntp"])))
-
-    buffer.append("driftfile /var/lib/chrony/chrony.drift")
-    buffer.append("rtcsync")
-
-    util.file.write("chrony.conf", "\n".join(buffer), output_dir)
 
 
 _SETUP_METRICS = """echo "Configuring Prometheus"
