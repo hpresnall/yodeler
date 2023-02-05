@@ -66,8 +66,12 @@ def validate(site_yaml: dict) -> dict:
     for key in DEFAULT_CONFIG:
         if key not in site_cfg:
             site_cfg[key] = DEFAULT_CONFIG[key]
-        elif not isinstance(site_cfg[key], bool) and not site_cfg[key]:
-            raise KeyError(f"property '{key}' cannot be None / empty")
+        else:
+            value = site_cfg[key]
+            if type(value) not in (bool, str, list):
+                raise KeyError(f"property '{key}' must be bool, str or list, not {type(value)}")
+            if not isinstance(value, bool) and not value:
+                raise KeyError(f"property '{key}' cannot be None / empty")
 
     vswitch.validate(site_cfg)
 
@@ -83,10 +87,6 @@ def _load_all_hosts(site_cfg: dict):
     """Load and validate all host YAML files for the given site."""
     _logger.debug("loading hosts for site '%s'", site_cfg["site_name"])
 
-    # TODO proper role hierarchy and ordering
-    required_roles = set()  # {"dns", "router"}
-    defined_roles = set()
-
     site_dir = site_cfg["site_dir"]
 
     for host_path in os.listdir(site_dir):
@@ -96,19 +96,7 @@ def _load_all_hosts(site_cfg: dict):
             _logger.debug("skipping file %s", host_path)
             continue
 
-        host_cfg = host.load(site_cfg, os.path.join(site_dir, host_path))
-
-        if host_cfg["is_vm"]:
-            required_roles.add("vmhost")
-
-        for role in host_cfg["roles"]:
-            if (role.name != "common") and (role.name in defined_roles):
-                raise Exception(f"cannot have more than one {role.name} server for site '{site_cfg['site_name']}'")
-            defined_roles.add(role.name)
-
-    for role in required_roles:
-        if role not in defined_roles:
-            raise Exception(f"required role {role} not defined for site '{site_cfg['site_name']}'")
+        host.load(site_cfg, os.path.join(site_dir, host_path))
 
     _logger.debug("loaded %d hosts for site '%s'", len(site_cfg["hosts"]), site_cfg["site_name"])
 
@@ -131,7 +119,7 @@ def _validate_site(site_cfg: dict):
         if role_name == "common":
             hostnames = site_cfg["hosts"].keys()
         else:
-            hostnames = site_cfg["roles_to_hostnames"][role_name]
+            hostnames = site_cfg["roles_to_hostnames"][role_name] if role_name in site_cfg["roles_to_hostnames"] else []
 
         count = len(hostnames)
 

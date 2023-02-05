@@ -92,8 +92,8 @@ class Router(Role):
         # router will use Shorewall instead
         self._cfg["local_firewall"] = False
 
-        self._cfg["aliases"].add("router")
-        self._cfg["aliases"].add("gateway")
+        self.add_alias("router")
+        self.add_alias("gateway")
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -185,22 +185,13 @@ def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
     if not dhcp_addresses:
         raise ValueError("router needs to relay DHCP but cannot find any reachable DHCP servers")
 
+    # assume only one dhcp server
     dhcp_addresses = dhcp_addresses[0]
 
     # dhrelay requires setting the upper interface _and_ ipaddress
     # find the router interface that is in the same subnet as the dhcp server
-    upper_iface4 = None
-    upper_iface6 = None
-
-    for iface in cfg["interfaces"]:
-        if iface["type"] != "vlan":
-            continue
-
-        if dhcp_addresses["ipv4_address"] in iface["vlan"]["ipv4_subnet"]:
-            upper_iface4 = iface["name"]
-        if ((iface["vlan"]["ipv6_subnet"] is not None)
-                and (dhcp_addresses["ipv6_address"] in iface["vlan"]["ipv6_subnet"])):
-            upper_iface6 = iface["name"]
+    upper_iface4 = dhcp_addresses["src_iface"]["name"] if dhcp_addresses["ipv4_address"] else None
+    upper_iface6 = dhcp_addresses["src_iface"]["name"] if dhcp_addresses["ipv6_address"] else None
 
     if dhrelay4_ifaces or dhrelay6_ifaces:
         setup.blank()

@@ -159,6 +159,30 @@ class TestHost(base.TestCfgBase):
         self._host_yaml["roles"] = ["role"]
         self.build_error()
 
+    def test_invalid_role_type(self):
+        self._host_yaml["role"] = {}
+        self.build_error()
+
+    def test_invalid_role_list(self):
+        self._host_yaml["role"] = [ False ]
+        self.build_error()
+
+    def test_invalid_alias_type(self):
+        self._host_yaml["alias"] = {}
+        self.build_error()
+
+    def test_invalid_alias_list(self):
+        self._host_yaml["aliases"] = [ False ]
+        self.build_error()
+
+    def test_invalid_type_default(self):
+        self._host_yaml["is_vm"] = {}
+        self.build_error()
+
+    def test_empty_default(self):
+        self._host_yaml["vcpus"] = []
+        self.build_error()
+
     def test_invalid_external_dns(self):
         self._host_yaml["external_dns"] = ["invalid"]
         self.build_error()

@@ -23,7 +23,7 @@ class Dhcp(Role):
         return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-dhcp-ddns", "kea-admin", "kea-ctrl-agent"}
 
     def additional_configuration(self):
-        self._cfg["aliases"].add("dhcp")
+        self.add_alias("dhcp")
 
     def validate(self):
         missing_vlans = interface.check_accessiblity(self._cfg["interfaces"],
@@ -83,12 +83,9 @@ class Dhcp(Role):
             # even if multiple dns servers are configured, DDNS should only update one; assume first is the primary
             dns_server_interfaces = self._cfg["hosts"][self._cfg["roles_to_hostnames"]["dns"][0]]["interfaces"]
 
+        ntp_servers = []
         if "ntp" in self._cfg["roles_to_hostnames"]:
-            # TODO when multiple hosts are allowed, combine all interfaces
-            ntp_host = self._cfg["roles_to_hostnames"]["ntp"][0]
-            ntp_server_interfaces = self._cfg["hosts"][ntp_host]["interfaces"]
-        else:
-            ntp_server_interfaces = None
+            ntp_servers = [self._cfg["hosts"][server] for server in self._cfg["roles_to_hostnames"]["ntp"]]
 
         if not self._cfg["domain"]:
             # no top-level domain => no vlans will have domains, so there is no need for DDNS updates
@@ -120,23 +117,29 @@ class Dhcp(Role):
                 dns_addresses = interface.find_ips_from_vlan(vswitch, vlan, dns_server_interfaces)
                 dns4 = [str(match["ipv4_address"]) for match in dns_addresses if match["ipv4_address"]]
                 dns6 = [str(match["ipv6_address"]) for match in dns_addresses if match["ipv6_address"]]
+                ntp4 = []
+                ntp6 = []
 
-                if ntp_server_interfaces:
-                    # ntp server addresses for this vlan
-                    ntp_addresses = interface.find_ips_from_vlan(vswitch, vlan, ntp_server_interfaces)
-                    ntp4 = [str(match["ipv4_address"]) for match in ntp_addresses if match["ipv4_address"]]
-                    ntp6 = [str(match["ipv6_address"]) for match in ntp_addresses if match["ipv6_address"]]
+                if ntp_servers:
+                    for server in ntp_servers:
+                        ntp_addresses = interface.find_ips_from_vlan(vswitch, vlan, server["interfaces"])
 
-                    # if dns is available and vlan has a domain, prefer using the time alias for ntp
-                    if vlan["domain"]:
-                        # TODO when there can be multiple ntp servers, use time1, time2, etc
-                        if dns4 and ntp4:
-                            ntp4 = [ "time." + vlan["domain"]]
-                        if dns6 and ntp6:
-                            ntp6 = [ "time." + vlan["domain"]]
-                else:
-                    ntp4 = None
-                    ntp6 = None
+                        for ntp in ntp_addresses:
+                            domain = ntp["dest_iface"]["vlan"]["domain"]
+                            alias = [alias for alias in server["aliases"] if alias.startswith("time")][0]
+
+                            if ntp["ipv4_address"]:
+                                # if dns is available and vlan has a domain, prefer using the time alias for ntp
+                                if dns4 and domain:
+                                    ntp4.append(alias + "." + domain)
+                                else:
+                                    ntp4.append(str(ntp["ipv4_address"]))
+                            if ntp["ipv6_address"]:
+                                # if dns is available and vlan has a domain, prefer using the time alias for ntp
+                                if dns6 and domain:
+                                    ntp6.append(alias + "." + domain)
+                                else:
+                                    ntp6.append(str(ntp["ipv6_address"]))
 
                 domains = []
                 if vlan["domain"]:  # more specific domain first
@@ -179,7 +182,7 @@ class Dhcp(Role):
                     subnet6["pools"] = []
                     if vlan["dhcp6_managed"]:  # no pool if DHCP is only informational
                         subnet6["pools"] = [{"pool": str(ip6_subnet.network_address + vlan["dhcp_min_address_ipv6"]) +
-                                             " - " + str(ip6_subnet.network_address + vlan["dhcp_max_address_ipv6"])}]
+                                            " - " + str(ip6_subnet.network_address + vlan["dhcp_max_address_ipv6"])}]
                     if vlan["domain"]:
                         subnet6["ddns-qualifying-suffix"] = vlan["domain"]
 

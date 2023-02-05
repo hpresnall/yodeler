@@ -145,8 +145,8 @@ def validate_iface(iface):
                     raise KeyError("ipv6_subnet must be set when using static ipv6_address")
                 try:
                     iface["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
-                except:
-                    raise KeyError("invalid ipv6_subnet defined") from None
+                except ValueError as ve:
+                    raise KeyError("invalid ipv6_subnet defined") from ve
 
             _validate_ipaddress(iface, "ipv6")
         else:
@@ -172,8 +172,8 @@ def _validate_ipaddress(iface, ip_version):
     value = iface.get(key)
     try:
         iface[key] = address = ipaddress.ip_address(value)
-    except Exception as exp:
-        raise KeyError(f"invalid {key} '{value}'") from exp
+    except ValueError as ve:
+        raise KeyError(f"invalid {key} '{value}'") from ve
 
     if ip_version + "_subnet" in iface["vlan"]:
         subnet = iface["vlan"].get(ip_version + "_subnet")
@@ -262,7 +262,9 @@ def _match_iface(iface: dict, to_match: list[dict], prefer_routable=True, first_
             # localhost beats all other possible matches
             return [{
                 "ipv4_address": ipaddress.ip_address("127.0.0.1"),
-                "ipv6_address": ipaddress.ip_address("::1")
+                "ipv6_address": ipaddress.ip_address("::1"),
+                "src_iface": iface,
+                "dst_iface": match
             }]
         else:
             ip4 = None if match["ipv4_address"] == "dhcp" else match["ipv4_address"]
@@ -271,7 +273,9 @@ def _match_iface(iface: dict, to_match: list[dict], prefer_routable=True, first_
             if ip4 or ip6:
                 candidates.append({
                     "ipv4_address": ip4,
-                    "ipv6_address": ip6
+                    "ipv6_address": ip6,
+                    "src_iface": iface,
+                    "dest_iface": match
                 })
 
     if prefer_routable:
@@ -285,7 +289,7 @@ def _match_iface(iface: dict, to_match: list[dict], prefer_routable=True, first_
     return matches
 
 
-def check_accessiblity(to_check: list[dict], vswitches: list[dict], ignore_vlan: callable(dict)=lambda *_: False) -> set[str]:
+def check_accessiblity(to_check: list[dict], vswitches: list[dict], ignore_vlan: callable(dict) = lambda *_: False) -> set[str]:
     """Check if the the given list of interfaces can reach all the vlans on the given vswitches.
     Returns an empty set if all vlans or accessible. Otherwise returns a set of vlan names, as strings.
 

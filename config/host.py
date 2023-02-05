@@ -79,6 +79,9 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
     # shallow copy site config; host values overwrite site values
     host_cfg = {**site_cfg, **host_yaml}
 
+    # since site_cfg is shared with host config, all hosts can find other hosts
+    site_cfg["hosts"][host_cfg["hostname"]] = host_cfg
+
     _set_defaults(host_cfg)
 
     _load_roles(host_cfg)
@@ -88,24 +91,18 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
 
     interface.validate(host_cfg)
 
-    # allow both 'alias' and 'aliases'; only store 'aliases'
-    host_cfg["aliases"] = _configure_aliases(host_cfg, "aliases")
-    host_cfg["aliases"] |= _configure_aliases(host_cfg, "alias")
-    host_cfg.pop("alias", None)
+    _configure_aliases(host_cfg)
 
     for role in host_cfg["roles"]:
         role.additional_configuration()
 
-        # TODO handle role aliases when more than 1 host can have the same role
         if role.name != "common":
-            host_cfg["aliases"].add(role.name)
+            role.add_alias(role.name)
 
     # ensure hostname is not duplicated by a role
     host_cfg["aliases"].discard(host_cfg["hostname"])
 
     _configure_packages(site_cfg, host_yaml, host_cfg)
-
-    site_cfg["hosts"][host_cfg["hostname"]] = host_cfg
 
     return host_cfg
 
@@ -160,8 +157,12 @@ def _set_defaults(cfg: dict):
     for key in DEFAULT_CONFIG:
         if key not in cfg:
             cfg[key] = DEFAULT_CONFIG[key]
-        elif not isinstance(cfg[key], bool) and not cfg[key]:
-            raise KeyError(f"property '{key}' cannot be None / empty")
+        else:
+            value = cfg[key]
+            if type(value) not in (bool, int, str, list):
+                raise KeyError(f"property '{key}' must be bool, int, str or list, not {type(value)}")
+            if not isinstance(value, bool) and not value:
+                raise KeyError(f"property '{key}' cannot be None / empty")
 
     # remove from script output if not needed
     if not cfg["install_private_ssh_key"]:
@@ -170,14 +171,27 @@ def _set_defaults(cfg: dict):
     for dns in cfg["external_dns"]:
         try:
             ipaddress.ip_address(dns)
-        except:
-            raise KeyError(f"invalid external_dns IP address {dns}") from None
+        except ValueError as ve:
+            raise KeyError(f"invalid external_dns IP address {dns}") from ve
 
 
 def _load_roles(cfg: dict):
     # list of role names in yaml => list of Role subclass instances
+    role_names = set()
+    for key in {"role", "roles"}:
+        if key not in cfg:
+            continue
+        if isinstance(cfg[key], str):
+            role_names.add(cfg[key])
+        elif isinstance(cfg[key], list):
+            for role in cfg[key]:
+                if not isinstance(role, str):
+                    raise KeyError(f"invalid role '{role}' for host '{cfg['hostname']}'; it must be a string")
+                role_names.add(role)
+        else:
+            raise KeyError(f"{key} must be a str or list, not {type(cfg[key])}")
+
     # Common _must_ be the first so it is configured and setup first
-    role_names = set(cfg["roles"] if cfg.get("roles") is not None else [])
     role_names.discard("common")
     cfg["roles"] = [roles.role.load("common", cfg)]
 
@@ -237,21 +251,27 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
         _logger.debug("removing packages %s", host_cfg["remove_packages"])
 
 
-def _configure_aliases(cfg: dict, key: str) -> set[str]:
-    if key not in cfg:
-        return set()
+def _configure_aliases(cfg: dict):
+    aliases = set()
 
-    if isinstance(cfg[key], str):
-        return {cfg[key]}
-    elif isinstance(cfg[key], list):
-        aliases = set()
-        for alias in cfg[key]:
-            if not isinstance(alias, str):
-                raise KeyError(f"invalid alias '{alias}' for host '{cfg['hostname']}'; it must be a string")
-            aliases.add(alias)
-        return aliases
-    else:
-        raise KeyError(f"invalid alias '{key}' for host '{cfg['hostname']}'; it must be a string or an array")
+    # allow both 'alias' and 'aliases'; only store 'aliases'
+    for key in {"alias", "aliases"}:
+        if key not in cfg:
+            continue
+
+        if isinstance(cfg[key], str):
+            aliases.add(cfg[key])
+        elif isinstance(cfg[key], list):
+            for alias in cfg[key]:
+                if not isinstance(alias, str):
+                    raise KeyError(f"invalid alias '{alias}' for host '{cfg['hostname']}'; it must be a string")
+                aliases.add(alias)
+        else:
+            raise KeyError(f"invalid alias '{key}' for host '{cfg['hostname']}'; it must be a string or an array")
+
+    cfg.pop("alias", None)
+
+    cfg["aliases"] = aliases
 
 
 def _bootstrap_physical(cfg: dict, output_dir: str):

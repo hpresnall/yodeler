@@ -2,4 +2,5 @@ memory_mb: 256
 uplink:
   ipv4_address: dhcp
   macvtap: eth0
-roles: [router]
+roles: [router, test]
+aliases: ["firewall"]

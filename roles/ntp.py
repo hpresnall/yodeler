@@ -22,9 +22,9 @@ class NTP(Role):
         return set()  # create_chrony_conf() already called in common
 
     def additional_configuration(self):
-        self._cfg["aliases"].add("time")
-        self._cfg["aliases"].add("ntp")
-        self._cfg["aliases"].add("sntp")
+        self.add_alias("time")
+        self.add_alias("ntp")
+        self.add_alias("sntp")
 
     def validate(self):
         missing_vlans = interface.check_accessiblity(self._cfg["interfaces"],

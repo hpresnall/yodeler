@@ -54,6 +54,25 @@ class Role(ABC):
         Create the configuration files that implement this role.
         """
 
+    def add_alias(self, alias: str):
+        """Add an alias to the host.
+
+        The alias will be numbered if other hosts in the site have the same role"""
+        self._cfg["aliases"].add(alias)
+
+        # assume this is called _after_ _load_roles() and will not raise KeyError
+        existing_hosts = self._cfg["roles_to_hostnames"][self.name]
+
+        # only instance of the role, do not rename
+        if len(existing_hosts) == 1:
+            return
+
+        # rename all aliases by renumbering
+        for i, host in enumerate(existing_hosts, start=1):
+            aliases = self._cfg["hosts"][host]["aliases"]
+            aliases.discard(alias)
+            aliases.add(alias + str(i))
+
 
 # cache loaded Role subclasses
 _role_class_by_name = {}
@@ -66,15 +85,15 @@ def load(role_name: str, host_cfg: dict) -> Role:
     # instantiate the class
     try:
         return clazz(host_cfg)
-    except TypeError:
-        raise KeyError(f"cannot instantiate class '{clazz}'")
+    except TypeError as te:
+        raise KeyError(f"cannot instantiate class '{clazz}'") from te
 
 
 def _load_role_class(role_name: str):
     try:
         mod = importlib.import_module("roles." + role_name)
-    except ModuleNotFoundError:
-        raise KeyError(f"cannot load module for role '{role_name}' from the roles package")
+    except ModuleNotFoundError as mnfe:
+        raise KeyError(f"cannot load module for role '{role_name}' from the roles package") from mnfe
 
     # find class for role; assume only 1 class in each module
     role_class = None

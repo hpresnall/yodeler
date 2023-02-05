@@ -11,3 +11,4 @@ interfaces:
   - ipv4_address: 192.168.2.5
     vswitch: private
     firewall_zone: PRIV
+role: test

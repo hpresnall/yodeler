@@ -98,8 +98,8 @@ def _validate_vlan_subnet(vswitch_name, vlan, ip_version):
 
     try:
         vlan[ip_version + "_subnet"] = subnet = ipaddress.ip_network(subnet)
-    except Exception as exp:
-        raise KeyError(f"invalid {ip_version}_subnet for vlan '{vlan_name}' in vswitch '{vswitch_name}'") from exp
+    except ValueError as ve:
+        raise KeyError(f"invalid {ip_version}_subnet for vlan '{vlan_name}' in vswitch '{vswitch_name}'") from ve
 
     # default to DHCP range over all addresses except the router
     min_key = "dhcp_min_address_" + ip_version
@@ -180,9 +180,9 @@ def _validate_ip_address(ip_version, index, vlan, vswitch_name):
 
     try:
         address = ipaddress.ip_address(vlan["dhcp_reservations"][index][key])
-    except Exception as exp:
+    except ValueError as ve:
         raise KeyError(
-            f"invalid {ip_version}_address for host {index} in vlan '{vlan['name']}' for vswitch '{vswitch_name}'") from exp
+            f"invalid {ip_version}_address for host {index} in vlan '{vlan['name']}' for vswitch '{vswitch_name}'") from ve
 
     if (ip_version == "ipv6") and (vlan["ipv6_subnet"] is None):
         _logger.warning("ipv6_address %s for host %s in vlan '%s' with no ipv6_subnet in vswitch '%s' will be ignored",
@@ -241,9 +241,9 @@ def _validate_access_vlans(vswitch):
             try:
                 access = lookup(vlan_id, vswitch)
                 vlan["access_vlans"].append(access["name"])
-            except KeyError as err:
-                msg = err.args[0]
-                raise KeyError(f"access_vlan {msg}") from err
+            except KeyError as ke:
+                msg = ke.args[0]
+                raise KeyError(f"access_vlan {msg}") from ke
 
 
 def lookup(vlan_id, vswitch):

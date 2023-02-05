@@ -1,9 +1,10 @@
 hostname: client
 motd: client
-packages: [ "both_need", "server_needs" ]
-remove_packages: ["both_remove", "site_needs" ]
+packages: ["both_need", "server_needs"]
+remove_packages: ["both_remove", "site_needs"]
 interfaces:
   - ipv4_address: dhcp
     vswitch: public
     firewall_zone: PUB
     vlan: 10
+alias: laptop

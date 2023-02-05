@@ -58,8 +58,8 @@ class VmHost(Role):
         # do not support nested vms
         self._cfg["is_vm"] = False
 
-        self._cfg["aliases"].add("vmhost")
-        self._cfg["aliases"].add("kvm")
+        self.add_alias("vmhost")
+        self.add_alias("kvm")
 
     def validate(self):
         pass
