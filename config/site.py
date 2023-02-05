@@ -6,6 +6,7 @@ import os
 import copy
 
 import util.file as file
+import util.parse as parse
 
 import config.vswitch as vswitch
 import config.host as host
@@ -49,29 +50,13 @@ def validate(site_yaml: dict) -> dict:
     This configuration _is not_ valid for creating a set of scripts for a specific host.
     Instead, this configuration must be used as the base for loading host YAML files.
     """
-    if site_yaml is None:
-        raise ValueError("empty site config")
-    if not isinstance(site_yaml, dict):
-        raise ValueError("site config must be a dictionary")
+    parse.non_empty_dict("site_yaml", site_yaml)
 
-    if "site_name" not in site_yaml:
-        raise KeyError("site_name cannot be empty")
-    if not isinstance(site_yaml["site_name"], str):
-        raise KeyError("site_name must be a string")
-    if not site_yaml["site_name"]:
-        raise KeyError("site_name cannot be empty")
+    parse.non_empty_string("site_name", site_yaml, "site_yaml")
 
     site_cfg = copy.deepcopy(site_yaml)
 
-    for key in DEFAULT_CONFIG:
-        if key not in site_cfg:
-            site_cfg[key] = DEFAULT_CONFIG[key]
-        else:
-            value = site_cfg[key]
-            if type(value) not in (bool, str, list):
-                raise KeyError(f"property '{key}' must be bool, str or list, not {type(value)}")
-            if not isinstance(value, bool) and not value:
-                raise KeyError(f"property '{key}' cannot be None / empty")
+    host.validate_site_defaults(site_cfg)
 
     vswitch.validate(site_cfg)
 
@@ -148,19 +133,3 @@ def _validate_site(site_cfg: dict):
 
         for role in host_cfg["roles"]:
             role.validate()
-
-
-# accessible for testing
-DEFAULT_CONFIG = {
-    "timezone": "UTC",
-    "keymap": "us us",
-    "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
-    "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
-    "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
-    "metrics": True,
-    # top-level domain for the site; empty => no local DNS
-    "domain": "",
-    # if not specified, no SSH access will be possible!
-    "user": "nonroot",
-    "password": "apassword",
-}

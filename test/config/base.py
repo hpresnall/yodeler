@@ -50,5 +50,5 @@ class TestCfgBase(unittest.TestCase):
 
     def build_error(self):
         """Build the current configuration, assuming it will error."""
-        with self.assertRaises(KeyError):
+        with self.assertRaises((KeyError, ValueError)):
             self.build_cfg()

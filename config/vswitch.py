@@ -3,16 +3,13 @@ import logging
 
 import config.vlan as vlan
 
+import util.parse as parse
+
 
 def validate(cfg: dict):
     """Validate all the vswitches defined in the site configuration."""
     vswitches = cfg.get("vswitches")
-    if vswitches is None:
-        raise KeyError("no vswitches defined")
-    if not isinstance(vswitches, list):
-        raise KeyError("vswitches must be an array")
-    if len(vswitches) == 0:
-        raise KeyError("vswitches cannot be empty")
+    parse.non_empty_list("vswitches", vswitches)
 
     # list of vswitches in yaml => dict of names to vswitches
     vswitches_by_name = cfg["vswitches"] = {}
@@ -20,35 +17,22 @@ def validate(cfg: dict):
     uplinks = set()
 
     for i, vswitch in enumerate(vswitches, start=1):
-        if not isinstance(vswitch, dict):
-            raise KeyError(f"vswitch {i} must be an object")
+        parse.non_empty_dict("vswitch " + str(i), vswitch)
 
         # name is required and must be unique
-        if ("name" not in vswitch) or (not vswitch["name"]):
-            raise KeyError(f"no name defined for vswitch {i}")
-
-        vswitch_name = vswitch["name"]
+        vswitch_name = parse.non_empty_string("name", vswitch, "vswitch" + str(i))
 
         if vswitches_by_name.get(vswitch_name) is not None:
             raise KeyError(f"duplicate name {vswitch_name} defined for vswitch {i}")
         vswitches_by_name[vswitch_name] = vswitch
 
-        uplink = vswitch.get("uplink")
+        vswitch_uplinks = parse.read_string_list("uplink", vswitch, f"vswitch {i}: '{vswitch_name}'")
 
-        if uplink is not None:
-            if isinstance(uplink, str):
-                if uplink in uplinks:
-                    raise KeyError(f"uplink '{uplink}' reused for vswitch {i}: '{vswitch_name}'")
-                uplinks.add(uplink)
-            elif isinstance(uplink, list):
-                for link in uplink:
-                    if link in uplinks:
-                        # an uplink interface can only be set for a single vswitch
-                        raise KeyError(f"uplink '{link}' reused for vswitch {i}: '{vswitch_name}'")
-                uplinks |= set(uplink)
-            else:
-                raise KeyError(f"uplink {uplink} not a string or list for vswitch {i}: '{vswitch_name}'")
-        else:
-            vswitch["uplink"] = None
+        for uplink in vswitch_uplinks:
+            if uplink in uplinks:
+                raise KeyError(f"uplink '{uplink}' reused for vswitch {i}: '{vswitch_name}'")
+            uplinks.add(uplink)
+
+        vswitch["uplink"] = vswitch_uplinks if vswitch_uplinks else None
 
         vlan.validate(cfg["domain"], vswitch, all_vlans)

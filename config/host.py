@@ -6,6 +6,7 @@ import sys
 
 import util.file as file
 import util.shell as shell
+import util.parse as parse
 
 import config.interface as interface
 
@@ -49,29 +50,13 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
     Returns a configuration file that is a combination of the site and host configuration.
     This merged configuration is valid for creating a set of scripts for a specific host.
     """
-    if site_cfg is None:
-        raise ValueError("empty site config")
-    if not isinstance(site_cfg, dict):
-        raise ValueError("site config must be a dictionary")
-    if len(site_cfg) == 0:
-        raise ValueError("empty site config")
+    parse.non_empty_dict("site_cfg", site_cfg)
+    parse.non_empty_dict("host_yaml", host_yaml)
 
-    if host_yaml is None:
-        raise ValueError("empty host config")
-    if not isinstance(host_yaml, dict):
-        raise ValueError("host config must be a dictionary")
-    if len(host_yaml) == 0:
-        raise ValueError("empty host config")
+    hostname = parse.non_empty_string("hostname", host_yaml, "host_yaml")
 
-    if "hostname" not in host_yaml:
-        raise KeyError("hostname cannot be empty")
-    if not isinstance(host_yaml["hostname"], str):
-        raise KeyError("hostname must be a string")
-    if not host_yaml["hostname"]:
-        raise KeyError("hostname cannot be empty")
-
-    if host_yaml["hostname"] in site_cfg["hosts"]:
-        raise ValueError("duplicate hostname '{host_yaml['hostname'")
+    if hostname in site_cfg["hosts"]:
+        raise ValueError(f"duplicate hostname '{host_yaml['hostname']}'")
 
     # silently ignore attempts to overwrite site config
     host_yaml.pop("vswitches", None)
@@ -80,7 +65,7 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
     host_cfg = {**site_cfg, **host_yaml}
 
     # since site_cfg is shared with host config, all hosts can find other hosts
-    site_cfg["hosts"][host_cfg["hostname"]] = host_cfg
+    site_cfg["hosts"][hostname] = host_cfg
 
     _set_defaults(host_cfg)
 
@@ -149,47 +134,45 @@ def write_scripts(host_cfg: dict, output_dir: str):
     _preview_dir(host_dir)
 
 
-def _set_defaults(cfg: dict):
-    for key in _REQUIRED_PROPERTIES:
-        if key not in cfg:
-            raise KeyError("{0} not defined".format(key))
+def validate_site_defaults(site_cfg: dict):
+    # ensure overridden default values are the correct type and arrays only contain strings
+    parse.configure_defaults("site_yaml", DEFAULT_SITE_CONFIG, _DEFAULT_SITE_CONFIG_TYPES, site_cfg)
 
-    for key in DEFAULT_CONFIG:
-        if key not in cfg:
-            cfg[key] = DEFAULT_CONFIG[key]
-        else:
-            value = cfg[key]
-            if type(value) not in (bool, int, str, list):
-                raise KeyError(f"property '{key}' must be bool, int, str or list, not {type(value)}")
-            if not isinstance(value, bool) and not value:
-                raise KeyError(f"property '{key}' cannot be None / empty")
+    for array in ("alpine_repositories", "external_ntp", "external_dns"):
+        site_cfg[array] = parse.read_string_list(array, site_cfg, array + " for " + site_cfg["site_name"])
 
-    # remove from script output if not needed
-    if not cfg["install_private_ssh_key"]:
-        cfg["private_ssh_key"] = ""
-
-    for dns in cfg["external_dns"]:
+    for dns in site_cfg["external_dns"]:
         try:
             ipaddress.ip_address(dns)
         except ValueError as ve:
             raise KeyError(f"invalid external_dns IP address {dns}") from ve
 
 
+def _set_defaults(cfg: dict):
+    for i, key in enumerate(_REQUIRED_PROPERTIES):
+        if key not in cfg:
+            raise KeyError("{0} not defined".format(key))
+
+        value = cfg[key]
+        kind = _REQUIRED_PROPERTIES_TYPES[i]
+
+        if not isinstance(value, kind):
+            raise KeyError(f"{key} value '{value}' in '{cfg['hostname']}' is {type(value)} not {kind}")
+
+    parse.configure_defaults(cfg["hostname"], DEFAULT_CONFIG, _DEFAULT_CONFIG_TYPES, cfg)
+
+    # remove from script output if not needed
+    if not cfg["install_private_ssh_key"]:
+        cfg["private_ssh_key"] = ""
+
+    validate_site_defaults(cfg)
+
+
 def _load_roles(cfg: dict):
     # list of role names in yaml => list of Role subclass instances
     role_names = set()
     for key in {"role", "roles"}:
-        if key not in cfg:
-            continue
-        if isinstance(cfg[key], str):
-            role_names.add(cfg[key])
-        elif isinstance(cfg[key], list):
-            for role in cfg[key]:
-                if not isinstance(role, str):
-                    raise KeyError(f"invalid role '{role}' for host '{cfg['hostname']}'; it must be a string")
-                role_names.add(role)
-        else:
-            raise KeyError(f"{key} must be a str or list, not {type(cfg[key])}")
+        role_names.update(parse.read_string_list(key, cfg, key + " for " + cfg["hostname"]))
 
     # Common _must_ be the first so it is configured and setup first
     role_names.discard("common")
@@ -253,22 +236,10 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
 
 def _configure_aliases(cfg: dict):
     aliases = set()
+    for key in {"alias", "aliases"}:
+        aliases.update(parse.read_string_list(key, cfg, key + " for " + cfg["hostname"]))
 
     # allow both 'alias' and 'aliases'; only store 'aliases'
-    for key in {"alias", "aliases"}:
-        if key not in cfg:
-            continue
-
-        if isinstance(cfg[key], str):
-            aliases.add(cfg[key])
-        elif isinstance(cfg[key], list):
-            for alias in cfg[key]:
-                if not isinstance(alias, str):
-                    raise KeyError(f"invalid alias '{alias}' for host '{cfg['hostname']}'; it must be a string")
-                aliases.add(alias)
-        else:
-            raise KeyError(f"invalid alias '{key}' for host '{cfg['hostname']}'; it must be a string or an array")
-
     cfg.pop("alias", None)
 
     cfg["aliases"] = aliases
@@ -337,6 +308,35 @@ def _preview_dir(output_dir: str, line_count: int = sys.maxsize):
 
 # properties that are unique and cannot be set as defaults
 _REQUIRED_PROPERTIES = ["site_name", "public_ssh_key"]
+_REQUIRED_PROPERTIES_TYPES = [str, str]
+
+# site-level properties defined here since they should be checked when loading the site YAML _and_ for each host YAML
+# accessible for testing
+DEFAULT_SITE_CONFIG = {
+    "timezone": "UTC",
+    "keymap": "us us",
+    "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
+    "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
+    "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
+    "metrics": True,
+    # top-level domain for the site; empty => no local DNS
+    "domain": "",
+    # if not specified, no SSH access will be possible!
+    "user": "nonroot",
+    "password": "apassword",
+}
+
+_DEFAULT_SITE_CONFIG_TYPES = {
+    "timezone": str,
+    "keymap": str,
+    "alpine_repositories": list,
+    "external_ntp": list,
+    "external_dns": list,
+    "metrics": bool,
+    "domain": str,
+    "user": str,
+    "password": str,
+}
 
 # accessible for testing
 DEFAULT_CONFIG = {
@@ -358,4 +358,20 @@ DEFAULT_CONFIG = {
     # for physical servers, manually specify contents of /etc/network/interfaces
     # default blank => installer will prompt
     "install_interfaces": ""
+}
+
+_DEFAULT_CONFIG_TYPES = {
+    "is_vm": bool,
+    "vcpus": int,
+    "memory_mb": int,
+    "disk_size_mb": int,
+    "image_format": str,
+    "vm_images_path": str,
+    "root_dev": str,
+    "root_partition": str,  # default disk layout puts /root on /dev/sda3
+    "local_firewall": bool,
+    "motd": str,
+    "install_private_ssh_key": bool,
+    "primary_domain": str,
+    "install_interfaces": str
 }

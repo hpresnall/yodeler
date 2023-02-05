@@ -290,8 +290,8 @@ class TestVlan(base.TestCfgBase):
 
     def test_vlan_dhcpres_nonlist_aliases(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
-            {"hostname": "pub_test", "ipv4_address": "192.168.1.5", "mac_address": "00:11:22:33:44:55", "aliases": "invalid"}]
-        self.build_error()
+            {"hostname": "pub_test", "ipv4_address": "192.168.1.5", "mac_address": "00:11:22:33:44:55", "aliases": "single_string"}]
+        self.build_cfg()
 
     def test_vlan_dhcpres_nonstring_alias(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [

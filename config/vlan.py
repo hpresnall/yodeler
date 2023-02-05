@@ -3,6 +3,8 @@ import logging
 import ipaddress
 import re
 
+import util.parse as parse
+
 _logger = logging.getLogger(__name__)
 
 
@@ -11,24 +13,18 @@ def validate(domain: str, vswitch, other_vswitch_vlans: set):
     vswitch_name = vswitch["name"]
 
     vlans = vswitch.get("vlans")
-    if vlans is None:
-        raise KeyError(f"no vlans defined for vswitch '{vswitch_name}'")
-    if not isinstance(vlans, list):
-        raise KeyError(f"vlans must be an array for vswitch '{vswitch_name}'")
+    parse.non_empty_list("vlans", vlans)
 
     # list of vlans in yaml => dicts of names & ids to vswitches
     vlans_by_id = vswitch["vlans_by_id"] = {}
     vlans_by_name = vswitch["vlans_by_name"] = {}
 
     for i, vlan in enumerate(vlans, start=1):
-        if not isinstance(vlan, dict):
-            raise KeyError(f"vlan {i} must be an object for vswitch '{vswitch_name}'")
+        parse.non_empty_dict("vlan " + str(i), vlan)
 
         # name is required and must be unique
-        if not vlan.get("name") or (not vlan["name"]):
-            raise KeyError(f"no name for vlan {i} in vswitch '{vswitch_name}'")
+        vlan_name = parse.non_empty_string("name", vlan, "vlan" + str(i))
 
-        vlan_name = vlan["name"]
         if vlan_name in vlans_by_name:
             raise KeyError(f"duplicate name '{vlan_name}' for vlan in vswitch '{vswitch_name}'")
         if vlan_name in other_vswitch_vlans:
@@ -133,8 +129,7 @@ def _validate_vlan_dhcp_reservations(vswitch_name, vlan):
         return
 
     for i, res in enumerate(reservations, start=1):
-        if not isinstance(res, dict):
-            raise KeyError(f"reservation {i} must be an object in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
+        parse.non_empty_dict("reservation " + str(i), vlan)
 
         # hostname & mac address required; ip addresses are not
         if "hostname" not in res:
@@ -158,17 +153,8 @@ def _validate_vlan_dhcp_reservations(vswitch_name, vlan):
             raise KeyError(
                 f"no mac_address for reservation '{res['hostname']}' in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
 
-        if "aliases" in res:
-            aliases = res["aliases"]
-            if not isinstance(aliases, list):
-                raise KeyError(
-                    f"invalid aliases for reservation {i}; it must be an array in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
-            for alias in res["aliases"]:
-                if not isinstance(alias, str):
-                    raise KeyError(
-                        f"invalid alias '{alias}' for reservation {i}; it must be a string in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
-        else:
-            res["aliases"] = []
+        res["aliases"] = parse.read_string_list(
+            "aliases", res, f"reservation {i} in vlan '{vlan['name']}' for vswitch '{vswitch_name}'")
 
 
 def _validate_ip_address(ip_version, index, vlan, vswitch_name):
@@ -222,14 +208,9 @@ def _configure_default_vlan(vswitch):
 def _validate_access_vlans(vswitch):
     for vlan in vswitch["vlans"]:
         vlan_name = vlan["name"]
-        access_vlans = vlan["access_vlans"]
 
-        if not isinstance(access_vlans, list):
-            if isinstance(access_vlans, str):
-                access_vlans = [access_vlans]
-            else:
-                raise KeyError(f"non-array access_vlans in vlan '{vlan_name}' for vswitch '{vswitch['name']}'")
-
+        access_vlans = parse.read_string_list(
+            "access_vlans", vlan, "access_vlan for " + vlan_name)
         vlan["access_vlans"] = []
 
         # set() to make unique

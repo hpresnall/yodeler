@@ -4,19 +4,15 @@ import ipaddress
 
 import config.vlan
 
+import util.parse as parse
+
 _logger = logging.getLogger(__name__)
 
 
 def validate(cfg):
     """Validate all the interfaces defined in the host."""
     ifaces = cfg.get("interfaces")
-
-    if ifaces is None:
-        raise KeyError(f"no interfaces defined for host '{cfg['hostname']}'")
-    if not isinstance(ifaces, list):
-        raise KeyError(f"interfaces must be an array for host '{cfg['hostname']}'")
-    if len(ifaces) == 0:
-        raise KeyError(f"interfaces cannot be empty for host '{cfg['hostname']}'")
+    parse.non_empty_list("interfaces", ifaces)
 
     vswitches = cfg["vswitches"]
 
@@ -25,8 +21,7 @@ def validate(cfg):
     iface_counter = 0
 
     for i, iface in enumerate(ifaces):
-        if not isinstance(iface, dict):
-            raise KeyError(f"iface {i} must be an object for host '{cfg['hostname']}'")
+        parse.non_empty_dict("iface " + str(i), iface)
 
         if "name" not in iface:
             iface["name"] = f"eth{iface_counter}"
