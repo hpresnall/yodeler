@@ -37,8 +37,7 @@ def interface_from_config(hostname, iface):
     vlan_name = iface["vlan"]["name"]
     interface = xml.Element("interface")
     interface.attrib["type"] = "network"
-    xml.SubElement(interface, "source",
-                   {"network": iface["vswitch"]["name"], "portgroup": vlan_name})
+    xml.SubElement(interface, "source", {"network": iface["vswitch"]["name"], "portgroup": vlan_name})
     xml.SubElement(interface, "target", {"dev": f"{hostname}-{vlan_name}"})
     xml.SubElement(interface, "model", {"type": "virtio"})
 
@@ -56,8 +55,7 @@ def macvtap_interface(cfg, iface_name):
     """
     for vswitch in cfg["vswitches"].values():
         if "uplink" in vswitch and vswitch["uplink"] == iface_name:
-            raise KeyError((f"invalid router uplink; "
-                            f"cannot reuse uplink {iface_name} from vswitch {vswitch['name']}"))
+            raise KeyError((f"invalid router uplink; cannot reuse uplink {iface_name} from vswitch {vswitch['name']}"))
 
     interface = xml.Element("interface")
     interface.attrib["type"] = "direct"
@@ -103,3 +101,59 @@ def update_interfaces(hostname, new_interfaces, output_dir):
 
     xml.indent(template, space="  ")
     template.write(file_name)
+
+
+def create_network(vswitch, output_dir):
+    """Create a libvirt XML file for the given vswitch and write it to <vswitch[name]>.xml.
+
+    Creates a portgroup for each vlan. For every routable vlan, adds that vlan to a 'router' portgroup that creates a
+    trunk port on the vswitch that can be used by a router as an uplink.
+    """
+    vswitch_name = vswitch["name"]
+
+    template = xml.parse("templates/vm/network.xml")
+    net = template.getroot()
+
+    net.find("name").text = vswitch_name
+    net.find("bridge").attrib["name"] = vswitch_name
+
+    # create a portgroup for the router that trunks all the routable vlans
+    router_portgroup = xml.SubElement(net, "portgroup")
+    router_portgroup.attrib["name"] = "router"
+    router = xml.SubElement(router_portgroup, "vlan")
+    router.attrib["trunk"] = "yes"
+    routable = False
+
+    # create a portgroup for each vlan
+    for vlan in vswitch["vlans"]:
+        portgroup = xml.SubElement(net, "portgroup")
+        portgroup.attrib["name"] = vlan["name"]
+        vlan_id = vlan["id"]
+
+        if vlan["default"]:
+            portgroup.attrib["default"] = "yes"
+
+        if vlan_id is not None:
+            vlan_xml = xml.SubElement(portgroup, "vlan")
+            tag = xml.SubElement(vlan_xml, "tag")
+            tag.attrib["id"] = str(vlan_id)
+
+        # add to router portgroup
+        if vlan["routable"]:
+            routable = True
+            tag = xml.SubElement(router, "tag")
+
+            if vlan_id is None:
+                tag.attrib["id"] = "0"  # id required; use 0 for untagged
+                tag.attrib["nativeMode"] = "untagged"
+            else:
+                tag.attrib["id"] = str(vlan_id)
+
+    # no routable vlans on the vswitch, remove the router portgroup
+    if not routable:
+        net.remove(router_portgroup)
+
+    # save the file and add the virsh commands to the script
+    network_xml = vswitch_name + ".xml"
+    xml.indent(template, space="  ")
+    template.write(os.path.join(output_dir, network_xml))

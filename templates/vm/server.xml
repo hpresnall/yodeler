@@ -1,7 +1,7 @@
 <domain type="kvm" >
   <name></name>
-  <memory unit="MiB">256</memory>
-  <vcpu>1</vcpu>
+  <memory unit="MiB"></memory>
+  <vcpu></vcpu>
   <os>
     <type arch="x86_64" machine="q35">hvm</type>
   </os>

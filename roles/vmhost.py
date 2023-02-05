@@ -1,12 +1,11 @@
 """Configuration & setup for the main KVM & Openvswitch Alpine host."""
-import os.path
-
-import xml.etree.ElementTree as xml
 
 from roles.role import Role
 
 import config.interface as interface
 import config.vlan as vlan
+
+import util.libvirt as libvirt
 
 
 class VmHost(Role):
@@ -178,56 +177,9 @@ def _setup_libvirt(cfg, setup, output_dir):
 
     # for each vswitch, create an XML network definition
     for vswitch in cfg["vswitches"].values():
-        name = vswitch["name"]
+        libvirt.create_network(vswitch, output_dir)
 
-        template = xml.parse("templates/vm/network.xml")
-        net = template.getroot()
-
-        net.find("name").text = name
-        net.find("bridge").attrib["name"] = name
-
-        # create a portgroup for the router that trunks all the routable vlans
-        router_portgroup = xml.SubElement(net, "portgroup")
-        router_portgroup.attrib["name"] = "router"
-        router = xml.SubElement(router_portgroup, "vlan")
-        router.attrib["trunk"] = "yes"
-        routable = False
-
-        # create a portgroup for each vlan
-        for vlan in vswitch["vlans"]:
-            portgroup = xml.SubElement(net, "portgroup")
-            portgroup.attrib["name"] = vlan["name"]
-            vlan_id = vlan["id"]
-
-            if vlan["default"]:
-                portgroup.attrib["default"] = "yes"
-
-            if vlan_id is not None:
-                vlan_xml = xml.SubElement(portgroup, "vlan")
-                tag = xml.SubElement(vlan_xml, "tag")
-                tag.attrib["id"] = str(vlan_id)
-
-            # add to router portgroup
-            if vlan["routable"]:
-                routable = True
-                tag = xml.SubElement(router, "tag")
-
-                if vlan_id is None:
-                    tag.attrib["id"] = "0"  # id required; use 0 for untagged
-                    tag.attrib["nativeMode"] = "untagged"
-                else:
-                    tag.attrib["id"] = str(vlan_id)
-
-        # no routable vlans on the vswitch, remove the router portgroup
-        if not routable:
-            net.remove(router_portgroup)
-
-        # save the file and add the virsh commands to the script
-        network_xml = name + ".xml"
-        xml.indent(template, space="  ")
-        template.write(os.path.join(output_dir, network_xml))
-
-        setup.append(f"virsh net-define $DIR/{network_xml}")
-        setup.append(f"virsh net-start {name}")
-        setup.append(f"virsh net-autostart {name}")
+        setup.append(f"virsh net-define $DIR/{vswitch['name']}.xml")
+        setup.append(f"virsh net-start {vswitch['name']}")
+        setup.append(f"virsh net-autostart {vswitch['name']}")
         setup.blank()
