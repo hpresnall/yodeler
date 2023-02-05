@@ -21,9 +21,10 @@ class NTP(Role):
     def additional_packages(self):
         return set()  # create_chrony_conf() already called in common
 
-    @staticmethod
-    def maximum_instances(site_cfg: dict) -> int:
-        return 1
+    def additional_configuration(self):
+        self._cfg["aliases"].add("time")
+        self._cfg["aliases"].add("ntp")
+        self._cfg["aliases"].add("sntp")
 
     def validate(self):
         missing_vlans = interface.check_accessiblity(self._cfg["interfaces"],
@@ -47,21 +48,33 @@ def create_chrony_conf(cfg, output_dir):
     else:
         ntp_addresses = []
         ntp_fqdn = None
+        # external_ntp will always be defined so chrony.conf will always be valid
+
+    # do not run initstepslew at boot
+    # for the router since dns will not be up
+    # for vmhost since dns and the router will not be up
+    at_boot = True
+    for role in cfg["roles"]:
+        if role.name in {"router", "vmhost"}:
+            at_boot = False
+            break
 
     # if this is the ntp server, use the external addresses
     if ntp_addresses and (str(ntp_addresses[0]["ipv4_address"]) != "127.0.0.1"):
-        for ntp in ntp_addresses:
-            buffer.append(_pool_or_server(_find_address(ntp)))
+        for ntp_address in ntp_addresses:
+            buffer.append(_pool_or_server(_find_address(ntp_address)))
 
         # just use the first address for boot setup
-        buffer.append("")
-        buffer.append(f"initstepslew 10 " + _find_address(ntp_addresses[0]))
+        if at_boot:
+            buffer.append("")
+            buffer.append(f"initstepslew 10 " + _find_address(ntp_addresses[0]))
     else:
         for server in cfg["external_ntp"]:
             buffer.append(_pool_or_server(server))
 
-        buffer.append("")
-        buffer.append(f"initstepslew 10 {cfg['external_ntp'][0]}")
+        if at_boot:
+            buffer.append("")
+            buffer.append(f"initstepslew 10 {cfg['external_ntp'][0]}")
 
     buffer.append("")
     buffer.append("driftfile /var/lib/chrony/chrony.drift")
@@ -83,12 +96,14 @@ def _pool_or_server(ntp_server: str) -> str:
         return f"server {ntp_server} iburst"
 
 
-def _find_address(ntp: dict) -> str:
+def _find_address(ntp_address: dict) -> str:
     # prefer IPv4 for updates
-    if "ipv4_address" in ntp:
-        return str(ntp["ipv4_address"])
+    # interface.find_ips_to_interfaces will always return one type of address if there are any
+    # no need for else / None checks by callers
+    if "ipv4_address" in ntp_address:
+        return str(ntp_address["ipv4_address"])
     else:
-        return str(ntp["ipv6_address"])
+        return str(ntp_address["ipv6_address"])
 
 
 def _configure_server(cfg: dict, buffer: list[str]):

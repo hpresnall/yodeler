@@ -22,6 +22,9 @@ class Dhcp(Role):
     def additional_packages(self):
         return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-dhcp-ddns", "kea-admin", "kea-ctrl-agent"}
 
+    def additional_configuration(self):
+        self._cfg["aliases"].add("dhcp")
+
     def validate(self):
         missing_vlans = interface.check_accessiblity(self._cfg["interfaces"],
                                                      self._cfg["vswitches"].values(),
@@ -75,10 +78,15 @@ class Dhcp(Role):
         subnets_4 = []
         subnets_6 = []
 
-        dns_server_interfaces = self._cfg["hosts"][self._cfg["roles_to_hostnames"]["dns"][0]]["interfaces"]
+        dns_server_interfaces = []
+        if "dns" in self._cfg["roles_to_hostnames"]:
+            # even if multiple dns servers are configured, DDNS should only update one; assume first is the primary
+            dns_server_interfaces = self._cfg["hosts"][self._cfg["roles_to_hostnames"]["dns"][0]]["interfaces"]
+
         if "ntp" in self._cfg["roles_to_hostnames"]:
-            ntp_hosts = self._cfg["roles_to_hostnames"]["ntp"][0]
-            ntp_server_interfaces = self._cfg["hosts"][ntp_hosts]["interfaces"]
+            # TODO when multiple hosts are allowed, combine all interfaces
+            ntp_host = self._cfg["roles_to_hostnames"]["ntp"][0]
+            ntp_server_interfaces = self._cfg["hosts"][ntp_host]["interfaces"]
         else:
             ntp_server_interfaces = None
 
@@ -118,6 +126,14 @@ class Dhcp(Role):
                     ntp_addresses = interface.find_ips_from_vlan(vswitch, vlan, ntp_server_interfaces)
                     ntp4 = [str(match["ipv4_address"]) for match in ntp_addresses if match["ipv4_address"]]
                     ntp6 = [str(match["ipv6_address"]) for match in ntp_addresses if match["ipv6_address"]]
+
+                    # if dns is available and vlan has a domain, prefer using the time alias for ntp
+                    if vlan["domain"]:
+                        # TODO when there can be multiple ntp servers, use time1, time2, etc
+                        if dns4 and ntp4:
+                            ntp4 = [ "time." + vlan["domain"]]
+                        if dns6 and ntp6:
+                            ntp6 = [ "time." + vlan["domain"]]
                 else:
                     ntp4 = None
                     ntp6 = None

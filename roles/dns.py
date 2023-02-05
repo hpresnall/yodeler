@@ -32,9 +32,7 @@ class Dns(Role):
         self._cfg["dns_domain"] = domain
         # note, no top-level domain => vlans will not have domains and DNS will only have the single, top-levle zone
 
-        # add hostname information for DNS
-        # each vlan will be a separate zone
-        self._cfg["dns_entries_by_vlan"] = {}
+        self._cfg["aliases"].add("dns")
 
     def validate(self):
         for iface in self._cfg["interfaces"]:
@@ -94,7 +92,10 @@ class Dns(Role):
 
 
 def _create_dns_entries(cfg):
-    # create dns entries for all hosts
+    # each vlan will be a separate zone
+    cfg["dns_entries_by_vlan"] = {}
+
+    # each host gets a dns entry
     for host_cfg in cfg["hosts"].values():
         for iface in host_cfg["interfaces"]:
             # skip port, vlan and uplink interfaces
@@ -114,7 +115,26 @@ def _create_dns_entries(cfg):
                 "hostname": host_cfg["hostname"],
                 "ipv4_address": iface["ipv4_address"],
                 "ipv6_address": iface["ipv6_address"],
-                "aliases": [role.name for role in host_cfg["roles"] if role.name != "common"]})
+                "aliases": host_cfg["aliases"]
+            })
+
+    # also create entries for DNS reservations from each vlan
+    for vswitch in cfg["vswitches"].values():
+        for vlan in vswitch["vlans"]:
+            # no domain name => no DNS
+            if not vlan["domain"]:
+                continue
+
+            if vlan["name"] not in cfg["dns_entries_by_vlan"]:
+                cfg["dns_entries_by_vlan"][vlan["name"]] = []
+
+            for res in vlan["dhcp_reservations"]:
+                cfg["dns_entries_by_vlan"][vlan["name"]].append({
+                    "hostname": res["hostname"],
+                    "ipv4_address": res["ipv4_address"] if res["ipv4_address"] else "dhcp",
+                    "ipv6_address": res["ipv6_address"],
+                    "aliases": res["aliases"]
+                })
 
 
 def _init_named(cfg):
@@ -227,8 +247,6 @@ def _forward_zone_file(cfg, zone_name, vlan, zone_file_name, zone_dir):
 
         data = {"fqdn": host["hostname"] + "." + vlan["domain"]}
         for alias in host["aliases"]:
-            if alias == host["hostname"]:
-                continue  # no need for a CNAME if the hostname already matches
             data["alias"] = alias
             cnames.append(_CNAME.format_map(data))
 

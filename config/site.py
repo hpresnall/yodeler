@@ -66,6 +66,8 @@ def validate(site_yaml: dict) -> dict:
     for key in DEFAULT_CONFIG:
         if key not in site_cfg:
             site_cfg[key] = DEFAULT_CONFIG[key]
+        elif not isinstance(site_cfg[key], bool) and not site_cfg[key]:
+            raise KeyError(f"property '{key}' cannot be None / empty")
 
     vswitch.validate(site_cfg)
 
@@ -120,6 +122,7 @@ def write_host_scripts(site_cfg: dict, output_dir: str):
     for host_cfg in site_cfg["hosts"].values():
         host.write_scripts(host_cfg, output_dir)
 
+
 def _validate_site(site_cfg: dict):
     # confirm site contains all necessary roles
     for role_class in roles.role.Role.__subclasses__():
@@ -139,9 +142,25 @@ def _validate_site(site_cfg: dict):
             raise ValueError((f"role '{role_name}' cannot have more than {role_class.minimum_instances()} host defined;"
                               f" site '{site_cfg['site_name']}' has {count} hosts: {hostnames}"))
 
+    # confirm all hostnames and aliases are unique
+    aliases = set()
     for host_cfg in site_cfg["hosts"].values():
+        aliases.update(host_cfg["aliases"])
+
+    hostnames = set()
+    for host_cfg in site_cfg["hosts"].values():
+        hostname = host_cfg["hostname"]
+
+        if hostname in hostnames:
+            raise KeyError("duplicate hostname '{hostname}'")
+        if hostname in aliases:
+            raise KeyError("hostname '{hostname}' cannot be the same as another host's alias")
+
+        hostnames.add(hostname)
+
         for role in host_cfg["roles"]:
             role.validate()
+
 
 # accessible for testing
 DEFAULT_CONFIG = {

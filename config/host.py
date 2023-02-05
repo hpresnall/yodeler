@@ -88,8 +88,20 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
 
     interface.validate(host_cfg)
 
+    # allow both 'alias' and 'aliases'; only store 'aliases'
+    host_cfg["aliases"] = _configure_aliases(host_cfg, "aliases")
+    host_cfg["aliases"] |= _configure_aliases(host_cfg, "alias")
+    host_cfg.pop("alias", None)
+
     for role in host_cfg["roles"]:
         role.additional_configuration()
+
+        # TODO handle role aliases when more than 1 host can have the same role
+        if role.name != "common":
+            host_cfg["aliases"].add(role.name)
+
+    # ensure hostname is not duplicated by a role
+    host_cfg["aliases"].discard(host_cfg["hostname"])
 
     _configure_packages(site_cfg, host_yaml, host_cfg)
 
@@ -148,6 +160,8 @@ def _set_defaults(cfg: dict):
     for key in DEFAULT_CONFIG:
         if key not in cfg:
             cfg[key] = DEFAULT_CONFIG[key]
+        elif not isinstance(cfg[key], bool) and not cfg[key]:
+            raise KeyError(f"property '{key}' cannot be None / empty")
 
     # remove from script output if not needed
     if not cfg["install_private_ssh_key"]:
@@ -221,6 +235,23 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
     if _logger.isEnabledFor(logging.DEBUG):
         _logger.debug("adding packages %s", host_cfg["packages"])
         _logger.debug("removing packages %s", host_cfg["remove_packages"])
+
+
+def _configure_aliases(cfg: dict, key: str) -> set[str]:
+    if key not in cfg:
+        return set()
+
+    if isinstance(cfg[key], str):
+        return {cfg[key]}
+    elif isinstance(cfg[key], list):
+        aliases = set()
+        for alias in cfg[key]:
+            if not isinstance(alias, str):
+                raise KeyError(f"invalid alias '{alias}' for host '{cfg['hostname']}'; it must be a string")
+            aliases.add(alias)
+        return aliases
+    else:
+        raise KeyError(f"invalid alias '{key}' for host '{cfg['hostname']}'; it must be a string or an array")
 
 
 def _bootstrap_physical(cfg: dict, output_dir: str):

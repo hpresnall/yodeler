@@ -92,6 +92,9 @@ class Router(Role):
         # router will use Shorewall instead
         self._cfg["local_firewall"] = False
 
+        self._cfg["aliases"].add("router")
+        self._cfg["aliases"].add("gateway")
+
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         # router needed if there are routable vlans
