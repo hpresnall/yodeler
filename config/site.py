@@ -31,8 +31,7 @@ def load(site_dir: str) -> dict:
 
     site_yaml = file.load_yaml(os.path.join(site_dir, "site.yaml"))
 
-    if "site_name" not in site_yaml:
-        site_yaml["site_name"] = os.path.basename(site_dir)
+    parse.set_default_string("site_name", site_yaml, os.path.basename(site_dir))
     site_yaml["site_dir"] = site_dir
 
     site_cfg = validate(site_yaml)
@@ -131,5 +130,6 @@ def _validate_site(site_cfg: dict):
 
         hostnames.add(hostname)
 
+    for host_cfg in site_cfg["hosts"].values():
         for role in host_cfg["roles"]:
             role.validate()

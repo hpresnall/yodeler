@@ -26,13 +26,16 @@ def validate(cfg: dict):
             raise KeyError(f"duplicate name {vswitch_name} defined for vswitch {i}")
         vswitches_by_name[vswitch_name] = vswitch
 
-        vswitch_uplinks = parse.read_string_list("uplink", vswitch, f"vswitch {i}: '{vswitch_name}'")
+        vswitch_uplinks = parse.read_string_list_plurals(
+            {"uplink", "uplinks"}, vswitch, f"uplink in vswitch {i}: '{vswitch_name}'")
+        vswitch.pop("uplink", None)
 
         for uplink in vswitch_uplinks:
             if uplink in uplinks:
                 raise KeyError(f"uplink '{uplink}' reused for vswitch {i}: '{vswitch_name}'")
             uplinks.add(uplink)
 
-        vswitch["uplink"] = vswitch_uplinks if vswitch_uplinks else None
+        vswitch["uplinks"] = vswitch_uplinks
+        vswitch.pop("uplink", None)
 
         vlan.validate(cfg["domain"], vswitch, all_vlans)

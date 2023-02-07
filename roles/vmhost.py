@@ -86,19 +86,19 @@ class VmHost(Role):
 
 
 def _create_uplink_ports(vswitch: dict) -> list[dict]:
-    uplink = vswitch["uplink"]
+    uplinks = vswitch["uplinks"]
     vswitch_name = vswitch["name"]
 
-    if uplink is None:
+    if not uplinks:
         return []
-
-    if isinstance(uplink, str):
+    elif len(uplinks) == 1:
+        uplink = next(iter(uplinks))
         return [interface.for_port(uplink, f"uplink for vswitch {vswitch_name}", vswitch_name, uplink)]
     else:
         ports = []
-        for n, iface in enumerate(uplink):
+        for n, iface in enumerate(uplinks):
             ports.append(interface.for_port(
-                iface, f"uplink {n+1} of {len(uplink)} for vswitch {vswitch_name}", vswitch_name, iface))
+                iface, f"uplink {n+1} of {len(uplinks)} for vswitch {vswitch_name}", vswitch_name, iface))
         return ports
 
 
@@ -112,6 +112,7 @@ def _setup_open_vswitch(cfg, setup):
 
         setup.comment(f"setup {vswitch_name} vswitch")
         setup.append(f"ovs-vsctl add-br {vswitch_name}")
+        setup.blank()
 
         _create_vswitch_uplink(vswitch, setup)
 
@@ -134,26 +135,29 @@ def _setup_open_vswitch(cfg, setup):
 
 def _create_vswitch_uplink(vswitch, setup):
     # for each uplink, create a port on the vswitch
-    uplink = vswitch["uplink"]
+    uplinks = vswitch["uplinks"]
 
-    if uplink is None:
+    if not uplinks:
         return []
 
-    setup.blank()
     vswitch_name = vswitch["name"]
 
-    if not isinstance(uplink, str):
+    if len(uplinks) > 1:
         # multiple uplink interfaces; create a bond named 'uplink'
-        bond_ifaces = " ".join(uplink)
+        bond_ifaces = " ".join(uplinks)
         bond_name = f"{vswitch_name}-uplink"
 
         setup.comment("bonded uplink")
         setup.append(f"ovs-vsctl add-bond {vswitch_name} {bond_name} {bond_ifaces} lacp=active")
 
-        uplink = bond_name  # use new uplink name for tagging, if needed
+        uplink_name = bond_name  # use new uplink name for tagging, if needed
     else:
+        uplink_name =  next(iter(uplinks))
+
         setup.comment("uplink")
-        setup.append(f"ovs-vsctl add-port {vswitch_name} {uplink}")
+        setup.append(f"ovs-vsctl add-port {vswitch_name} {uplink_name}")
+
+    setup.blank()
 
     # tag the uplink port
     vlans_by_id = vswitch["vlans_by_id"].keys()
@@ -161,7 +165,8 @@ def _create_vswitch_uplink(vswitch, setup):
         # single vlan with id => access port
         if None not in vlans_by_id:
             tag = list(vlans_by_id)[0]
-            setup.append(f"ovs-vsctl set port {uplink} tag={tag} vlan_mode=access")
+            setup.append(f"ovs-vsctl set port {uplink_name} tag={tag} vlan_mode=access")
+            setup.blank()
         # else no tagging needed
     elif len(vlans_by_id) > 1:  # multiple vlans => trunk port
         trunks = [str(vlan_id) for vlan_id in vlans_by_id if vlan_id != None]
@@ -170,9 +175,8 @@ def _create_vswitch_uplink(vswitch, setup):
         # native or PVID vlan => native_untagged
         # see http://www.openvswitch.org/support/dist-docs/ovs-vswitchd.conf.db.5.txt
         vlan_mode = "native_untagged" if None in vlans_by_id else "trunk"
-        setup.append(f"ovs-vsctl set port {uplink} trunks={trunks} vlan_mode={vlan_mode}")
-
-    setup.blank()
+        setup.append(f"ovs-vsctl set port {uplink_name} trunks={trunks} vlan_mode={vlan_mode}")
+        setup.blank()
 
 
 def _setup_libvirt(cfg, setup, output_dir):

@@ -1,6 +1,10 @@
 # ensure the drive running this script is writable
-YODELER_DEV=$$(realpath $$(df $$DIR | grep '^/' | cut -d' ' -f1))
-mount -o remount,rw $$YODELER_DEV
+YODELER_DEV=$$(df $$DIR | grep -E '^(/|share)' | cut -d' ' -f1)
+
+if [ "$$YODELER_DEV" ne "share" ]; then
+  YODELER_DEV=$$(realpath $$YODELER_DEV)
+  mount -o remount,rw $$YODELER_DEV
+fi
 
 # use site-level APK cache for this boot
 # will be partially populated by Alpine install

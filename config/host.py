@@ -32,9 +32,7 @@ def load(site_cfg: dict, host_path: str) -> dict:
 
     host_yaml = file.load_yaml(host_path)
 
-    if "hostname" in host_yaml:
-        host_yaml["hostname"] = host_yaml.pop("hostname")
-    else:
+    if "hostname" not in host_yaml:
         host_yaml["hostname"] = os.path.basename(host_path)[:-5]  # remove .yaml
 
     host_cfg = validate(site_cfg, host_yaml)
@@ -76,7 +74,10 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
 
     interface.validate(host_cfg)
 
-    _configure_aliases(host_cfg)
+    # allow both 'alias' and 'aliases'; only store 'aliases'
+    host_cfg["aliases"] = parse.read_string_list_plurals(
+        {"alias", "aliases"}, host_cfg, "alias for " + host_cfg["hostname"])
+    host_cfg.pop("alias", None)
 
     for role in host_cfg["roles"]:
         role.additional_configuration()
@@ -115,7 +116,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
     # add all scripts from each role
     for role in host_cfg["roles"]:
-        setup.append(f"########## {role.name} ##########")
+        setup.append(f"########## {role.name.upper()} ##########")
         setup.blank()
         try:
             role.write_config(setup, host_dir)
@@ -138,8 +139,11 @@ def validate_site_defaults(site_cfg: dict):
     # ensure overridden default values are the correct type and arrays only contain strings
     parse.configure_defaults("site_yaml", DEFAULT_SITE_CONFIG, _DEFAULT_SITE_CONFIG_TYPES, site_cfg)
 
-    for array in ("alpine_repositories", "external_ntp", "external_dns"):
-        site_cfg[array] = parse.read_string_list(array, site_cfg, array + " for " + site_cfg["site_name"])
+    for key in ("alpine_repositories", "external_ntp", "external_dns"):
+        # already a set, assume host config has not overriden since YAML does not support sets
+        if isinstance(site_cfg.get(key), set):
+            continue
+        site_cfg[key] = parse.read_string_list(key, site_cfg, site_cfg["site_name"])
 
     for dns in site_cfg["external_dns"]:
         try:
@@ -151,7 +155,7 @@ def validate_site_defaults(site_cfg: dict):
 def _set_defaults(cfg: dict):
     for i, key in enumerate(_REQUIRED_PROPERTIES):
         if key not in cfg:
-            raise KeyError("{0} not defined".format(key))
+            raise KeyError(f"{key} not defined")
 
         value = cfg[key]
         kind = _REQUIRED_PROPERTIES_TYPES[i]
@@ -165,14 +169,16 @@ def _set_defaults(cfg: dict):
     if not cfg["install_private_ssh_key"]:
         cfg["private_ssh_key"] = ""
 
+    # also called in site.py; this call ensures overridden values from the host are also valid
     validate_site_defaults(cfg)
 
 
 def _load_roles(cfg: dict):
     # list of role names in yaml => list of Role subclass instances
-    role_names = set()
-    for key in {"role", "roles"}:
-        role_names.update(parse.read_string_list(key, cfg, key + " for " + cfg["hostname"]))
+
+    # allow both 'role' and 'roles'; only store 'roles'
+    role_names = parse.read_string_list_plurals({"role", "roles"}, cfg, "role for " + cfg["hostname"])
+    cfg.pop("role", None)
 
     # Common _must_ be the first so it is configured and setup first
     role_names.discard("common")
@@ -232,17 +238,6 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
     if _logger.isEnabledFor(logging.DEBUG):
         _logger.debug("adding packages %s", host_cfg["packages"])
         _logger.debug("removing packages %s", host_cfg["remove_packages"])
-
-
-def _configure_aliases(cfg: dict):
-    aliases = set()
-    for key in {"alias", "aliases"}:
-        aliases.update(parse.read_string_list(key, cfg, key + " for " + cfg["hostname"]))
-
-    # allow both 'alias' and 'aliases'; only store 'aliases'
-    cfg.pop("alias", None)
-
-    cfg["aliases"] = aliases
 
 
 def _bootstrap_physical(cfg: dict, output_dir: str):
@@ -315,9 +310,11 @@ _REQUIRED_PROPERTIES_TYPES = [str, str]
 DEFAULT_SITE_CONFIG = {
     "timezone": "UTC",
     "keymap": "us us",
-    "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
-    "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
-    "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
+    # note sets here for comparisions on test, but list type in _TYPES since that is what YAML will load
+    # running type will also be parsed as sets
+    "alpine_repositories": {"http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"},
+    "external_ntp": {"0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"},
+    "external_dns": {"8.8.8.8", "9.9.9.9", "1.1.1.1"},
     "metrics": True,
     # top-level domain for the site; empty => no local DNS
     "domain": "",

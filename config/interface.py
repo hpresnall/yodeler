@@ -23,17 +23,17 @@ def validate(cfg):
     for i, iface in enumerate(ifaces):
         parse.non_empty_dict("iface " + str(i), iface)
 
-        if "name" not in iface:
+        if "name" in iface:
+            iface["name"] = parse.non_empty_string("name", iface, f"iface {i} on host '{cfg['hostname']}'")
+        else:
             iface["name"] = f"eth{iface_counter}"
             iface_counter += 1
 
         try:
-            if ("type" not in iface):
-                iface["type"] = "std"
-            # ports have no configuration; vlan ifaces are defined by the vlan config
-            else:
-                if iface["type"] not in {"vlan", "port", "uplink"}:
-                    raise KeyError("only 'vlan' and 'port' types are supported")
+            iface.setdefault("type", "std")
+            types = {"std", "vlan", "port", "uplink"}
+            if iface["type"] not in types:
+                raise KeyError(f"only {type} interface types are supported")
             validate_network(iface, vswitches)
             validate_iface(iface)
         except KeyError as err:
@@ -48,7 +48,7 @@ def validate(cfg):
     if cfg["primary_domain"]:
         if matching_domain is None:
             raise KeyError(
-                f"invalid primary_domain: no interface's vlan domain matches primary_domain '{cfg['primary_domain']}'")
+                f"invalid primary_domain: no interface's vlan domain matches primary_domain '{cfg['primary_domain']}' for host '{cfg['hostname']}'")
     else:
         # single interface => set host domain to vlan domain
         if len(ifaces) == 1:
@@ -59,8 +59,8 @@ def validate(cfg):
 def validate_network(iface, vswitches):
     """Validate the interface's vswitch and vlan."""
     match iface["type"]:
-        # ports and macvtap and non-vm uplinks do not have any network to validate
         case "port":
+            # ports (vlan parents and vswitch ifaces) do not have any network to validate
             return
         case "uplink":
             vswitch_name = iface.get("vswitch")
@@ -73,18 +73,13 @@ def validate_network(iface, vswitches):
                     raise KeyError(f"invalid vswitch '{vswitch_name}'")
                 # do not return; continue checking for vlan
         case "vlan":
-            # vlan ifaces should already have vswitch and vlan objects set
-            if ("vswitch" not in iface) and not iface["vswitch"]:
-                raise KeyError("vswitch must be specified")
-            if ("vlan" not in iface) and not iface["vlan"]:
-                raise KeyError("vlan must be specified")
-            vswitch = iface["vswitch"]
-            if iface["vlan"]["id"] not in iface["vswitch"]["vlans_by_id"]:
-                raise KeyError(f"invalid vlan '{iface['vlan']['id']}'; not defined in vswitch '{vswitch['name']}'")
+            # already validated in for_vlan()
             return
-        case _:
+        case "std":
             vswitch_name = iface.get("vswitch")
             vswitch = vswitches.get(vswitch_name)
+        case _:
+            raise ValueError("unknown interface type " + iface["type"])
 
     # for std interfaces and uplinks for vswitches, confirm the vlan
     if vswitch is None:
@@ -289,7 +284,7 @@ def check_accessiblity(to_check: list[dict], vswitches: list[dict], ignore_vlan:
     Returns an empty set if all vlans or accessible. Otherwise returns a set of vlan names, as strings.
 
     Optionally accepts an additional check function that can remove a vlan from consideration. This function will be
-    passed a single vlan. If the vlan should be removed, even if it is not accessible by the given interfactions, the
+    passed a single vlan. If the vlan should be removed, even if it is not accessible by the given interfaces, the
     function should return 'True'."""
     # find all the vlans this host can access
     accessible_vlans = set()
@@ -315,6 +310,14 @@ def check_accessiblity(to_check: list[dict], vswitches: list[dict], ignore_vlan:
 
 
 def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:
+    if not vswitch:
+        raise KeyError("vswitch must be specified")
+    if not vlan:
+        raise KeyError("vlan must be specified")
+
+    if vlan["id"] not in vswitch["vlans_by_id"]:
+        raise KeyError(f"invalid vlan '{iface['vlan']['id']}'; not defined in vswitch '{vswitch['name']}'")
+
     iface = {
         "type": "vlan",
         "vswitch": vswitch,
@@ -322,11 +325,6 @@ def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:
         "accept_ra": False,
         "ipv6_dhcp": False
     }
-
-    if not vswitch:
-        raise KeyError("vswitch must be specified")
-    if not vlan:
-        raise KeyError("vlan must be specified")
 
     iface["ipv4_address"] = str(vlan["ipv4_subnet"].network_address + 1)
 
@@ -384,12 +382,7 @@ def configure_uplink(cfg: dict):
         raise KeyError("must define an uplink")
 
     # default to the first interface
-    if "name" in uplink:
-        name = uplink["name"]
-        if name:
-            uplink["name"] = "eth0"
-    else:
-        uplink["name"] = "eth0"
+    parse.set_default_string("name", uplink, "eth0")
 
     # allow some end user configuration of the uplink interface YAML
     # but it will always forwarding

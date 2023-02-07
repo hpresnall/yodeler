@@ -12,8 +12,8 @@ def from_config(cfg):
     The interfaces must be from a validated host configuration."""
     # loopback is first
     all_interfaces = ["""auto lo
-# iface lo
-# """]
+iface lo
+"""]
 
     for iface in cfg["interfaces"]:
         match iface["type"]:

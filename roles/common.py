@@ -119,7 +119,7 @@ def _setup_repos(cfg, setup):
     setup.append("echo \"Configuring APK repositories\"")
     setup.blank()
 
-    repos = cfg["alpine_repositories"]
+    repos = list(cfg["alpine_repositories"])
 
     # overwrite on first, append on subsequent
     setup.append(f"echo {repos[0]} > /etc/apk/repositories")

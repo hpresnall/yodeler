@@ -75,10 +75,10 @@ class TestHost(base.TestCfgBase):
 
         # has all default config
         for key in host.DEFAULT_SITE_CONFIG:
-            self.assertIsNotNone(cfg[key])
+            self.assertIsNotNone(cfg.get(key))
             self.assertEqual(host.DEFAULT_SITE_CONFIG[key], cfg[key])
         for key in host.DEFAULT_CONFIG:
-            self.assertIsNotNone(cfg[key])
+            self.assertIsNotNone(cfg.get(key))
             self.assertEqual(host.DEFAULT_CONFIG[key], cfg[key])
 
         # has all default packages

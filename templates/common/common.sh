@@ -77,6 +77,8 @@ if [ -f $$DIR/resolv.conf ]; then
 fi
 if [ -f $$DIR/resolv.conf.head ]; then
   rootinstall $$DIR/resolv.conf.head /etc
+  # remove resolv.conf from setup
+  rm /etc/resolv.conf
 fi
 # prevent dhcpcd starting as a service; let ifupdown-ng start it, if needed
 sed -i -e "s/provide net/# provide net/g" /etc/init.d/dhcpcd

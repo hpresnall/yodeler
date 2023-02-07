@@ -40,7 +40,9 @@ vswitches:
         # assumes 'ipv6_pd_prefixlen' of 56 defined in the router uplink
         ipv6_pd_network: 10
         dhcp4_enabled: false # DHCP server will not be configured
-        access_vlans: all # firewall will allow any access to all vlans, including the internet
+        # firewall will allow any access to all vlans, including the internet
+        # can also set allow_internet: true to only allow some vlans + the internet
+        access_vlans: all
         allow_access_stopped_firewall: true # allow internet access when firewall is stopped
         allow_dns_update: true # allow this subnet to make DDNS updates
       - name: user
@@ -50,7 +52,6 @@ vswitches:
         ipv6_subnet: fd24:87e8:06c7:20::/64
         ipv6_pd_network: 20
         default: true # if not specified, VMs default to this vlan
-        allow_internet: false # firewall will restrict outbound internet access
         dhcp_min_address_ipv4: 2
         dhcp_max_address_ipv4: 252
         # dhcp6_managed defaults to false so DHCP6 will be information only

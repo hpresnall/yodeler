@@ -35,7 +35,7 @@ class NTP(Role):
 
     def write_config(self, setup, output_dir):
         # create_chrony_conf() will be called by common
-        pass
+        setup.comment("set in chrony.conf; no additional config needed")
 
 
 def create_chrony_conf(cfg, output_dir):
@@ -73,8 +73,9 @@ def create_chrony_conf(cfg, output_dir):
             buffer.append(_pool_or_server(server))
 
         if at_boot:
+            external = next(iter(cfg['external_ntp']))
             buffer.append("")
-            buffer.append(f"initstepslew 10 {cfg['external_ntp'][0]}")
+            buffer.append(f"initstepslew 10 {external}")
 
     buffer.append("")
     buffer.append("driftfile /var/lib/chrony/chrony.drift")
@@ -125,3 +126,5 @@ def _configure_server(cfg: dict, buffer: list[str]):
 
             if iface["vlan"]["ipv6_subnet"]:
                 buffer.append("allow " + str(iface["vlan"]["ipv6_subnet"]))
+
+    buffer.append("")

@@ -13,6 +13,8 @@ from roles.role import Role
 
 import config.interface as interface
 
+import util.parse as parse
+
 
 class Router(Role):
     """Router defines the configuration needed to setup a system that can route from the configured
@@ -41,8 +43,10 @@ class Router(Role):
             # create a unique interface for each vswitch
             if self._cfg["is_vm"]:
                 iface_name = f"eth{iface_counter}"
-            elif vswitch["uplink"]:
-                iface_name = vswitch["uplink"]
+            elif vswitch["uplinks"]:
+                # TODO handle multiple uplinks; maybe just error instead of creating physical bond ifaces
+                # TODO if vmhost and router, but router if vm, need router_iface in vswitch config
+                iface_name = vswitch["uplinks"]
                 # vswitch validation already confirmed uplink uniqueness
             else:
                 # note that this assumes ethernet layout of non-vm hosts
@@ -66,7 +70,7 @@ class Router(Role):
 
                 # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
                 network = vlan["ipv6_pd_network"]
-                if not network:
+                if network is None:
                     network = prefix_counter
                     prefix_counter += 1
                 _validate_vlan_pd_network(uplink["ipv6_pd_prefixlen"], network)
@@ -82,11 +86,8 @@ class Router(Role):
                     vswitch_interfaces.append(interface.for_port(iface_name, comment))
                 vswitch_interfaces.extend(vlan_interfaces)
 
-        if "interfaces" not in self._cfg:
-            self._cfg["interfaces"] = []
-
         # set uplink then vswitch interfaces first in /etc/interfaces
-        self._cfg["interfaces"] = [uplink] + vswitch_interfaces + self._cfg["interfaces"]
+        self._cfg["interfaces"] = [uplink] + vswitch_interfaces + self._cfg.setdefault("interfaces", [])
 
     def additional_configuration(self):
         # router will use Shorewall instead
@@ -109,7 +110,8 @@ class Router(Role):
 
     def write_config(self, setup, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
-        uplink = self._cfg["uplink"]
+        uplink = self._cfg.get("uplink")
+        parse.non_empty_dict("router 'uplink'", uplink)
 
         if self._cfg["is_vm"]:
             # uplink can be an existing vswitch or a physical iface on the host via macvtap
@@ -198,6 +200,7 @@ def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
         setup.comment("configure dhcp relay for routable vlans")
 
     if dhrelay6_ifaces:
+        # create dhcrelay6 init.d first, then ipv4 conf, then ipv6 conf
         if not dhcp_addresses["ipv6_address"]:
             raise ValueError("router needs to relay DHCP but cannot find any reachable IPv6 addresses")
 
