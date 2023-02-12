@@ -149,7 +149,7 @@ def _validate_vlan_dhcp_reservations(vswitch_name, vlan):
         else:
             raise KeyError(f"no mac_address for reservation '{res['hostname']}' in {cfg_name}")
 
-        res["aliases"] = parse.read_string_list_plurals(("alias", "aliases"), res, f"reservation {i} in {cfg_name}")
+        res["aliases"] = parse.read_string_list_plurals({"alias", "aliases"}, res, f"reservation {i} in {cfg_name}")
         res.pop("alias", None)
 
 

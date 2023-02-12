@@ -8,8 +8,7 @@ import util.parse as parse
 
 def validate(cfg: dict):
     """Validate all the vswitches defined in the site configuration."""
-    vswitches = cfg.get("vswitches")
-    parse.non_empty_list("vswitches", vswitches)
+    vswitches = parse.non_empty_list("vswitches", cfg.get("vswitches"))
 
     # list of vswitches in yaml => dict of names to vswitches
     vswitches_by_name = cfg["vswitches"] = {}

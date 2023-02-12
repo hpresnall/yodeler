@@ -17,10 +17,10 @@ _logger = logging.getLogger(__name__)
 
 
 def load(site_dir: str) -> dict:
-    """Load 'site.yaml' from the given directory and validate it. This method also loads and validates all the host
-    configuration for the site.
+    """Load 'site.yaml' from the given directory and validate it. This method also loads and validates all the host's
+    configurations for the site.
 
-    Return the site configuration that can be used in a subsequent call to write_host_configs().
+    Return the site configuration that can be used in a subsequent call to write_host_scripts().
     """
     if not site_dir:
         raise ValueError("site_dir cannot be empty")
@@ -32,11 +32,10 @@ def load(site_dir: str) -> dict:
     site_yaml = file.load_yaml(os.path.join(site_dir, "site.yaml"))
 
     parse.set_default_string("site_name", site_yaml, os.path.basename(site_dir))
-    site_yaml["site_dir"] = site_dir
 
     site_cfg = validate(site_yaml)
 
-    _load_all_hosts(site_cfg)
+    _load_all_hosts(site_cfg, site_dir)
 
     _logger.debug("loaded site '%s' from '%s'", site_cfg["site_name"], site_dir)
 
@@ -67,11 +66,9 @@ def validate(site_yaml: dict) -> dict:
     return site_cfg
 
 
-def _load_all_hosts(site_cfg: dict):
+def _load_all_hosts(site_cfg: dict, site_dir: str):
     """Load and validate all host YAML files for the given site."""
     _logger.debug("loading hosts for site '%s'", site_cfg["site_name"])
-
-    site_dir = site_cfg["site_dir"]
 
     for host_path in os.listdir(site_dir):
         if host_path == "site.yaml":
@@ -91,6 +88,7 @@ def write_host_scripts(site_cfg: dict, output_dir: str):
 
     _validate_site(site_cfg)
 
+
     for host_cfg in site_cfg["hosts"].values():
         host.write_scripts(host_cfg, output_dir)
 
@@ -108,10 +106,10 @@ def _validate_site(site_cfg: dict):
         count = len(hostnames)
 
         if count < role_class.minimum_instances(site_cfg):
-            raise ValueError((f"role '{role_name}' requires at least {role_class.minimum_instances()} host defined;"
+            raise ValueError((f"role '{role_name}' requires at least {role_class.minimum_instances(site_cfg)} host defined;"
                               f" site '{site_cfg['site_name']}' has {count} hosts: {hostnames}"))
         if count > role_class.maximum_instances(site_cfg):
-            raise ValueError((f"role '{role_name}' cannot have more than {role_class.minimum_instances()} host defined;"
+            raise ValueError((f"role '{role_name}' cannot have more than {role_class.minimum_instances(site_cfg)} host defined;"
                               f" site '{site_cfg['site_name']}' has {count} hosts: {hostnames}"))
 
     # confirm all hostnames and aliases are unique

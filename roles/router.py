@@ -110,8 +110,9 @@ class Router(Role):
 
     def write_config(self, setup, output_dir):
         """Create the scripts and configuration files for the given host's configuration."""
-        uplink = self._cfg.get("uplink")
-        parse.non_empty_dict("router 'uplink'", uplink)
+        uplink = parse.non_empty_dict("router 'uplink'", self._cfg.get("uplink"))
+
+        libvirt_interfaces = []
 
         if self._cfg["is_vm"]:
             # uplink can be an existing vswitch or a physical iface on the host via macvtap
@@ -190,11 +191,6 @@ def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
     # assume only one dhcp server
     dhcp_addresses = dhcp_addresses[0]
 
-    # dhrelay requires setting the upper interface _and_ ipaddress
-    # find the router interface that is in the same subnet as the dhcp server
-    upper_iface4 = dhcp_addresses["src_iface"]["name"] if dhcp_addresses["ipv4_address"] else None
-    upper_iface6 = dhcp_addresses["src_iface"]["name"] if dhcp_addresses["ipv6_address"] else None
-
     if dhrelay4_ifaces or dhrelay6_ifaces:
         setup.blank()
         setup.comment("configure dhcp relay for routable vlans")
@@ -209,6 +205,9 @@ def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
     if dhrelay4_ifaces:
         if not dhcp_addresses["ipv4_address"]:
             raise ValueError("router needs to relay DHCP but cannot find any reachable IPv4 addresses")
+
+        # find the router interface that is in the same subnet as the dhcp server
+        upper_iface4 = dhcp_addresses["src_iface"]["name"] if dhcp_addresses["ipv4_address"] else None
 
         # dhrelay requires listening on the interface that is on the dhcp server's vlan
         # make sure it is setup, even if that vlan does not have dhcp enabled
@@ -225,12 +224,14 @@ def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
     if dhrelay6_ifaces:
         # remove upper iface from list; no need to relay traffic already being broadcast
         # dhrelay6 does require it to be explicitly set with the ip address
+        upper_iface6 = dhcp_addresses["src_iface"]["name"] if dhcp_addresses["ipv6_address"] else ""
         dhrelay6_ifaces = [iface for iface in dhrelay6_ifaces if iface != upper_iface6]
+        upper_iface6 = "%" + upper_iface6 if upper_iface6 else upper_iface6
 
         setup.comment("setup dhcrelay6.conf")
         setup.append("echo 'IFACE=\"" + " ".join(dhrelay6_ifaces) + "\"' >> /etc/conf.d/dhcrelay6")
         setup.append("echo 'DHCRELAY_SERVERS=\"-u " +
-                     str(dhcp_addresses["ipv6_address"]) + "%" + upper_iface6 + "\"' >> /etc/conf.d/dhcrelay6")
+                     str(dhcp_addresses["ipv6_address"]) + upper_iface6 + "\"' >> /etc/conf.d/dhcrelay6")
         setup.service("dhcrelay6")
         setup.blank()
 

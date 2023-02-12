@@ -2,6 +2,8 @@
 import logging
 import ipaddress
 
+from typing import Callable
+
 import config.vlan
 
 import util.parse as parse
@@ -279,7 +281,7 @@ def _match_iface(iface: dict, to_match: list[dict], prefer_routable=True, first_
     return matches
 
 
-def check_accessiblity(to_check: list[dict], vswitches: list[dict], ignore_vlan: callable(dict) = lambda *_: False) -> set[str]:
+def check_accessiblity(to_check: list[dict], vswitches: list[dict], ignore_vlan: Callable = lambda *_: False) -> set[str]:
     """Check if the the given list of interfaces can reach all the vlans on the given vswitches.
     Returns an empty set if all vlans or accessible. Otherwise returns a set of vlan names, as strings.
 
@@ -316,7 +318,7 @@ def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:
         raise KeyError("vlan must be specified")
 
     if vlan["id"] not in vswitch["vlans_by_id"]:
-        raise KeyError(f"invalid vlan '{iface['vlan']['id']}'; not defined in vswitch '{vswitch['name']}'")
+        raise KeyError(f"invalid vlan '{vlan['id']}'; not defined in vswitch '{vswitch['name']}'")
 
     iface = {
         "type": "vlan",

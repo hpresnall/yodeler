@@ -84,6 +84,8 @@ class Dhcp(Role):
             dns_server_interfaces = self._cfg["hosts"][self._cfg["roles_to_hostnames"]["dns"][0]]["interfaces"]
 
         ntp_servers = []
+        ddns_json = {}
+
         if "ntp" in self._cfg["roles_to_hostnames"]:
             ntp_servers = [self._cfg["hosts"][server] for server in self._cfg["roles_to_hostnames"]["ntp"]]
 
@@ -147,10 +149,12 @@ class Dhcp(Role):
                 if self._cfg["domain"]:
                     domains.append(self._cfg["domain"])
 
+                subnet4 = {}
+                subnet6 = {}
+
                 if vlan["dhcp4_enabled"]:
                     ip4_subnet = vlan["ipv4_subnet"]
 
-                    subnet4 = {}
                     subnet4["subnet"] = str(ip4_subnet)
                     subnet4["pools"] = [{"pool": str(ip4_subnet.network_address + vlan["dhcp_min_address_ipv4"]) +
                                         " - " + str(ip4_subnet.network_address + vlan["dhcp_max_address_ipv4"])}]
@@ -167,7 +171,7 @@ class Dhcp(Role):
                     if domains:
                         subnet4["option-data"].append({"name": "domain-search", "data": ", ".join(domains)})
                     if vlan["routable"]:
-                        subnet4["option-data"].append({"name": "routers", "data": str(ip4_subnet.network_address + 1)}),
+                        subnet4["option-data"].append({"name": "routers", "data": str(ip4_subnet.network_address + 1)})
                     if ntp4:
                         subnet4["option-data"].append({"name": "time-servers", "data":  ", ".join(ntp4)})
                     subnet4["reservations"] = []
@@ -176,7 +180,6 @@ class Dhcp(Role):
                 if vlan["ipv6_subnet"]:
                     ip6_subnet = vlan["ipv6_subnet"]
 
-                    subnet6 = {}
                     subnet6["subnet"] = str(ip6_subnet)
                     subnet6["rapid-commit"] = True
                     subnet6["pools"] = []

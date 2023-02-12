@@ -4,15 +4,15 @@ These functions will raise ValueErrors or KeyErrors for invalid values.
 """
 
 
-def non_empty_dict(name: str, value: any):
-    _non_empty(name, value, dict)
+def non_empty_dict(name: str, value: object) -> dict:
+   return  _non_empty(name, value, dict)
 
 
-def non_empty_list(name: str, value: any):
-    _non_empty(name, value, list)
+def non_empty_list(name: str, value: object) -> list:
+    return _non_empty(name, value, list)
 
 
-def _non_empty(name: str, value: any, kind: type):
+def _non_empty(name: str, value, kind: type) -> object:
     if not name:
         raise ValueError("name cannot be empty")
     if value is None:
@@ -26,6 +26,8 @@ def _non_empty(name: str, value: any, kind: type):
         raise ValueError(f"{name} must be a {kind}, not a {type(value)}")
     if len(value) == 0:
         raise ValueError(f"{name} cannot be empty")
+
+    return value
 
 
 def non_empty_string(key: str, cfg: dict, dict_name: str) -> str:
@@ -48,7 +50,7 @@ def non_empty_string(key: str, cfg: dict, dict_name: str) -> str:
     return value
 
 
-def set_default_string(key: str, cfg: dict, default: str):
+def set_default_string(key: str, cfg: None | dict, default: str):
     if not key:
         raise ValueError("key cannot be empty")
     if cfg is None:
@@ -64,7 +66,7 @@ def set_default_string(key: str, cfg: dict, default: str):
     cfg[key] = value
 
 
-def read_string_list_plurals(keys: tuple[str], cfg: dict, value_name: str) -> set[str]:
+def read_string_list_plurals(keys: set[str], cfg: dict, value_name: str) -> set[str]:
     # combine all all the values from all the keys into a single set
     # this allows something like foo: bar or foos: [ bar, baz ]
     values = set()
