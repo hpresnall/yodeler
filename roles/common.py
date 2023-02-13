@@ -82,7 +82,7 @@ class Common(Role):
             # for physical servers, add packages manually
             _setup_repos(self._cfg, setup)
             _apk_update(setup)
-            setup.append("echo \"Installing required packages\"")
+            setup.append("log \"Installing required packages\"")
             setup.append("apk -q --no-progress add $(cat $DIR/packages)")
             setup.blank()
 
@@ -90,7 +90,7 @@ class Common(Role):
             self._cfg["remove_packages"].add("libusb")
 
         if (self._cfg["remove_packages"]):
-            setup.append("echo \"Removing unneeded packages\"")
+            setup.append("log \"Removing unneeded packages\"")
             setup.append("apk -q del " + " ".join(self._cfg["remove_packages"]))
             setup.blank()
 
@@ -116,7 +116,7 @@ class Common(Role):
 
 
 def _setup_repos(cfg, setup):
-    setup.append("echo \"Configuring APK repositories\"")
+    setup.append("log \"Setting up APK repositories\"")
     setup.blank()
 
     repos = list(cfg["alpine_repositories"])

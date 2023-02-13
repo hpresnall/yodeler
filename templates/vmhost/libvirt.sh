@@ -1,4 +1,4 @@
-echo "Configuring libvirt"
+log "Setting up libvirt"
 
 # remove CEPH storage option; it has caused libvirt startup issues in the past
 rm /usr/lib/libvirt/storage-backend/libvirt_storage_backend_rbd.so
@@ -29,7 +29,7 @@ cd /home/$USER
 git clone --depth=1 --single-branch --branch=master https://github.com/alpinelinux/alpine-make-vm-image.git
 chown -R $USER:$USER alpine-make-vm-image
 
-echo "Starting libvirt services"
+log "Starting libvirt"
 # libvirt needs networking; make libvirt think it is started
 # continue to use the installer network instead
 mkdir -p /var/run/openrc/started
@@ -46,7 +46,7 @@ while [ "$$?" -ne 0 ]; do
     virsh list > /dev/null 2>&1
 done
 
-echo "Configuring libvirt storage"
+log "Configuring libvirt storage"
 mkdir $VM_IMAGES_PATH
 chown nobody:libvirt $VM_IMAGES_PATH
 chmod 755 $VM_IMAGES_PATH
@@ -54,7 +54,7 @@ virsh pool-define-as --name vmstorage --type dir --target $VM_IMAGES_PATH
 virsh pool-autostart vmstorage
 virsh pool-start vmstorage
 
-echo "Configuring libvirt networks"
+log "Configuring libvirt networks"
 # remove default DHCP network
 virsh net-destroy default
 virsh net-undefine default

@@ -1,5 +1,3 @@
-echo "Configuring common setup"
-
 # basic config
 echo "$MOTD" > /etc/motd
 setup-timezone -z $TIMEZONE

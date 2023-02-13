@@ -10,6 +10,7 @@ import util.parse as parse
 
 import config.interface as interface
 
+import roles.role
 import roles.common
 
 import ipaddress
@@ -110,13 +111,14 @@ def write_scripts(host_cfg: dict, output_dir: str):
     # create a setup script that sources all the other scripts
     setup = shell.ShellScript("setup.sh")
     setup.append_self_dir()
+    setup.add_log_function()
     setup.append_rootinstall()
-
-    setup.append(f"echo \"Setting up '{host_cfg['hostname']}'\"\n")
 
     # add all scripts from each role
     for role in host_cfg["roles"]:
-        setup.append(f"########## {role.name.upper()} ##########")
+        name = role.name.upper()
+        setup.append(f"echo ########## {name} ##########")
+        setup.append(f"log Configuring role {name}")
         setup.blank()
         try:
             role.write_config(setup, host_dir)
@@ -208,6 +210,7 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
         if site is None and host is None:
             host_cfg[key] = set()
         elif site is None:
+            host = list(host)
             host_cfg[key] = set(host)
         elif host is None:
             host_cfg[key] = set(site)
@@ -243,8 +246,12 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
 def _bootstrap_physical(cfg: dict, output_dir: str):
     # boot with install media; run /media/<install_dev>/<site>/<host>/yodel.sh
     # setup.sh will run in the installed host via chroot
+
+    cfg.setdefault("before_chroot", "# no configuration needed before chroot")
+
     yodel = shell.ShellScript("yodel.sh")
     yodel.append_self_dir()
+    yodel.setup_logging(cfg["hostname"])
     yodel.substitute("templates/physical/create_physical.sh", cfg)
     yodel.write_file(output_dir)
 
@@ -258,6 +265,7 @@ def _bootstrap_vm(cfg: dict, output_dir: str):
     # setup.sh will run in the VM via chroot
     yodel = shell.ShellScript("yodel.sh")
     yodel.append_self_dir()
+    yodel.setup_logging(cfg["hostname"])
     yodel.substitute("templates/vm/create_vm.sh", cfg)
     yodel.write_file(output_dir)
 
@@ -302,6 +310,7 @@ def _preview_dir(output_dir: str, line_count: int = sys.maxsize):
 
 
 # properties that are unique and cannot be set as defaults
+# usually set by the site and copied to the host
 _REQUIRED_PROPERTIES = ["site_name", "public_ssh_key"]
 _REQUIRED_PROPERTIES_TYPES = [str, str]
 

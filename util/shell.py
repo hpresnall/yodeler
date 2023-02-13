@@ -18,17 +18,17 @@ class ShellScript():
 
         self.name = name
 
-        shell_header = """#!/bin/sh\nset -o errexit\n"""
+        shell_header = "#!/bin/sh\nset -o errexit\n"
 
         self._script_fragments = [shell_header]
 
     def blank(self):
         """Add a blank line to the script."""
-        self._script_fragments.append("")
+        self.append("")
 
     def comment(self, comment):
         """Add a comment to the script."""
-        self._script_fragments.append("# " + comment)
+        self.append("# " + comment)
 
     def append(self, fragment):
         """Add code to the script."""
@@ -36,16 +36,19 @@ class ShellScript():
 
     def substitute(self, file, cfg):
         """Append the given template file to the script, after performing variable substitution."""
-        self._script_fragments.append(util.file.substitute(file, cfg))
+        self.append(util.file.substitute(file, cfg))
 
     def append_self_dir(self):
-        """Append code that puts the directory where the shell is located into the $DIR variable."""
-        self._script_fragments.append("""DIR=$(cd -P -- "$(dirname -- "$0")" && pwd -P)\n""")
+        """Append code that puts the directory where this shell script is located into the $DIR variable.
+        Also sets $SITE_DIR based on that location."""
+        self.append("""DIR=$(cd -P -- "$(dirname -- "$0")" && pwd -P)""")
+        self.append("SITE_DIR=$(realpath $DIR/..)")
+        self.blank()
 
     def append_rootinstall(self):
         """Append a rootinstall shell function.
         This ensures the install command copies as root with 644 perms."""
-        self._script_fragments.append("""rootinstall() {
+        self.append("""rootinstall() {
   install -o root -g root -m 644 $@
 }
 """)
@@ -54,12 +57,33 @@ class ShellScript():
         """Adds a service to system startup at the given runlevel."""
         self.append(f"rc-update add {service} {runlevel}")
 
-    def setup_logging(self, hostname):
-        """Make this script log to /root/yodeler/logs/<hostname>.
-        This removes to need to explicitly redirect all commands in the script."""
-        self.append("mkdir -p  /root/yodeler/logs")
-        self.append("exec >> /root/yodeler/logs/" + hostname + " 2>&1")
-        self.append("")
+    def setup_logging(self, hostname: str):
+        """Make this script log to $SITE_DIR/logs/<yyyymmdd>_<hhmmss>/<hostname>.log.
+        This removes to need to explicitly redirect all commands in the script.
+        All scripts should use the log() function rather than echo."""
+        self.comment("configure logging")
+        self.append("LOG_DIR=$SITE_DIR/logs/$(date +\"%Y%m%d_%H%M%S\")")
+        self.append("mkdir -p  \"$LOG_DIR\"")
+        self.append(f"LOG=$LOG_DIR/{hostname}")
+        self.append("""if [ -t 3 ]; then
+  # for chroot and subshells, continue using parent's stdout at fd 3
+  :
+else
+  exec 3>&1
+fi""")
+        self.append("echo \"Writing logs to $LOG\" >&3")
+        self.append("exec 1> $LOG")
+        self.append("exec 2>&1")
+        self.blank()
+        self.add_log_function()
+
+    def add_log_function(self):
+        self.append("""
+log () {
+  echo $*
+  echo $* >&3
+}
+""")
 
     def write_file(self, output_dir):
         """Write the script to the given directory."""

@@ -5,6 +5,7 @@ from roles.role import Role
 import config.interface as interface
 import config.vlan as vlan
 
+import util.file as file
 import util.libvirt as libvirt
 
 
@@ -61,6 +62,9 @@ class VmHost(Role):
         self.add_alias("vmhost")
         self.add_alias("kvm")
 
+        # additional physical server config before running chroot during setup
+        self._cfg["before_chroot"] = file.substitute("templates/vmhost/before_chroot.sh", self._cfg)
+
     def validate(self):
         pass
 
@@ -70,8 +74,11 @@ class VmHost(Role):
 
         # call yodel.sh for each VM
         setup.comment("run yodel.sh for each VM for this site")
-        setup.comment("site directory")
-        setup.append("cd $DIR/..")  # site dir
+        setup.append("cd $SITE_DIR")
+        setup.blank()
+
+        setup.append("log \"Creating VMs\"")
+        setup.append("log \"\"")
         setup.blank()
 
         for _, host in self._cfg["hosts"].items():
@@ -80,8 +87,9 @@ class VmHost(Role):
             if not host["is_vm"] or hostname == self._cfg["hostname"]:
                 continue
 
-            setup.append("echo \"Setting up VM '" + hostname + "'...\"")
+            setup.append("log \"Creating VM for '" + hostname + "'\"")
             setup.append(hostname + "/yodel.sh")
+            setup.append("log \"\"")
             setup.blank()
 
 
@@ -152,7 +160,7 @@ def _create_vswitch_uplink(vswitch, setup):
 
         uplink_name = bond_name  # use new uplink name for tagging, if needed
     else:
-        uplink_name =  next(iter(uplinks))
+        uplink_name = next(iter(uplinks))
 
         setup.comment("uplink")
         setup.append(f"ovs-vsctl add-port {vswitch_name} {uplink_name}")

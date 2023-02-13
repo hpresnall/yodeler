@@ -1,4 +1,4 @@
-echo "Configuring OpenVSwitch"
+log "Configuring Open vSwitch"
 
 rc-update add ovs-modules boot
 rc-update add ovsdb-server boot

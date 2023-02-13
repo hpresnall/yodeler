@@ -1,7 +1,8 @@
 # answerfile for basic Alpine physical host install
 
-# use the main CDN repo with no proxy
-APKREPOSOPTS="-1"
+# use the main CDN repo with community packages and no proxy
+# note this is only for basic configuration; setup.sh will honor site/host configuration
+APKREPOSOPTS="-1 -c"
 PROXYOPTS=none
 
 # general options

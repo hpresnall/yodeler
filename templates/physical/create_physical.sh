@@ -1,55 +1,42 @@
 # ensure the drive running this script is writable
 YODELER_DEV=$$(df $$DIR | grep -E '^(/|share)' | cut -d' ' -f1)
 
-if [ "$$YODELER_DEV" ne "share" ]; then
+# share when testing in VM with shared host filesystem
+if [ "$$YODELER_DEV" != "share" ]; then
   YODELER_DEV=$$(realpath $$YODELER_DEV)
   mount -o remount,rw $$YODELER_DEV
 fi
 
 # use site-level APK cache for this boot
 # will be partially populated by Alpine install
-echo "Setting up APK cache for site '$SITE_NAME'"
+log "Setting up APK cache for site '$SITE_NAME'"
 rm -f /etc/apk/cache
-mkdir -p $$DIR/../apk_cache
-ln -s $$(realpath $$DIR/../apk_cache) /etc/apk/cache
+mkdir -p $$SITE_DIR/apk_cache
+ln -s $$(realpath $$SITE_DIR/apk_cache) /etc/apk/cache
 
 # alpine install will setup the network
 # block all incoming traffic until awall is configured
-echo "Blocking incoming traffic before installation"
+log "Blocking incoming network traffic"
 apk -q add iptables
 iptables -P INPUT DROP
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
 # install Alpine with answerfile
-echo -n "Installing Alpine to $ROOT_DEV"
+log -n "Installing Alpine to $ROOT_DEV"
 # TODO log install output somewhere
 setup-alpine -e -f $$DIR/answerfile
-echo
-echo "Alpine install complete"
+log -e "\nAlpine install complete"
 
 # mount the installed system and run setup inside of chroot
-echo "Mounting installed system"
+log "Mounting installed system"
 INSTALLED=/media/installed
 mkdir -p "$$INSTALLED"
 mount ${ROOT_DEV}${ROOT_PARTITION} "$$INSTALLED"
 
-# TODO this is only needed for vmhost; need a method to add to this script based on role
-
-echo "Copying yodeler scripts for site '$SITE_NAME' to $$INSTALLED/root/"
-# note this includes the site-level apk_cache
-cp -R $$DIR/../../$SITE_NAME "$$INSTALLED/root/"
-
-# vm host install need openvswitch module running
-# however, the installer's kernel version could be different than the installed system
-# so, modprobe in chroot will not work; do it here instead
-# TODO need check for intel / amd
-# TODO remove this for non-vmhost physical servers
-setup-apkrepos -1 -c
-apk -q add openvswitch qemu-system-x86_64
-modprobe openvswitch
-modprobe nbd
-modprobe tun
-modprobe kvm_intel
+log "Copying yodeler scripts & apk_cache for site '$SITE_NAME' to $$INSTALLED/root/" 
+apk -q add rsync
+# do not include logs dir as that will stop output for this script
+rsync -r --exclude logs "$$SITE_DIR" "$$INSTALLED/root"
 
 # still using Alpine installer's network configuration in chroot
 # backup the installed resolv.conf and use the current installation's instead
@@ -63,7 +50,9 @@ cp /etc/resolv.conf "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.conf" # will b
 rm -f "$$INSTALLED/etc/apk/cache"
 ln -s /root/$SITE_NAME/apk_cache "$$INSTALLED/etc/apk/cache"
 
-echo "Chrooting to installed system"
+$BEFORE_CHROOT
+
+log "Chrooting to installed system"
 mkdir -p "$$INSTALLED"/proc "$$INSTALLED"/dev "$$INSTALLED"/sys
 mount -t proc none "$$INSTALLED"/proc
 mount --bind /dev "$$INSTALLED"/dev
@@ -71,18 +60,20 @@ mount --make-private "$$INSTALLED"/dev
 mount --bind /sys "$$INSTALLED"/sys
 mount --make-private "$$INSTALLED"/sys
 
-echo "Running setup for '$HOSTNAME' inside chroot"
-set +o errexit # copy cached APKs even if setup fails
-chroot "$$INSTALLED" /bin/sh -c "cd /root/$SITE_NAME/$HOSTNAME && ./setup.sh"
+log "Running setup for '$HOSTNAME' in chroot"
+# continue running the rest of the script even if setup.sh fails
+set +o errexit
+# set log_log dir in chroot to use the existing one this script is already using
+chroot "$$INSTALLED" /bin/sh -c "cd /root/$SITE_NAME/$HOSTNAME; ./setup.sh"
 RESULT=$$?
 
 # mount status gets reset sometimes; ensure still writable
 mount -o remount,rw $$YODELER_DEV
 
-echo "Synching $HOSTNAME's APK cache back to site-level cache"
+log "Copying APK cache out of chroot"
 # copy any new APKS back to the site APK cache
-apk -q add rsync
-rsync -r "$$INSTALLED/root/$SITE_NAME/apk_cache" $$DIR/../
+rsync -r "$$INSTALLED/root/$SITE_NAME/apk_cache" "$$SITE_DIR"
+rsync -r "$$INSTALLED/root/$SITE_NAME/logs" "$$SITE_DIR"
 
 # copy back final resolv.conf
 if [ -f "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.orig" ]; then
@@ -91,9 +82,9 @@ if [ -f "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.orig" ]; then
 fi
 
 if [ "$$RESULT" == 0 ]; then
-  echo "Successful Yodel!"
-  echo "The system will now reboot"
+  log "Successful Yodel!"
+  log "The system will now reboot"
   # reboot
 else
-  echo "Installation did not complete successfully; please see the logs for more info"
+  echo "Installation did not complete successfully; please see $$LOG for more info" >&3
 fi
