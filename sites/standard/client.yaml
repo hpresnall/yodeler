@@ -1,4 +1,4 @@
-motd: "hello, I am a minimal Alpine VM"
+motd: "Minimal Alpine VM on the client vlan"
 interfaces:
   - ipv4_address: dhcp
     vswitch: public

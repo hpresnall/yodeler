@@ -26,6 +26,6 @@ NTP(ACCEPT)	all	inet
 # Google QUIC protocol
 ACCEPT	all	inet	udp	443
 
-# allow DNS and ping to infra
-DNS(ACCEPT)	all	infra
-Ping(ACCEPT)	all	infra
+# allow DNS and ping to server
+DNS(ACCEPT)	all	server
+Ping(ACCEPT)	all	server

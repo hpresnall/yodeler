@@ -41,7 +41,7 @@ class Dhcp(Role):
 
         for iface in self._cfg["interfaces"]:
             ifaces4.append(iface["name"])
-            if iface["vlan"]["ipv6_subnet"]:  # ipv6 subnets are optional
+            if "ipv6_subnet" in iface["vlan"]:  # ipv6 subnets are optional
                 # add ipv6 address so kea will listen on it; this will allow dhcrelay to work without using ff02::1:2
                 ifaces6.append(iface["name"] + "/" + str(iface["ipv6_address"]))
             ifaces_by_vswitch[iface["vswitch"]["name"]] = iface["name"]

@@ -36,6 +36,8 @@ class Dns(Role):
 
     def validate(self):
         for iface in self._cfg["interfaces"]:
+            if iface["type"] != "std":
+                continue
             if iface["ipv4_address"] == "dhcp":
                 raise KeyError("cannot configure DNS server with a DHCP ipv4 address")
 

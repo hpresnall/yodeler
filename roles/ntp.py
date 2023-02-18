@@ -26,6 +26,10 @@ class NTP(Role):
         self.add_alias("ntp")
         self.add_alias("sntp")
 
+    @staticmethod
+    def minimum_instances(site_cfg: dict) -> int:
+        return 0
+
     def validate(self):
         missing_vlans = interface.check_accessiblity(self._cfg["interfaces"],
                                                      self._cfg["vswitches"].values())
@@ -47,7 +51,6 @@ def create_chrony_conf(cfg: dict, output_dir: str):
         ntp_addresses = interface.find_ips_to_interfaces(cfg, ntp_server_interfaces)
     else:
         ntp_addresses = []
-        ntp_fqdn = None
         # external_ntp will always be defined so chrony.conf will always be valid
 
     # do not run initstepslew at boot

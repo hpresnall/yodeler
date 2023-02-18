@@ -43,15 +43,17 @@ class Router(Role):
             # create a unique interface for each vswitch
             if self._cfg["is_vm"]:
                 iface_name = f"eth{iface_counter}"
+                iface_counter += 1
             elif vswitch["uplinks"]:
                 # TODO handle multiple uplinks; maybe just error instead of creating physical bond ifaces
-                # TODO if vmhost and router, but router if vm, need router_iface in vswitch config
-                iface_name = vswitch["uplinks"]
+                # TODO if site also have a separate, physical vmhost, then need a way to
+                # differentiate uplinks for vmhost vs router; maybe router_iface in vswitch config?
+                iface_name = next(iter(vswitch["uplinks"]))
                 # vswitch validation already confirmed uplink uniqueness
             else:
                 # note that this assumes ethernet layout of non-vm hosts
                 iface_name = f"eth{iface_counter}"
-            iface_counter += 1
+                iface_counter += 1
 
             vswitch["router_iface"] = iface_name
             vlan_interfaces = []
@@ -108,7 +110,7 @@ class Router(Role):
     def validate(self):
         pass
 
-    def write_config(self, setup:util.shell.ShellScript, output_dir: str):
+    def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
         uplink = parse.non_empty_dict("router 'uplink'", self._cfg.get("uplink"))
 

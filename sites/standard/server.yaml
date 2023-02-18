@@ -1,0 +1,9 @@
+motd: "Minimal Alpine VM on the server vlan"
+primary_domain: server.yodeler.internal
+interfaces:
+  - ipv4_address: 192.168.210.100
+    vswitch: public
+    vlan: server # vlan can be name or id
+  - ipv4_address: 172.16.251.6
+    vswitch: private
+    # use default (only) vlan

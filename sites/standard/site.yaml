@@ -5,12 +5,14 @@ external_ntp:
   - 2.us.pool.ntp.org
   - 3.us.pool.ntp.org
 timezone: US/Eastern
-motd: Welcome to Yodeler's Basic Example Site!\n
+motd: Welcome to Yodeler's Standard Example Site!\n
 alpine_repositories:
   - http://dl-cdn.alpinelinux.org/alpine/edge/main
   - http://dl-cdn.alpinelinux.org/alpine/edge/community
   - http://dl-cdn.alpinelinux.org/alpine/edge/testing
-public_ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQC9Av51+kAxf3Tozo/TueBDN3rWEcLWrTUjh672JpQGUAu71IzHBCxi4R6mZNi3+Z9HA4Ur2CeQWFZO1ZTZKwstJibaLh7SFoU1EggH9b0GNHPV35xVY+P2k0WNMXuKrKAAPeSL0kNh0TnTqF4qOX/rHwdORNvwXy4izLKFFH5uPQ== basic
+public_ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQC9Av51+kAxf3Tozo/TueBDN3rWEcLWrTUjh672JpQGUAu71IzHBCxi4R6mZNi3+Z9HA4Ur2CeQWFZO1ZTZKwstJibaLh7SFoU1EggH9b0GNHPV35xVY+P2k0WNMXuKrKAAPeSL0kNh0TnTqF4qOX/rHwdORNvwXy4izLKFFH5uPQ== yodeler
+# private key installed on any host that has 'install_private_ssh_key: true'
+# DO NOT allow this host to have unrestricted internet access
 private_ssh_key: |
   -----BEGIN OPENSSH PRIVATE KEY-----
   b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAlwAAAAdzc2gtcn
@@ -29,11 +31,15 @@ private_ssh_key: |
   0MH/yy6YFDQC4xfV59AAAADkh1bnRlckBQbGFuY2hhAQIDBA==
   -----END OPENSSH PRIVATE KEY-----
 vswitches:
+  # switch shared by clients & servers which are in separate vlans
+  # the router VM will allow routing between the vlans
   - name: public
+    # add uplink here to allow other, physical systems access to these vlans
+    # this uplink should connect to a switch port that trunks vlans 10 & 20
     vlans:
-      - name: infra
+      - name: server
         id: 10
-        domain: infra.yodeler.internal
+        domain: server.yodeler.internal
         ipv4_subnet: 192.168.210.0/24
         ipv6_subnet: fd24:87e8:06c7:10::/64
         # instead of defaulting to index order, set delegated prefix to the 10th /64 in the IPv6 PD
@@ -45,9 +51,9 @@ vswitches:
         access_vlans: all
         allow_access_stopped_firewall: true # allow internet access when firewall is stopped
         allow_dns_update: true # allow this subnet to make DDNS updates
-      - name: user
+      - name: client
         id: 20
-        domain: user.yodeler.internal
+        domain: client.yodeler.internal
         ipv4_subnet: 192.168.220.0/24
         ipv6_subnet: fd24:87e8:06c7:20::/64
         ipv6_pd_network: 20
@@ -59,12 +65,18 @@ vswitches:
           - hostname: laptop
             ipv4_address: 192.168.220.3
             ipv6_address: fd24:87e8:06c7:20::3
-            mac_address: 34:8c:56:5f:1e:02 # will add static DHCP assignment
+            mac_address: ab:cd:ef:12:34:56 # will add static DHCP assignment
+  # switch for "management" connections like physical switches, wireless access points, etc
+  # the uplink is the port on the _vmhost_; this port is set as the uplink by open vswitch
+  # for security, the router VM will not be on the management network
   - name: private
+    # the physical port on the vmhost should either connect to a separate switch
+    # or a vlan tagged port on the switch shared with the client & server vlans
     uplink: eth1
     vlans:
       - name: mgmt
-        id: # default and only vlan; vswitch will not vlan tag
+        # default and only vlan
+        # id is left as null; vswitch will not vlan tag
         routable: false # no interface and no firewall rules will be created on the router
         domain: mgmt.yodeler.internal
         ipv4_subnet: 172.16.251.0/24

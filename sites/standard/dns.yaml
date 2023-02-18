@@ -1,0 +1,15 @@
+motd: "Alpine DNS, DHCP & NTP server VM built by Yodeler"
+roles: [dns, dhcp, ntp]
+primary_domain: server.yodeler.internal
+interfaces:
+  # DNS & DHCP roles require static IP addresses
+  # note that other systems do not need to know these IP addresses
+  # yodeler will automatically configure resolv.conf based on what networks are in common
+  - ipv4_address: 192.168.210.2
+    ipv6_address: fd24:87e8:06c7:10::2
+    vswitch: public
+    vlan: server
+  - ipv4_address: 172.16.251.2
+    vswitch: private
+    # note that this switch is _not_ routable
+    # the DNS server _must_ have an interface on each vlan or that vlan will not be able to make DNS queries

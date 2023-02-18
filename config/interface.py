@@ -21,6 +21,8 @@ def validate(cfg: dict):
     matching_domain = None
     iface_counter = 0
 
+    names = set()
+
     for i, iface in enumerate(ifaces):
         parse.non_empty_dict("iface " + str(i), iface)
 
@@ -29,6 +31,10 @@ def validate(cfg: dict):
         else:
             iface["name"] = f"eth{iface_counter}"
             iface_counter += 1
+
+        if iface["name"] in names:
+            raise ValueError(f"duplicate interface name {iface['name']} on host '{cfg['hostname']}")
+        names.add(iface["name"])
 
         try:
             iface.setdefault("type", "std")
@@ -91,7 +97,7 @@ def _validate_network(iface: dict, vswitches: dict):
 
     vlan_id = iface.get("vlan")
     iface["vlan"] = config.vlan.lookup(vlan_id, vswitch)
-    iface["firewall_zone"] = str(iface.get("firewall_zone", vswitch_name)).upper()
+    iface["firewall_zone"] = str(iface.get("firewall_zone", iface["vlan"]["name"])).upper()
 
 
 def _validate_iface(iface: dict):
@@ -345,7 +351,7 @@ def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:
 
 
 # set the minimal set of properties tht allow all functions to accept the objects, but not match by any criteria
-_unknown_vswitch = {"name": "__none__", "vlans_by_name": {}, "vlans_by_id": {}}
+_unknown_vswitch = {"name": "__none__", "vlans_by_name": {}, "vlans_by_id": {}, "vlans": []}
 # ports should not be assigned addresses, so disable ipv6
 _port_vlan = {
     "id": -1, "name": "__none__", "domain": "__unknown__",

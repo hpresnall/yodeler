@@ -1,15 +1,18 @@
-motd: "hello, I am a KVM host"
-primary_domain: infra.yodeler.internal
-is_vm: false
+# the single physical server for this site
+# setting up this system will also set up all the VMs
+roles: [vmhost]
+motd: "KVM host built by Yodeler"
+primary_domain: server.yodeler.internal # needed when host has multiple interfaces
+is_vm: false # physical server
 interfaces:
   - ipv4_address: 192.168.210.5
     ipv6_address: fd24:87e8:06c7:10::5
     vswitch: public
-    firewall_zone: PUB
-    vlan: infra
+    vlan: server
+    firewall_zone: SRV # shorten default SERVER; not requried
   - ipv4_address: 172.16.251.5
     vswitch: private
-    firewall_zone: PRIV
+    # no need to specify vlan since there is only one defined
 # /etc/network/interfaces used during initial Alpine Linux install
 # if not set, install will prompt
 # this is the direct file contents, in _BusyBox's_ interfaces file format, not ifupdown-ng!
@@ -21,7 +24,7 @@ install_interfaces: |
 # private key will be put on this server and it can be used as a jump box
 install_private_ssh_key: true
 packages: [ndisc6 tcpdump]
-roles: [vmhost]
+# INSTALL DISK MUST BE CORRECT
+# installation will reformat this drive during the install
 root_dev: /dev/nvme0n1
-#root_dev: /dev/vdb
 root_partition: p3

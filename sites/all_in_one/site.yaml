@@ -1,0 +1,14 @@
+public_ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQC9Av51+kAxf3Tozo/TueBDN3rWEcLWrTUjh672JpQGUAu71IzHBCxi4R6mZNi3+Z9HA4Ur2CeQWFZO1ZTZKwstJibaLh7SFoU1EggH9b0GNHPV35xVY+P2k0WNMXuKrKAAPeSL0kNh0TnTqF4qOX/rHwdORNvwXy4izLKFFH5uPQ== yodeler
+domain: yodeler.internal
+vswitches:
+  - name: lan
+    # uplink in a site without a vmhost / non-virtualized router specifies
+    # the physical port the _router_ will use
+    # this uplink should connect to a switch port with an untagged vlan (or no vlan)
+    uplink: eth1
+    vlans:
+      - name: lan
+        # default and only vlan
+        # id is left as null; vswitch will not vlan tag
+        ipv4_subnet: 192.168.123.0/24
+        ipv6_subnet: fd24:87e8:06c7:00::/64

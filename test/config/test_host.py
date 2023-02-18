@@ -112,7 +112,7 @@ class TestHost(base.TestCfgBase):
         # has interface config
         iface = cfg["interfaces"][0]
         self.assertEqual(10, iface["vlan"]["id"])
-        self.assertEqual("PUBLIC", iface["firewall_zone"])
+        self.assertEqual("PUB_TEST", iface["firewall_zone"])
         self.assertEqual("eth0", iface["name"])
 
         self.assertEqual("192.168.1.1", str(iface["ipv4_address"]))

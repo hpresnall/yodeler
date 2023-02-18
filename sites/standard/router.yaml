@@ -1,0 +1,22 @@
+# note that the router _does not_ define any interfaces
+# instead it defines an uplink that connects to the WAN/ISP
+# router configuration will automatically create and configure interfaces for all routable vlans
+motd: "Alpine router VM built by Yodeler"
+roles: [router]
+primary_domain: server.yodeler.internal
+memory_mb: 256
+uplink:
+  # could also use static IP addresses here for ISPs that provide them
+  ipv4_address: dhcp
+  # request a DHCP6 address in addtion to SLAAC and DHCP6 options
+  ipv6_dhcp: true
+  # request an IPv6 prefix delegation of this length
+  # this will be distributed to the vlans, possibly using the ipv6_pd_network setting 
+  ipv6_pd_prefixlen: 56
+  # note that eth0 _cannot_ also be an uplink for a vswitch
+  # this interface is dedicated to the router by the KVM host using macvtap
+  # could also set vswitch + vlan here instead of macvtap
+  # this would require a separate vswitch just for the router
+  macvtap: eth0
+# not on the mgmt vlan for security
+# if desired anyway, that interface would need to be manually added since it is not routable

@@ -32,5 +32,5 @@ NTP(ACCEPT)	all	inet
 ACCEPT	all	inet	udp	443
 
 # allow DNS and ping to infra
-DNS(ACCEPT)	all	infra
-Ping(ACCEPT)	all	infra
+DNS(ACCEPT)	all	server
+Ping(ACCEPT)	all	server

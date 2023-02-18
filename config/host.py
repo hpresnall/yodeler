@@ -171,6 +171,19 @@ def _set_defaults(cfg: dict):
     if not cfg["install_private_ssh_key"]:
         cfg["private_ssh_key"] = ""
 
+    if not cfg["is_vm"]:
+        # physical installs need a interface configure to download APKs and a disk to install the OS
+        cfg.setdefault("install_interfaces", """auto lo
+iface lo inet loopback
+auto eth0
+iface eth0 inet dhcp""")
+        cfg.setdefault("root_dev", "/dev/sda")
+        cfg.setdefault("root_partition", "3")
+
+        parse.non_empty_string("install_interfaces", cfg, cfg["hostname"] + " cfg")
+        parse.non_empty_string("root_dev", cfg, cfg["hostname"] + " cfg")
+        parse.non_empty_string("root_partition", cfg, cfg["hostname"] + " cfg")
+
     # also called in site.py; this call ensures overridden values from the host are also valid
     validate_site_defaults(cfg)
 
@@ -352,18 +365,13 @@ DEFAULT_CONFIG = {
     "disk_size_mb": 256,
     "image_format": "raw",
     "vm_images_path": "/vmstorage",
-    "root_dev": "/dev/sda",
-    "root_partition": "3",  # default disk layout puts /root on /dev/sda3
     # configure a local firewall and metrics on all systems
     "local_firewall": True,
     "motd": "",
     # do not install private ssh key on every host
     "install_private_ssh_key": False,
     # domain for the host when it has multiple interfaces; used for DNS search
-    "primary_domain": "",
-    # for physical servers, manually specify contents of /etc/network/interfaces
-    # default blank => installer will prompt
-    "install_interfaces": ""
+    "primary_domain": ""
 }
 
 _DEFAULT_CONFIG_TYPES = {
