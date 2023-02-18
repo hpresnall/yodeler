@@ -63,8 +63,8 @@ mount --make-private "$$INSTALLED"/sys
 log "Running setup for '$HOSTNAME' in chroot"
 # continue running the rest of the script even if setup.sh fails
 set +o errexit
-# set log_log dir in chroot to use the existing one this script is already using
-chroot "$$INSTALLED" /bin/sh -c "cd /root/$SITE_NAME/$HOSTNAME; ./setup.sh"
+# export START_TIME in chroot to use the same LOG_DIR this script is already using
+chroot "$$INSTALLED" /bin/sh -c "export START_TIME=$$START_TIME; cd /root/$SITE_NAME/$HOSTNAME; ./setup.sh"
 RESULT=$$?
 
 # mount status gets reset sometimes; ensure still writable

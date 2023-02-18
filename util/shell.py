@@ -12,7 +12,7 @@ class ShellScript():
     name = ""
     _script_fragments = []
 
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         if not name:
             raise ValueError("name cannot be None or empty")
 
@@ -61,25 +61,11 @@ class ShellScript():
         """Make this script log to $SITE_DIR/logs/<yyyymmdd>_<hhmmss>/<hostname>.log.
         This removes to need to explicitly redirect all commands in the script.
         All scripts should use the log() function rather than echo."""
-        self.comment("configure logging")
-        self.append("LOG_DIR=$SITE_DIR/logs/$(date +\"%Y%m%d_%H%M%S\")")
-        self.append("mkdir -p  \"$LOG_DIR\"")
-        self.append(f"LOG=$LOG_DIR/{hostname}")
-        self.append("""if [ -t 3 ]; then
-  # for chroot and subshells, continue using parent's stdout at fd 3
-  :
-else
-  exec 3>&1
-fi""")
-        self.append("echo \"Writing logs to $LOG\" >&3")
-        self.append("exec 1> $LOG")
-        self.append("exec 2>&1")
-        self.blank()
+        self.append(util.file.substitute("templates/common/logging.sh", {"hostname": hostname}))
         self.add_log_function()
 
     def add_log_function(self):
-        self.append("""
-log () {
+        self.append("""log () {
   echo $*
   echo $* >&3
 }
