@@ -13,7 +13,7 @@ class Role(ABC):
     functionality on a server.
     """
 
-    def __init__(self, name: str, cfg: dict):
+    def __init__(self, name: str, cfg: dict) -> None:
         self.name = name
         self._cfg = cfg
 

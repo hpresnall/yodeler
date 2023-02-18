@@ -33,7 +33,7 @@ class Dhcp(Role):
         if missing_vlans:
             raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {missing_vlans}")
 
-    def write_config(self, setup, output_dir):
+    def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
         ifaces4 = []
         ifaces6 = []

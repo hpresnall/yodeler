@@ -108,7 +108,7 @@ class Router(Role):
     def validate(self):
         pass
 
-    def write_config(self, setup, output_dir):
+    def write_config(self, setup:util.shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
         uplink = parse.non_empty_dict("router 'uplink'", self._cfg.get("uplink"))
 
@@ -181,7 +181,7 @@ def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
                             f" networks available with the 'ipv6_pd_prefixlen' of {prefixlen}"))
 
 
-def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
+def _write_dhcrelay_config(cfg: dict, setup: util.shell.ShellScript, dhrelay4_ifaces: list, dhrelay6_ifaces: list):
     dhcp_server = cfg["hosts"][cfg["roles_to_hostnames"]["dhcp"][0]]
     dhcp_addresses = interface.find_ips_to_interfaces(cfg, dhcp_server["interfaces"], first_match_only=False)
 
@@ -211,7 +211,7 @@ def _write_dhcrelay_config(cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces):
 
         # dhrelay requires listening on the interface that is on the dhcp server's vlan
         # make sure it is setup, even if that vlan does not have dhcp enabled
-        if upper_iface4 not in dhrelay4_ifaces:
+        if upper_iface4 and upper_iface4 not in dhrelay4_ifaces:
             dhrelay4_ifaces.insert(0, upper_iface4)
 
         setup.comment("setup dhcrelay.conf")

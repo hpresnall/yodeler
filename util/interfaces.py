@@ -6,7 +6,7 @@ the Debian's version from the ifupdown package."""
 import config.interface
 
 
-def from_config(cfg):
+def from_config(cfg: dict):
     """Convert the interfaces to a form for use in /etc/network/interfaces.
 
     The interfaces must be from a validated host configuration."""
@@ -33,7 +33,7 @@ iface lo
     return "\n".join(all_interfaces)
 
 
-def _standard(iface):
+def _standard(iface: dict):
     buffer = []
     if "comment" in iface:
         buffer.append("# {comment}")
@@ -88,7 +88,7 @@ def _standard(iface):
     return "\n".join(buffer).format_map(iface)
 
 
-def _port(cfg, iface):
+def _port(cfg: dict, iface: dict):
     """ Create an interface configuration for "port" interfaces like vswitches and vlan parents.
 
     # <comment>
@@ -129,7 +129,7 @@ def _port(cfg, iface):
     return "\n".join(buffer)
 
 
-def _vlan(iface):
+def _vlan(iface: dict):
     """ Create a router interface for the given vlan.
 
     # <name> vlan, id <id>
@@ -167,7 +167,7 @@ def _vlan(iface):
     return "\n".join(buffer)
 
 
-def _output_wifi(iface, buffer):
+def _output_wifi(iface: dict, buffer: list[str]):
     if "wifi_ssid" in iface:
         buffer.append("  use wifi")
         buffer.append("  wifi-ssid {wifi_ssid}")

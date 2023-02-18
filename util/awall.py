@@ -3,11 +3,14 @@ import logging
 import os
 
 import util.file
+import util.shell
+
+from roles.role import Role
 
 _logger = logging.getLogger(__name__)
 
 
-def configure(interfaces, roles, setup, output_dir):
+def configure(interfaces: list[dict], roles: list[Role], setup: util.shell.ShellScript, output_dir: str):
     """Create awall configuration for the given interfaces.
     Outputs all JSON to <output_dir>/awall.
     Returns a shell script fragment to process the JSON files and create iptables rules."""
@@ -74,7 +77,7 @@ def configure(interfaces, roles, setup, output_dir):
     setup.service("ip6tables", "boot")
 
 
-def _load_templates(services, template_dir):
+def _load_templates(services: dict, template_dir: str):
     if not os.path.exists(template_dir):
         return
 

@@ -16,6 +16,15 @@ class TestCfgBase(unittest.TestCase):
     """Base class for testing Yodler configuration functions."""
     _base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
+    def __init__(self, methodName: str) -> None:
+        super().__init__(methodName)
+
+        self._site_yaml: dict
+        self._host_yaml: dict
+
+        self._site_cfg: dict
+        self._host_cfg: dict
+
     @classmethod
     def setUpClass(cls):
         logging.basicConfig(level="ERROR")
@@ -35,10 +44,10 @@ class TestCfgBase(unittest.TestCase):
         del self._host_yaml["public_ssh_key"]
 
     def tearDown(self):
-        self._site_yaml = None
-        self._host_yaml = None
-        self._site_cfg = None
-        self._host_cfg = None
+        self._site_yaml = {}
+        self._host_yaml = {}
+        self._site_cfg = {}
+        self._host_cfg = {}
 
     def build_cfg(self):
         """Build the current configuration. No exceptions will indicate a successful test."""

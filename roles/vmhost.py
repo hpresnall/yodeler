@@ -6,6 +6,7 @@ import config.interface as interface
 import config.vlan as vlan
 
 import util.file as file
+import util.shell as shell
 import util.libvirt as libvirt
 
 
@@ -68,7 +69,7 @@ class VmHost(Role):
     def validate(self):
         pass
 
-    def write_config(self, setup, output_dir):
+    def write_config(self, setup: shell.ShellScript, output_dir: str):
         _setup_open_vswitch(self._cfg, setup,)
         _setup_libvirt(self._cfg, setup, output_dir)
 

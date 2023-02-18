@@ -3,8 +3,8 @@ import sys
 import os.path
 import shutil
 
-import util.shell
-import util.file
+import util.shell as shell
+import util.file as file
 import util.interfaces
 import util.libvirt
 import util.awall
@@ -71,9 +71,9 @@ class Common(Role):
 
             vswitches_used.add(vswitch_name)
 
-    def write_config(self, setup, output_dir):
+    def write_config(self, setup: shell.ShellScript, output_dir: str):
         # write all packages to a file; usage depends on vm or physical server
-        util.file.write("packages", " ".join(self._cfg["packages"]), output_dir)
+        file.write("packages", " ".join(self._cfg["packages"]), output_dir)
 
         if self._cfg["is_vm"]:
             # VMs will use host's configured repo file and have packages installed as part of image creation
@@ -105,7 +105,7 @@ class Common(Role):
         if self._cfg["local_firewall"]:
             util.awall.configure(self._cfg["interfaces"], self._cfg["roles"], setup, output_dir)
 
-        util.file.write("interfaces", util.interfaces.from_config(self._cfg), output_dir)
+        file.write("interfaces", util.interfaces.from_config(self._cfg), output_dir)
 
         util.resolv.create_conf(self._cfg, output_dir)
         util.dhcpcd.create_conf(self._cfg, output_dir)
@@ -115,7 +115,7 @@ class Common(Role):
             util.libvirt.write_vm_xml(self._cfg, output_dir)
 
 
-def _setup_repos(cfg, setup):
+def _setup_repos(cfg: dict, setup: shell.ShellScript):
     setup.append("log \"Setting up APK repositories\"")
     setup.blank()
 
@@ -130,7 +130,7 @@ def _setup_repos(cfg, setup):
     setup.blank()
 
 
-def _apk_update(setup):
+def _apk_update(setup: shell.ShellScript):
     setup.append("apk -q update")
     setup.blank()
 

@@ -4,7 +4,7 @@ import util.file as file
 import config.interface as interface
 
 
-def create_conf(cfg, output_dir):
+def create_conf(cfg: dict, output_dir: str):
     """Create resolv.conf and save it to the given directory.
 
     If DHCP or DHCP6 is used on any interfaces, no file is created.

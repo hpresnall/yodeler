@@ -11,10 +11,9 @@ import util.parse as parse
 _logger = logging.getLogger(__name__)
 
 
-def validate(cfg):
+def validate(cfg: dict):
     """Validate all the interfaces defined in the host."""
-    ifaces = cfg.get("interfaces")
-    parse.non_empty_list("interfaces", ifaces)
+    ifaces = parse.non_empty_list("interfaces", cfg.get("interfaces"))
 
     vswitches = cfg["vswitches"]
 
@@ -36,8 +35,8 @@ def validate(cfg):
             types = {"std", "vlan", "port", "uplink"}
             if iface["type"] not in types:
                 raise KeyError(f"only {type} interface types are supported")
-            validate_network(iface, vswitches)
-            validate_iface(iface)
+            _validate_network(iface, vswitches)
+            _validate_iface(iface)
         except KeyError as err:
             msg = err.args[0]
             raise KeyError(f"{msg} for interface {i} on host '{cfg['hostname']}': '{iface['name']}'") from err
@@ -58,7 +57,7 @@ def validate(cfg):
         # else leave host domain blank
 
 
-def validate_network(iface, vswitches):
+def _validate_network(iface: dict, vswitches: dict):
     """Validate the interface's vswitch and vlan."""
     match iface["type"]:
         case "port":
@@ -92,10 +91,10 @@ def validate_network(iface, vswitches):
 
     vlan_id = iface.get("vlan")
     iface["vlan"] = config.vlan.lookup(vlan_id, vswitch)
-    iface["firewall_zone"] = iface.get("firewall_zone", vswitch_name).upper()
+    iface["firewall_zone"] = str(iface.get("firewall_zone", vswitch_name)).upper()
 
 
-def validate_iface(iface):
+def _validate_iface(iface: dict):
     """Validate a single interface."""
     # vlan set by validate_network
     vlan = iface["vlan"]
@@ -159,9 +158,11 @@ def validate_iface(iface):
                 raise KeyError("both 'wifi_ssd' and 'wifi_psk' must be defined for WiFi interfaces")
 
 
-def _validate_ipaddress(iface, ip_version):
+def _validate_ipaddress(iface: dict, ip_version: str):
     key = ip_version + "_address"
     value = iface.get(key)
+    if not value:
+        raise KeyError(f"invalid {key} '{value}'")
     try:
         iface[key] = address = ipaddress.ip_address(value)
     except ValueError as ve:

@@ -16,7 +16,7 @@ import roles.role
 _logger = logging.getLogger(__name__)
 
 
-def load(site_dir: str) -> dict:
+def load(site_dir: str | None) -> dict:
     """Load 'site.yaml' from the given directory and validate it. This method also loads and validates all the host's
     configurations for the site.
 
@@ -42,13 +42,13 @@ def load(site_dir: str) -> dict:
     return site_cfg
 
 
-def validate(site_yaml: dict) -> dict:
+def validate(site_yaml: dict | str | None) -> dict:
     """Validate the given YAML formatted site configuration.
 
     This configuration _is not_ valid for creating a set of scripts for a specific host.
     Instead, this configuration must be used as the base for loading host YAML files.
     """
-    parse.non_empty_dict("site_yaml", site_yaml)
+    site_yaml = parse.non_empty_dict("site_yaml", site_yaml)
 
     parse.non_empty_string("site_name", site_yaml, "site_yaml")
 
@@ -87,7 +87,6 @@ def write_host_scripts(site_cfg: dict, output_dir: str):
     _logger.info("writing setup scripts for site to '%s'", output_dir)
 
     _validate_site(site_cfg)
-
 
     for host_cfg in site_cfg["hosts"].values():
         host.write_scripts(host_cfg, output_dir)

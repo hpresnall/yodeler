@@ -8,13 +8,24 @@ def write_vm_xml(cfg, output_dir):
     template = xml.parse("templates/vm/server.xml")
     domain = template.getroot()
 
-    domain.find("name").text = cfg["hostname"]
-    domain.find("memory").text = str(cfg["memory_mb"])
-    domain.find("vcpu").text = str(cfg["vcpus"])
+    _find_and_set_text(domain, "name", cfg["hostname"])
+    _find_and_set_text(domain, "memory", str(cfg["memory_mb"]))
+    _find_and_set_text(domain, "vcpu", str(cfg["vcpus"]))
 
     devices = domain.find("devices")
 
-    devices.find("disk/source").attrib["file"] = f"{cfg['vm_images_path']}/{cfg['hostname']}.img"
+    if devices is None:
+        devices = xml.SubElement(domain, "devices")
+
+    source = devices.find("disk/source")
+
+    if source is None:
+        disk = devices.find("disk")
+        if disk is None:
+            disk = xml.SubElement(devices, "disk")
+        source = xml.SubElement(disk, "source")
+
+    source.attrib["file"] = f"{cfg['vm_images_path']}/{cfg['hostname']}.img"
 
     for iface in cfg["interfaces"]:
         if iface["type"] != "std":
@@ -22,6 +33,7 @@ def write_vm_xml(cfg, output_dir):
         devices.append(interface_from_config(cfg["hostname"], iface))
 
     xml.indent(template, space="  ")
+
     template.write(os.path.join(output_dir, cfg["hostname"] + ".xml"))
 
 
@@ -91,6 +103,9 @@ def update_interfaces(hostname, new_interfaces, output_dir):
     template = xml.parse(file_name)
     devices = template.getroot().find("devices")
 
+    if devices is None:
+        devices = xml.SubElement(template.getroot(), "devices")
+
     # remove existing interfaces and add them back after the new ones
     original_interfaces = devices.findall("./interface")
     for original in original_interfaces:
@@ -114,8 +129,8 @@ def create_network(vswitch, output_dir):
     template = xml.parse("templates/vm/network.xml")
     net = template.getroot()
 
-    net.find("name").text = vswitch_name
-    net.find("bridge").attrib["name"] = vswitch_name
+    _find_and_set_text(net, "name", vswitch_name)
+    _find_and_set_text(net, "bridge", vswitch_name)
 
     # create a portgroup for the router that trunks all the routable vlans
     router_portgroup = xml.SubElement(net, "portgroup")
@@ -157,3 +172,12 @@ def create_network(vswitch, output_dir):
     network_xml = vswitch_name + ".xml"
     xml.indent(template, space="  ")
     template.write(os.path.join(output_dir, network_xml))
+
+
+def _find_and_set_text(root: xml.Element, element_name: str, text: str):
+    e = root.find(element_name)
+
+    if e is None:
+        e = xml.SubElement(root, element_name)
+
+    e.text = text

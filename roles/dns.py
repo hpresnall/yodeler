@@ -45,7 +45,7 @@ class Dns(Role):
         if accessible_vlans:
             raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {accessible_vlans}")
 
-    def write_config(self, setup, output_dir):
+    def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
 
         _create_dns_entries(self._cfg)
@@ -91,7 +91,7 @@ class Dns(Role):
         setup.append("rootinstall -t /var/bind $DIR/zones/*")
 
 
-def _create_dns_entries(cfg):
+def _create_dns_entries(cfg: dict):
     # each vlan will be a separate zone
     cfg["dns_entries_by_vlan"] = {}
 
@@ -137,7 +137,7 @@ def _create_dns_entries(cfg):
                 })
 
 
-def _init_named(cfg):
+def _init_named(cfg: dict):
     # parameter substitutions for named.conf
     named = {}
     named["listen"] = ["127.0.0.1"]
@@ -155,7 +155,7 @@ def _init_named(cfg):
     return named
 
 
-def _format_named(named):
+def _format_named(named: dict):
     # format named params with tabs and end with ;
     named["listen"] = "\n".join(["\t\t" + val + ";" for val in named["listen"]])
     named["listen6"] = "\n".join(["\t\t" + val + ";" for val in named["listen6"]])
@@ -169,7 +169,7 @@ def _format_named(named):
     named["update_acl6"] = "\n".join(["\t" + val + ";" for val in named["update_acl6"]])
 
 
-def _configure_zones(cfg, vlan, named, zone_dir):
+def _configure_zones(cfg: dict, vlan: dict, named: dict, zone_dir: str):
     zone_name = vlan["domain"]
     zone_file_name = zone_name + ".zone"
     named["zones"].append(_zone_config(zone_name, zone_file_name))
@@ -219,7 +219,7 @@ def _configure_zones(cfg, vlan, named, zone_dir):
         util.file.write(reverse_zone_file_name, "\n".join(zone_file), zone_dir)
 
 
-def _zone_config(zone_name, zone_file, forward=False):
+def _zone_config(zone_name: str, zone_file: str, forward: bool = False):
     zone = """zone "{0}" IN {{
 	type master;
 	file "{1}";
@@ -234,7 +234,7 @@ def _zone_config(zone_name, zone_file, forward=False):
     return zone.format(zone_name, zone_file)
 
 
-def _forward_zone_file(cfg, zone_name, vlan, zone_file_name, zone_dir):
+def _forward_zone_file(cfg: dict, zone_name: str, vlan: dict, zone_file_name: str, zone_dir: str):
     zone_file = [_ZONE_TEMPLATE.format(zone_name, cfg["dns_domain"],)]
     cnames = [""]
 
@@ -256,7 +256,7 @@ def _forward_zone_file(cfg, zone_name, vlan, zone_file_name, zone_dir):
     util.file.write(zone_file_name, "\n".join(zone_file), zone_dir)
 
 
-def _configure_tld(cfg, named, zone_dir):
+def _configure_tld(cfg: dict, named: dict, zone_dir: str):
     # forward top level DNS queries; assume these are configured by the registrar
     # insert as the first configured zone
     named["zones"].insert(0, _zone_config(cfg["domain"], cfg["domain"] + ".zone", True))

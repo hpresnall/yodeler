@@ -33,12 +33,12 @@ class NTP(Role):
         if missing_vlans:
             _logger.warning("vlans '%s' cannot access time from NTP host '%s'", self._cfg["hostname"], missing_vlans)
 
-    def write_config(self, setup, output_dir):
+    def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         # create_chrony_conf() will be called by common
         setup.comment("set in chrony.conf; no additional config needed")
 
 
-def create_chrony_conf(cfg, output_dir):
+def create_chrony_conf(cfg: dict, output_dir: str):
     buffer = []
 
     # use local NTP server if there is one defined

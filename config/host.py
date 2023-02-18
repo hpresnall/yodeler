@@ -18,7 +18,7 @@ import ipaddress
 _logger = logging.getLogger(__name__)
 
 
-def load(site_cfg: dict, host_path: str) -> dict:
+def load(site_cfg: dict, host_path: str | None) -> dict:
     """Load the given host YAML file from given path, using the existing site config.
 
     Return a configuration that is a combination of the site and host configuration.
@@ -43,14 +43,14 @@ def load(site_cfg: dict, host_path: str) -> dict:
     return host_cfg
 
 
-def validate(site_cfg: dict, host_yaml: dict) -> dict:
+def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     """Validate the given YAML formatted host configuration.
 
     Returns a configuration file that is a combination of the site and host configuration.
     This merged configuration is valid for creating a set of scripts for a specific host.
     """
-    parse.non_empty_dict("site_cfg", site_cfg)
-    parse.non_empty_dict("host_yaml", host_yaml)
+    site_cfg = parse.non_empty_dict("site_cfg", site_cfg)
+    host_yaml = parse.non_empty_dict("host_yaml", host_yaml)
 
     hostname = parse.non_empty_string("hostname", host_yaml, "host_yaml")
 

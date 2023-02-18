@@ -8,12 +8,11 @@ import util.parse as parse
 _logger = logging.getLogger(__name__)
 
 
-def validate(domain: str, vswitch, other_vswitch_vlans: set):
+def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
     """Validate all the vlans defined in the vswitch."""
     vswitch_name = vswitch["name"]
 
-    vlans = vswitch.get("vlans")
-    parse.non_empty_list("vlans", vlans)
+    vlans = parse.non_empty_list("vlans", vswitch.get("vlans"))
 
     # list of vlans in yaml => dicts of names & ids to vswitches
     vlans_by_id = vswitch["vlans_by_id"] = {}
@@ -76,7 +75,7 @@ def validate(domain: str, vswitch, other_vswitch_vlans: set):
     _validate_access_vlans(vswitch)
 
 
-def _validate_vlan_subnet(vswitch_name, vlan, ip_version):
+def _validate_vlan_subnet(vswitch_name: str, vlan: dict, ip_version: str):
     # ipv4 subnet is required
     # ipv6 subnet is optional; this does not preclude addresses from a prefix assignment
     subnet = vlan.get(ip_version + "_subnet")
@@ -89,6 +88,7 @@ def _validate_vlan_subnet(vswitch_name, vlan, ip_version):
         if ip_version == "ipv6":
             vlan["ipv6_subnet"] = None
             return
+    subnet = str(subnet)
 
     # remove the subnet if the vlan disables ipv6
     if ip_version == "ipv6" and vlan["ipv6_disabled"]:
@@ -121,7 +121,7 @@ def _validate_vlan_subnet(vswitch_name, vlan, ip_version):
 _VALID_MAC = re.compile("^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$")
 
 
-def _validate_vlan_dhcp_reservations(vswitch_name, vlan):
+def _validate_vlan_dhcp_reservations(vswitch_name: str, vlan: dict):
     reservations = vlan.setdefault("dhcp_reservations", [])
     cfg_name = f"vlan '{vlan['name']}' in vswitch '{vswitch_name}'"
 
@@ -153,7 +153,7 @@ def _validate_vlan_dhcp_reservations(vswitch_name, vlan):
         res.pop("alias", None)
 
 
-def _validate_ip_address(ip_version, index, vlan, vswitch_name):
+def _validate_ip_address(ip_version: str, index: int, vlan: dict, vswitch_name: str):
     key = ip_version + "_address"
 
     if key not in vlan["dhcp_reservations"][index]:
@@ -179,7 +179,7 @@ def _validate_ip_address(ip_version, index, vlan, vswitch_name):
     vlan["dhcp_reservations"][index][key] = address
 
 
-def _configure_default_vlan(vswitch):
+def _configure_default_vlan(vswitch: dict):
     # track which vlan is marked as the default
     default_vlan = None
 
@@ -202,7 +202,7 @@ def _configure_default_vlan(vswitch):
         vswitch["default_vlan"] = None
 
 
-def _validate_access_vlans(vswitch):
+def _validate_access_vlans(vswitch: dict):
     for vlan in vswitch["vlans"]:
         vlan_name = vlan["name"]
 
@@ -220,7 +220,7 @@ def _validate_access_vlans(vswitch):
                 raise KeyError(f"invalid access_vlan in vlan '{vlan_name}': {msg}") from ke
 
 
-def lookup(vlan_id, vswitch):
+def lookup(vlan_id: str | int | None, vswitch: dict):
     """Get the vlan object from the given vswitch. vlan_id can be either an id or a name."""
     if isinstance(vlan_id, str):
         lookup_dict = vswitch["vlans_by_name"]

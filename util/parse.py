@@ -2,14 +2,16 @@
 
 These functions will raise ValueErrors or KeyErrors for invalid values.
 """
+from typing import cast
 
 
 def non_empty_dict(name: str, value: object) -> dict:
-   return  _non_empty(name, value, dict)
+    # type: ignore
+    return cast(dict, _non_empty(name, value, dict))
 
 
 def non_empty_list(name: str, value: object) -> list:
-    return _non_empty(name, value, list)
+    return cast(list, _non_empty(name, value, list))
 
 
 def _non_empty(name: str, value, kind: type) -> object:

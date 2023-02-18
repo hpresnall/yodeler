@@ -2,7 +2,7 @@
 import util.file
 
 
-def create_conf(cfg, output_dir):
+def create_conf(cfg: dict, output_dir: str):
     """Create dhcpcd.conf and save it to the given directory.
     """
     conf = [util.file.read("templates/common/dhcpcd.conf")]
