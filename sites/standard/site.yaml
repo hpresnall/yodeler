@@ -58,12 +58,14 @@ vswitches:
         ipv6_subnet: fd24:87e8:06c7:20::/64
         ipv6_pd_network: 20
         default: true # if not specified, VMs default to this vlan
-        dhcp_min_address_ipv4: 2
-        dhcp_max_address_ipv4: 252
+        dhcp_min_address_ipv4: 16
+        dhcp_max_address_ipv4: 128
         # dhcp6_managed defaults to false so DHCP6 will be information only
+        # allow unrescricted access to the internet
+        allow_internet: true
         dhcp_reservations:
           - hostname: laptop
-            ipv4_address: 192.168.220.3
+            ipv4_address: 192.168.220.24
             ipv6_address: fd24:87e8:06c7:20::3
             mac_address: ab:cd:ef:12:34:56 # will add static DHCP assignment
   # switch for "management" connections like physical switches, wireless access points, etc

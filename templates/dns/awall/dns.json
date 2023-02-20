@@ -1,11 +1,10 @@
 {
-    "description": "allow DNS",
-    "filter": [
-      {
-        "in": [],
-        "service": "dns",
-        "action": "accept"
-      }
-    ]
-  }
-  
+  "description": "allow DNS",
+  "filter": [
+    {
+      "in": [],
+      "service": "dns",
+      "action": "accept"
+    }
+  ]
+}

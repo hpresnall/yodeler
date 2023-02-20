@@ -12,3 +12,5 @@ vswitches:
         # id is left as null; vswitch will not vlan tag
         ipv4_subnet: 192.168.123.0/24
         ipv6_subnet: fd24:87e8:06c7:00::/64
+        # allow unrescricted access to the internet
+        allow_internet: true

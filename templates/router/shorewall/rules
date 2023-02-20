@@ -18,14 +18,3 @@ DNS(ACCEPT)	$FW inet
 
 # allow SSH in, but at a limited rate and log connections
 SSH(ACCEPT):NFLOG(4)	inet	$FW	-	-	-	-	s:6/min:15
-
-# allow web, ping and NTP to internet
-Web(ACCEPT)	all	inet
-Ping(ACCEPT)	all	inet
-NTP(ACCEPT)	all	inet
-# Google QUIC protocol
-ACCEPT	all	inet	udp	443
-
-# allow DNS and ping to server
-DNS(ACCEPT)	all	server
-Ping(ACCEPT)	all	server
