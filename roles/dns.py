@@ -57,10 +57,15 @@ class Dns(Role):
         zone_dir = os.path.join(output_dir, "zones")
         os.mkdir(zone_dir)
 
+        no_domain_vlans = []
+
         # note walking interfaces, then vlans in the interface's vswitch
         # if an interface is not defined for a vswitch, its vlans
         #  _will not_ be able to resolve DNS queries unless the router routes DNS queries correctly
         for iface in self._cfg["interfaces"]:
+            if iface["type"] not in {"std", "vlan"}:
+                continue
+
             named["listen"].append(str(iface["ipv4_address"]))
             if iface["ipv6_address"] is not None:
                 named["listen6"].append(str(iface["ipv6_address"]))
@@ -68,6 +73,7 @@ class Dns(Role):
             for vlan in iface["vswitch"]["vlans"]:
                 # no domain => no dns
                 if not vlan["domain"]:
+                    no_domain_vlans.append(vlan)
                     continue
 
                 named["query_acl"].append(str(vlan["ipv4_subnet"]))
@@ -82,7 +88,15 @@ class Dns(Role):
 
                 _configure_zones(self._cfg, vlan, named, zone_dir)
 
-        if self._cfg["dns_domain"]:
+        # handle case where this is a single vlan; use that to configure the top-level-domain
+        if not named["zones"]:
+            if len(no_domain_vlans) != 1:
+                raise ValueError("cannot determine vlan to use for TLD when no vlan sets 'domain'")
+            no_domain_vlans[0]["domain"] = self._cfg["dns_domain"]
+            _create_dns_entries(self._cfg)
+            _configure_zones(self._cfg, no_domain_vlans[0], named, zone_dir)
+            no_domain_vlans[0]["domain"] = ""
+        elif self._cfg["dns_domain"]:
             _configure_tld(self._cfg, named, zone_dir)
 
         _format_named(named)
