@@ -36,10 +36,9 @@ class Dns(Role):
 
     def validate(self):
         for iface in self._cfg["interfaces"]:
-            if iface["type"] != "std":
-                continue
-            if iface["ipv4_address"] == "dhcp":
-                raise KeyError("cannot configure DNS server with a DHCP ipv4 address")
+            if (iface["type"] == "std") and (iface["ipv4_address"] == "dhcp"):
+                raise KeyError(
+                    f"host '{self._cfg['hostname']}' cannot configure a DNS server with a DHCP address on interface '{iface['name']}'")
 
         accessible_vlans = interface.check_accessiblity(self._cfg["interfaces"],
                                                         self._cfg["vswitches"].values())

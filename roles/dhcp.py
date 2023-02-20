@@ -26,12 +26,17 @@ class Dhcp(Role):
         self.add_alias("dhcp")
 
     def validate(self):
-        missing_vlans = interface.check_accessiblity(self._cfg["interfaces"],
+        for iface in self._cfg["interfaces"]:
+            if (iface["type"] == "std") and (iface["ipv4_address"] == "dhcp"):
+                raise KeyError(
+                    f"host '{self._cfg['hostname']}' cannot configure a DHCP server with a DHCP address on interface '{iface['name']}'")
+
+        accessible_vlans = interface.check_accessiblity(self._cfg["interfaces"],
                                                      self._cfg["vswitches"].values(),
                                                      lambda vlan: not vlan["dhcp4_enabled"] and not vlan["ipv6_subnet"])
 
-        if missing_vlans:
-            raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {missing_vlans}")
+        if accessible_vlans:
+            raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {accessible_vlans}")
 
     def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""

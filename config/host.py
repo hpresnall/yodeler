@@ -110,6 +110,9 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
     # create a setup script that sources all the other scripts
     setup = shell.ShellScript("setup.sh")
+    setup.comment("DO NOT run this script directly! It will be run in a chrooted environment _after_ configuring the server.")
+    setup.comment("Run yodel.sh instead!")
+    setup.blank()
     setup.append_self_dir()
     setup.add_log_function()
     setup.append_rootinstall()
@@ -263,6 +266,9 @@ def _bootstrap_physical(cfg: dict, output_dir: str):
     cfg.setdefault("before_chroot", "# no configuration needed before chroot")
 
     yodel = shell.ShellScript("yodel.sh")
+    yodel.comment("Run this script to configure a Yodeler physical server")
+    yodel.comment("Run in booted Alpine Linux install image")
+    yodel.blank()
     yodel.append_self_dir()
     yodel.setup_logging(cfg["hostname"])
     yodel.substitute("templates/physical/create_physical.sh", cfg)
@@ -277,6 +283,9 @@ def _bootstrap_physical(cfg: dict, output_dir: str):
 def _bootstrap_vm(cfg: dict, output_dir: str):
     # setup.sh will run in the VM via chroot
     yodel = shell.ShellScript("yodel.sh")
+    yodel.comment("Run this script to configure a Yodeler VM")
+    yodel.comment("Run from a KVM host configured by Yodeler")
+    yodel.blank()
     yodel.append_self_dir()
     yodel.setup_logging(cfg["hostname"])
     yodel.substitute("templates/vm/create_vm.sh", cfg)

@@ -31,6 +31,11 @@ class NTP(Role):
         return 0
 
     def validate(self):
+        for iface in self._cfg["interfaces"]:
+            if (iface["type"] == "std") and (iface["ipv4_address"] == "dhcp"):
+                raise KeyError(
+                    f"host '{self._cfg['hostname']}' cannot configure aN NTP server with a DHCP address on interface '{iface['name']}'")
+
         missing_vlans = interface.check_accessiblity(self._cfg["interfaces"],
                                                      self._cfg["vswitches"].values())
 
