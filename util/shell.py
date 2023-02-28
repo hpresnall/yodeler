@@ -66,7 +66,6 @@ class ShellScript():
 
     def add_log_function(self):
         self.append("""log () {
-  echo $*
   echo $* >&3
 }
 """)

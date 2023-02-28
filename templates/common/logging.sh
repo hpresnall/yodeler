@@ -4,16 +4,22 @@ if [ -z $$START_TIME ]; then
 fi
 
 LOG_DIR=$$SITE_DIR/logs/$$START_TIME
-mkdir -p  "$$LOG_DIR"
+mkdir -p "$$LOG_DIR"
 LOG=$$LOG_DIR/$HOSTNAME
 
-if [ -t 3 ]; then
-  # for chroot and subshells, continue using parent's stdout at fd 3
+if [ -t 4 ]; then
+  # for chroot and subshells, continue using parent's stdout at fd 4
   :
 else
-  exec 3>&1
+  exec 4>&1 # the outermost console
 fi
 
-echo "Writing logs to $$LOG" >&3
-exec 1> $$LOG
+# fd 3 writes to logfile & console
+exec 3> >(tee -a $$LOG >&4)
+
+echo "Writing logs to $$LOG"
+# stdout to log, stderr to log & console
+exec 1>> $$LOG
 exec 2>&1
+
+trap 'exec 3>&-;exec 1>&-' EXIT

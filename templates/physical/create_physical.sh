@@ -22,9 +22,9 @@ iptables -P INPUT DROP
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
 # install Alpine with answerfile
-log -n "Installing Alpine to $ROOT_DEV"
-# TODO log install output somewhere
-setup-alpine -e -f $$DIR/answerfile
+log -e "Installing Alpine to $ROOT_DEV\n"
+# redirecting to allow confirmation of deleting existing partitions
+setup-alpine -e -f $$DIR/answerfile >&3 2>&1
 log -e "\nAlpine install complete"
 
 # mount the installed system and run setup inside of chroot
@@ -60,7 +60,7 @@ mount --make-private "$$INSTALLED"/dev
 mount --bind /sys "$$INSTALLED"/sys
 mount --make-private "$$INSTALLED"/sys
 
-log "Running setup for '$HOSTNAME' in chroot"
+log -e "\nRunning setup for '$HOSTNAME' in chroot"
 # continue running the rest of the script even if setup.sh fails
 set +o errexit
 # export START_TIME in chroot to use the same LOG_DIR this script is already using
@@ -82,9 +82,8 @@ if [ -f "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.orig" ]; then
 fi
 
 if [ "$$RESULT" == 0 ]; then
-  log "Successful Yodel!"
-  log "The system will now reboot"
+  log -e "\nSuccessful Yodel!\nThe system will now reboot\n"
   # reboot
 else
-  echo "Installation did not complete successfully; please see $$LOG for more info" >&3
+  log "Installation did not complete successfully; please see $$LOG for more info"
 fi

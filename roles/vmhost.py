@@ -78,8 +78,7 @@ class VmHost(Role):
         setup.append("cd $SITE_DIR")
         setup.blank()
 
-        setup.append("log \"Creating VMs\"")
-        setup.append("log \"\"")
+        setup.append("log -e \"\\nCreating VMs\\n\"")
         setup.blank()
 
         for _, host in self._cfg["hosts"].items():

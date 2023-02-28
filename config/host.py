@@ -120,7 +120,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
     # add all scripts from each role
     for role in host_cfg["roles"]:
         name = role.name.upper()
-        setup.append(f"echo ########## {name} ##########")
+        setup.append(f"echo \"########## {name} ##########\"")
         setup.append(f"log Configuring role {name}")
         setup.blank()
         try:

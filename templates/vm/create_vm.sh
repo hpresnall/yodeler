@@ -32,5 +32,9 @@ if [ "$$?" = "0" ]; then
       log "Starting VM '$HOSTNAME'"
       virsh start $HOSTNAME
     fi
+  else
+    log "Installation did not complete successfully; please see $$LOG for more info"
   fi
+else
+  log "Installation did not complete successfully; please see $$LOG for more info"
 fi
