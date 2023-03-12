@@ -66,7 +66,7 @@ vswitches:
         dhcp_reservations:
           - hostname: laptop
             ipv4_address: 192.168.220.24
-            ipv6_address: fd24:87e8:06c7:20::3
+            ipv6_address: fd24:87e8:06c7:20::18
             mac_address: ab:cd:ef:12:34:56 # will add static DHCP assignment
   # switch for "management" connections like physical switches, wireless access points, etc
   # the uplink is the port on the _vmhost_; this port is set as the uplink by open vswitch
