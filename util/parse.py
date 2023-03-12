@@ -68,37 +68,41 @@ def set_default_string(key: str, cfg: None | dict, default: str):
     cfg[key] = value
 
 
-def read_string_list_plurals(keys: set[str], cfg: dict, value_name: str) -> set[str]:
+def read_string_list(key: str, cfg: dict, value_name: str) -> list[str]:
+    return read_string_list_plurals({key}, cfg, value_name)
+
+
+def read_string_list_plurals(keys: set[str], cfg: dict, value_name: str) -> list[str]:
     # combine all all the values from all the keys into a single set
     # this allows something like foo: bar or foos: [ bar, baz ]
-    values = set()
-    for key in keys:
-        values.update(read_string_list(key, cfg, value_name))
-    return values
-
-
-def read_string_list(key: str, cfg: dict, value_name: str) -> set[str]:
-    if not key:
-        raise ValueError("key cannot be empty")
     if cfg is None:
         raise ValueError("cfg cannot be None")
     if not value_name:
         raise ValueError("value_name cannot be empty")
 
-    values = set()
+    unique_values = set()
+    values = []
 
-    if key not in cfg:
-        return values
+    for key in keys:
+        if not key:
+            raise ValueError(f"key {key} cannot be empty")
 
-    if isinstance(cfg[key], str):
-        values.add(cfg[key])
-    elif isinstance(cfg[key], list):
-        for value in cfg[key]:
-            if not isinstance(value, str):
-                raise KeyError(f"invalid {value_name} value '{value}'; it must be a string")
-            values.add(value)
-    else:
-        raise KeyError(f"{key} for {value_name} must be a str or list, not {type(cfg[key])}")
+        if key not in cfg:
+            continue
+
+        if isinstance(cfg[key], str):
+            if key and key not in unique_values:
+                values.append(cfg[key])
+                unique_values.add(cfg[key])
+        elif isinstance(cfg[key], list):
+            for value in cfg[key]:
+                if not isinstance(value, str):
+                    raise KeyError(f"invalid {value_name} value '{value}'; it must be a string")
+                if key and key not in unique_values:
+                    values.append(value)
+                    unique_values.add(value)
+        else:
+            raise KeyError(f"{key} for {value_name} must be a str or list, not {type(cfg[key])}")
 
     return values
 
@@ -118,10 +122,6 @@ def configure_defaults(config_name: str, default_config: dict, default_types: di
             raise KeyError(f"{key} in {config_name} does not define a type")
 
         value = cfg.setdefault(key, default_config[key])
-
-        if isinstance(value, set):
-            # YAML does not support sets so this value has be configured in code; assume config already checked
-            continue
 
         kind = default_types[key]
 

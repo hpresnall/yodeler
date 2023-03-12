@@ -22,9 +22,6 @@ class Dhcp(Role):
     def additional_packages(self):
         return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-dhcp-ddns", "kea-admin", "kea-ctrl-agent"}
 
-    def additional_configuration(self):
-        self.add_alias("dhcp")
-
     def validate(self):
         for iface in self._cfg["interfaces"]:
             if (iface["type"] == "std") and (iface["ipv4_address"] == "dhcp"):

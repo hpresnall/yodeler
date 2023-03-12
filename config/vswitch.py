@@ -35,6 +35,5 @@ def validate(cfg: dict):
             uplinks.add(uplink)
 
         vswitch["uplinks"] = vswitch_uplinks
-        vswitch.pop("uplink", None)
 
         vlan.validate(cfg["domain"], vswitch, all_vlans)

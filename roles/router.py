@@ -95,7 +95,6 @@ class Router(Role):
         # router will use Shorewall instead
         self._cfg["local_firewall"] = False
 
-        self.add_alias("router")
         self.add_alias("gateway")
 
     @staticmethod

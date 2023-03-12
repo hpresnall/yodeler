@@ -76,8 +76,8 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     interface.validate(host_cfg)
 
     # allow both 'alias' and 'aliases'; only store 'aliases'
-    host_cfg["aliases"] = parse.read_string_list_plurals(
-        {"alias", "aliases"}, host_cfg, "alias for " + host_cfg["hostname"])
+    host_cfg["aliases"] = set(parse.read_string_list_plurals(
+        {"alias", "aliases"}, host_cfg, "alias for " + host_cfg["hostname"]))
     host_cfg.pop("alias", None)
 
     for role in host_cfg["roles"]:
@@ -145,9 +145,6 @@ def validate_site_defaults(site_cfg: dict):
     parse.configure_defaults("site_yaml", DEFAULT_SITE_CONFIG, _DEFAULT_SITE_CONFIG_TYPES, site_cfg)
 
     for key in ("alpine_repositories", "external_ntp", "external_dns"):
-        # already a set, assume host config has not overriden since YAML does not support sets
-        if isinstance(site_cfg.get(key), set):
-            continue
         site_cfg[key] = parse.read_string_list(key, site_cfg, site_cfg["site_name"])
 
     for dns in site_cfg["external_dns"]:
@@ -195,7 +192,7 @@ def _load_roles(cfg: dict):
     # list of role names in yaml => list of Role subclass instances
 
     # allow both 'role' and 'roles'; only store 'roles'
-    role_names = parse.read_string_list_plurals({"role", "roles"}, cfg, "role for " + cfg["hostname"])
+    role_names = set(parse.read_string_list_plurals({"role", "roles"}, cfg, "role for " + cfg["hostname"]))
     cfg.pop("role", None)
 
     # Common _must_ be the first so it is configured and setup first
@@ -343,9 +340,9 @@ DEFAULT_SITE_CONFIG = {
     "keymap": "us us",
     # note sets here for comparisions on test, but list type in _TYPES since that is what YAML will load
     # running type will also be parsed as sets
-    "alpine_repositories": {"http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"},
-    "external_ntp": {"0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"},
-    "external_dns": {"8.8.8.8", "9.9.9.9", "1.1.1.1"},
+    "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
+    "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
+    "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
     "metrics": True,
     # top-level domain for the site; empty => no local DNS
     "domain": "",

@@ -80,6 +80,9 @@ _role_class_by_name = {}
 
 def load(role_name: str, host_cfg: dict) -> Role:
     """Load an Role subclass instance using the given role name."""
+    if host_cfg is None:
+        raise ValueError("host_cfg cannot be None")
+
     clazz = _role_class_by_name.setdefault(role_name, _load_role_class(role_name))
 
     # instantiate the class
@@ -89,7 +92,10 @@ def load(role_name: str, host_cfg: dict) -> Role:
         raise KeyError(f"cannot instantiate class '{clazz}'") from te
 
 
-def _load_role_class(role_name: str):
+def _load_role_class(role_name: str) -> type:
+    if not role_name:
+        raise ValueError("role_name cannot be empty")
+
     try:
         mod = importlib.import_module("roles." + role_name)
     except ModuleNotFoundError as mnfe:

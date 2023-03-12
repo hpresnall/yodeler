@@ -60,7 +60,6 @@ class VmHost(Role):
         # do not support nested vms
         self._cfg["is_vm"] = False
 
-        self.add_alias("vmhost")
         self.add_alias("kvm")
 
         # additional physical server config before running chroot during setup

@@ -32,8 +32,6 @@ class Dns(Role):
         self._cfg["dns_domain"] = domain
         # note, no top-level domain => vlans will not have domains and DNS will only have the single, top-levle zone
 
-        self._cfg["aliases"].add("dns")
-
     def validate(self):
         for iface in self._cfg["interfaces"]:
             if (iface["type"] == "std") and (iface["ipv4_address"] == "dhcp"):

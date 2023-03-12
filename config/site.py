@@ -121,9 +121,9 @@ def _validate_site(site_cfg: dict):
         hostname = host_cfg["hostname"]
 
         if hostname in hostnames:
-            raise KeyError("duplicate hostname '{hostname}'")
+            raise KeyError(f"duplicate hostname '{hostname}'")
         if hostname in aliases:
-            raise KeyError("hostname '{hostname}' cannot be the same as another host's alias")
+            raise KeyError(f"hostname '{hostname}' cannot be the same as another host's alias")
 
         hostnames.add(hostname)
 

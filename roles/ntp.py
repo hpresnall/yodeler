@@ -23,7 +23,6 @@ class NTP(Role):
 
     def additional_configuration(self):
         self.add_alias("time")
-        self.add_alias("ntp")
         self.add_alias("sntp")
 
     @staticmethod
