@@ -110,7 +110,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
     # create a setup script that sources all the other scripts
     setup = shell.ShellScript("setup.sh")
-    setup.comment("DO NOT run this script directly! It will be run in a chrooted environment _after_ configuring the server.")
+    setup.comment("DO NOT run this script directly! It will be run in a chrooted environment _after_ installing Alpine.")
     setup.comment("Run yodel.sh instead!")
     setup.blank()
     setup.append_self_dir()

@@ -24,11 +24,6 @@ rc-update add dbus
 rc-update add polkit
 rc-update add libvirtd
 
-# add alpine-make-vm-images for creating new VMs
-cd /home/$USER
-git clone --depth=1 --single-branch --branch=master https://github.com/alpinelinux/alpine-make-vm-image.git
-chown -R $USER:$USER alpine-make-vm-image
-
 log "Starting libvirt"
 # libvirt needs networking; make libvirt think it is started
 # continue to use the installer network instead
@@ -47,7 +42,7 @@ while [ "$$?" -ne 0 ]; do
 done
 
 log "Configuring libvirt storage"
-mkdir $VM_IMAGES_PATH
+mkdir -p $VM_IMAGES_PATH
 chown nobody:libvirt $VM_IMAGES_PATH
 chmod 755 $VM_IMAGES_PATH
 virsh pool-define-as --name vmstorage --type dir --target $VM_IMAGES_PATH
@@ -58,3 +53,13 @@ log "Configuring libvirt networks"
 # remove default DHCP network
 virsh net-destroy default
 virsh net-undefine default
+
+# add alpine-make-vm-images for creating new VMs
+log "Installing alpine-make-vm-image"
+cd $VM_IMAGES_PATH
+git clone --depth=1 --single-branch --branch=master https://github.com/alpinelinux/alpine-make-vm-image.git
+chown -R nobody:libvirt alpine-make-vm-image
+cd alpine-make-vm-image
+if [ -f $$DIR/patch ]; then
+    git apply $$DIR/patch
+fi

@@ -71,8 +71,10 @@ RESULT=$$?
 mount -o remount,rw $$YODELER_DEV
 
 log "Copying APK cache out of chroot"
-# copy any new APKS back to the site APK cache
-rsync -r "$$INSTALLED/root/$SITE_NAME/apk_cache" "$$SITE_DIR"
+# copy any new APKS back to the site APK cache, deleting old versions
+rsync -r --delete "$$INSTALLED/root/$SITE_NAME/apk_cache" "$$SITE_DIR"
+
+log "Copying logs from chroot to '$$LOG_DIR'"
 rsync -r "$$INSTALLED/root/$SITE_NAME/logs" "$$SITE_DIR"
 
 # copy back final resolv.conf

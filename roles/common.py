@@ -76,18 +76,20 @@ class Common(Role):
         file.write("packages", " ".join(self._cfg["packages"]), output_dir)
 
         if self._cfg["is_vm"]:
-            # VMs will use host's configured repo file and have packages installed as part of image creation
-            _apk_update(setup)
-        else:
-            # for physical servers, add packages manually
-            _setup_repos(self._cfg, setup)
-            _apk_update(setup)
-            setup.append("log \"Installing required packages\"")
-            setup.append("apk -q --no-progress add $(cat $DIR/packages)")
-            setup.blank()
+            # VMs will use host's configured repo file APK cache
+            # packages will be installed as part of image creation
 
             # VMs are setup without USB, so remove the library
             self._cfg["remove_packages"].add("libusb")
+        else:
+            # for physical servers, add packages manually
+            _setup_repos(self._cfg, setup)
+            setup.append("apk -q update")
+            setup.append("apk cache sync")
+            setup.blank()
+            setup.append("log \"Installing required packages\"")
+            setup.append("apk -q --no-progress add $(cat $DIR/packages)")
+            setup.blank()
 
         if (self._cfg["remove_packages"]):
             setup.append("log \"Removing unneeded packages\"")
@@ -127,11 +129,6 @@ def _setup_repos(cfg: dict, setup: shell.ShellScript):
     for repo in repos[1:]:
         setup.append(f"echo {repo} >> /etc/apk/repositories")
 
-    setup.blank()
-
-
-def _apk_update(setup: shell.ShellScript):
-    setup.append("apk -q update")
     setup.blank()
 
 

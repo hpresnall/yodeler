@@ -1,5 +1,8 @@
 """Configuration & setup for the main KVM & Openvswitch Alpine host."""
 
+import os
+import shutil
+
 from roles.role import Role
 
 import config.interface as interface
@@ -90,6 +93,10 @@ class VmHost(Role):
             setup.append(hostname + "/yodel.sh")
             setup.append("log \"\"")
             setup.blank()
+
+        # directly copy patch if it exists
+        if os.path.isfile("templates/vmhost/patch"):
+            shutil.copyfile("templates/vmhost/patch", os.path.join(output_dir, "patch"))
 
 
 def _create_uplink_ports(vswitch: dict) -> list[dict]:

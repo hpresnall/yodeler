@@ -5,7 +5,7 @@
 - [x] Minimal VM creation
 - [x] Basic awall firewall config
 - [x] Generic configuration & setup for physical servers
-- [ ] All-in-one, single system pysical server configuration
+- [x] All-in-one, router/DHCP/DNS pysical server configuration
 - [ ] All-in-one, router/DHCP/DNS VM configuration
 
 ## KVM Virtual Machine Host
@@ -30,6 +30,7 @@
 - [x] YAML-based configuration for additional DNS entries
 - [ ] Bind alternatives? PowerDNS?
 - [ ] Add / update IPv6 SLAAC addresses
+- [ ] DNSSEC
 
 ## DHCP
 - [x] Kea configuration for IPv4 and IPv6 with host reservations
@@ -38,7 +39,7 @@
 - [ ] Track DHCP reservations and IPv6 SLAAC addresses over time
 
 ## NTP
-- [ ] Configure chronyd server
+- [x] Configure chronyd server
 
 ## Metrics
 - [x] Configure Prometheus client on all systems

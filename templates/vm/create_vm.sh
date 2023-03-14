@@ -6,7 +6,7 @@ umask 022
 # create the virtual machine
 # run setup.sh inside a chroot of the VM's filesystem
 log "Building VM image for '$HOSTNAME'"
-/home/$USER/alpine-make-vm-image/alpine-make-vm-image \
+$VM_IMAGES_PATH/alpine-make-vm-image/alpine-make-vm-image \
   --image-format raw \
   --serial-console \
   --image-size ${DISK_SIZE_MB}M \
