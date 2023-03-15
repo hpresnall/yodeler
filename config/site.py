@@ -84,7 +84,7 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
 
 def write_host_scripts(site_cfg: dict, output_dir: str):
     """Create the configuration scripts and files for the site's hosts and write them to the given directory."""
-    _logger.info("writing setup scripts for site to '%s'", output_dir)
+    _logger.info("writing setup scripts for site '%s' to '%s'", site_cfg["site_name"], output_dir)
 
     _validate_site(site_cfg)
 
@@ -108,7 +108,7 @@ def _validate_site(site_cfg: dict):
             raise ValueError((f"role '{role_name}' requires at least {role_class.minimum_instances(site_cfg)} host defined;"
                               f" site '{site_cfg['site_name']}' has {count} hosts: {hostnames}"))
         if count > role_class.maximum_instances(site_cfg):
-            raise ValueError((f"role '{role_name}' cannot have more than {role_class.minimum_instances(site_cfg)} host defined;"
+            raise ValueError((f"role '{role_name}' cannot have more than {role_class.maximum_instances(site_cfg)} host defined;"
                               f" site '{site_cfg['site_name']}' has {count} hosts: {hostnames}"))
 
     # confirm all hostnames and aliases are unique

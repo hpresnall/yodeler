@@ -264,9 +264,10 @@ def _bootstrap_physical(cfg: dict, output_dir: str):
 
     yodel = shell.ShellScript("yodel.sh")
     yodel.comment("Run this script to configure a Yodeler physical server")
-    yodel.comment("Run in booted Alpine Linux install image")
+    yodel.comment("Run in a booted Alpine Linux install image")
     yodel.blank()
     yodel.append_self_dir()
+    yodel.substitute("templates/physical/ensure_writable.sh", cfg)
     yodel.setup_logging(cfg["hostname"])
     yodel.substitute("templates/physical/create_physical.sh", cfg)
     yodel.write_file(output_dir)
@@ -281,7 +282,7 @@ def _bootstrap_vm(cfg: dict, output_dir: str):
     # setup.sh will run in the VM via chroot
     yodel = shell.ShellScript("yodel.sh")
     yodel.comment("Run this script to configure a Yodeler VM")
-    yodel.comment("Run from a KVM host configured by Yodeler")
+    yodel.comment("Run in a KVM host configured by Yodeler")
     yodel.blank()
     yodel.append_self_dir()
     yodel.setup_logging(cfg["hostname"])

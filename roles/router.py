@@ -299,16 +299,16 @@ def _configure_shorewall_vlan(shorewall, vswitch_name, vlan):
     for access in vlan["access_vlans"]:
         if access == "all":
             all_access = True
-            shorewall["policy"].append(f"# vlan {vlan_name} has full access to EVERYTHING")
+            shorewall["policy"].append(f"# {vlan_name} vlan has full access to EVERYTHING")
         else:
-            shorewall["policy"].append(f"# vlan {vlan_name} has full access to vlan {access}")
+            shorewall["policy"].append(f"# {vlan_name} vlan has full access to vlan {access}")
         shorewall["policy"].append(f"{vlan_name}\t{access}\tACCEPT")
         shorewall["policy"].append("")
         # all should be the only item in the list from validation, so loop will end
 
     #  all access => internet
     if not all_access and vlan["allow_internet"]:
-        shorewall["policy"].append(f"# vlan {vlan_name} has full internet access")
+        shorewall["policy"].append(f"# {vlan_name} vlan has full internet access")
         shorewall["policy"].append(f"{vlan_name}\tinet\tACCEPT")
         shorewall["policy"].append("")
 
@@ -357,13 +357,15 @@ def _configure_shorewall_rules(cfg: dict, shorewall: dict, routable_vlans: list[
                         shorewall["rules"].append(f"# allow access to {host['hostname']}")
 
                     # allow ping on all hosts
-                    shorewall["rules"].append(f"Ping(ACCEPT)\t{routable_vlan['name']}\t{param4}")
+                    shorewall["rules"].append(f"Ping(ACCEPT)\t{routable_vlan['name']}\t${param}")
 
                     for role in host_roles:
                         if (role == "dns"):
-                            shorewall["rules"].append(f"DNS(ACCEPT)\t{routable_vlan['name']}\t{param4}")
+                            shorewall["rules"].append(f"DNS(ACCEPT)\t{routable_vlan['name']}\t${param}")
+                            shorewall["rules"].append(f"DNS(ACCEPT)\t$FW\t${param}")
                         if (role == "ntp"):
-                            shorewall["rules"].append(f"NTP(ACCEPT)\t{routable_vlan['name']}\t{param4}")
+                            shorewall["rules"].append(f"NTP(ACCEPT)\t{routable_vlan['name']}\t${param}")
+                            shorewall["rules"].append(f"NTP(ACCEPT)\t$FW\t${param}")
                         # DHCP4 is broadcast and does not need special handling
 
                 if param6:
@@ -372,13 +374,15 @@ def _configure_shorewall_rules(cfg: dict, shorewall: dict, routable_vlans: list[
                         shorewall["params6"].append(f"{param}={param6}")
                         shorewall["rules6"].append(f"# allow access to {host['hostname']}")
 
-                    shorewall["rules6"].append(f"Ping(ACCEPT)\t{routable_vlan['name']}\t{param6}")
+                    shorewall["rules6"].append(f"Ping(ACCEPT)\t{routable_vlan['name']}\t${param}")
 
                     for role in host_roles:
                         if (role == "dns"):
-                            shorewall["rules6"].append(f"DNS(ACCEPT)\t{routable_vlan['name']}\t{param6}")
+                            shorewall["rules6"].append(f"DNS(ACCEPT)\t{routable_vlan['name']}\t${param}")
+                            shorewall["rules6"].append(f"DNS(ACCEPT)\t$FW\t${param}")
                         if (role == "ntp"):
-                            shorewall["rules6"].append(f"NTP(ACCEPT)\t{routable_vlan['name']}\t{param6}")
+                            shorewall["rules6"].append(f"NTP(ACCEPT)\t{routable_vlan['name']}\t${param}")
+                            shorewall["rules6"].append(f"NTP(ACCEPT)\t$FW\t${param}")
                         # DHCP6 is handled by separate rules for the relay
 
         if output4:

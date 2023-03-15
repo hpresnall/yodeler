@@ -18,9 +18,12 @@ class ShellScript():
 
         self.name = name
 
-        shell_header = "#!/bin/sh\nset -o errexit\n"
-
-        self._script_fragments = [shell_header]
+        self._script_fragments = [
+            "#!/bin/sh",
+            "set -o errexit",
+            "trap 'echo \"Installation did not complete successfully; please see logs for details\"' ERR",
+            ""
+        ]
 
     def blank(self):
         """Add a blank line to the script."""

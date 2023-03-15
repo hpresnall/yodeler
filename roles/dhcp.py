@@ -29,8 +29,8 @@ class Dhcp(Role):
                     f"host '{self._cfg['hostname']}' cannot configure a DHCP server with a DHCP address on interface '{iface['name']}'")
 
         accessible_vlans = interface.check_accessiblity(self._cfg["interfaces"],
-                                                     self._cfg["vswitches"].values(),
-                                                     lambda vlan: not vlan["dhcp4_enabled"] and not vlan["ipv6_subnet"])
+                                                        self._cfg["vswitches"].values(),
+                                                        lambda vlan: not vlan["dhcp4_enabled"] and not vlan["ipv6_subnet"])
 
         if accessible_vlans:
             raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {accessible_vlans}")
@@ -43,7 +43,7 @@ class Dhcp(Role):
 
         for iface in self._cfg["interfaces"]:
             ifaces4.append(iface["name"])
-            if "ipv6_subnet" in iface["vlan"]:  # ipv6 subnets are optional
+            if iface["ipv6_address"]:
                 # add ipv6 address so kea will listen on it; this will allow dhcrelay to work without using ff02::1:2
                 ifaces6.append(iface["name"] + "/" + str(iface["ipv6_address"]))
             ifaces_by_vswitch[iface["vswitch"]["name"]] = iface["name"]
@@ -129,21 +129,10 @@ class Dhcp(Role):
                         ntp_addresses = interface.find_ips_from_vlan(vswitch, vlan, server["interfaces"])
 
                         for ntp in ntp_addresses:
-                            domain = ntp["dest_iface"]["vlan"]["domain"]
-                            alias = [alias for alias in server["aliases"] if alias.startswith("time")][0]
-
                             if ntp["ipv4_address"]:
-                                # if dns is available and vlan has a domain, prefer using the time alias for ntp
-                                if dns4 and domain:
-                                    ntp4.append(alias + "." + domain)
-                                else:
-                                    ntp4.append(str(ntp["ipv4_address"]))
+                                ntp4.append(str(ntp["ipv4_address"]))
                             if ntp["ipv6_address"]:
-                                # if dns is available and vlan has a domain, prefer using the time alias for ntp
-                                if dns6 and domain:
-                                    ntp6.append(alias + "." + domain)
-                                else:
-                                    ntp6.append(str(ntp["ipv6_address"]))
+                                ntp6.append(str(ntp["ipv6_address"]))
 
                 domains = []
                 if vlan["domain"]:  # more specific domain first
@@ -169,13 +158,14 @@ class Dhcp(Role):
                             {"name": vlan["domain"] + ".", "dns-servers": ddns_dns_addresses})
                         ddns_config["reverse-ddns"]["ddns-domains"].append(
                             {"name": util.address.rptr_ipv4(ip4_subnet) + ".", "dns-servers": ddns_dns_addresses})
-                    subnet4["option-data"] = [{"name": "domain-name-servers", "data":  ", ".join(dns4)}]
+                    subnet4["option-data"] = [{"name": "domain-name-servers", "data":  ", ".join(dns4)},
+                                              {"name": "domain-name", "data": f"{vlan['domain']}"}]
                     if domains:
                         subnet4["option-data"].append({"name": "domain-search", "data": ", ".join(domains)})
                     if vlan["routable"]:
                         subnet4["option-data"].append({"name": "routers", "data": str(ip4_subnet.network_address + 1)})
                     if ntp4:
-                        subnet4["option-data"].append({"name": "time-servers", "data":  ", ".join(ntp4)})
+                        subnet4["option-data"].append({"name": "ntp-servers", "data":  ", ".join(ntp4)})
                     subnet4["reservations"] = []
                     subnets_4.append(subnet4)
 

@@ -126,23 +126,22 @@ def create_network(vswitch, output_dir):
     """
     vswitch_name = vswitch["name"]
 
-    template = xml.parse("templates/vm/network.xml")
-    net = template.getroot()
-
-    _find_and_set_text(net, "name", vswitch_name)
-    _find_and_set_text(net, "bridge", vswitch_name)
+    net = xml.Element("network")
+    name = xml.SubElement(net, "name")
+    name.text = vswitch_name
+    xml.SubElement(net, "virtualport", {"type": "openvswitch"})
+    xml.SubElement(net, "forward", {"mode": "bridge"})
+    xml.SubElement(net, "bridge", {"name": vswitch_name})
 
     # create a portgroup for the router that trunks all the routable vlans
-    router_portgroup = xml.SubElement(net, "portgroup")
-    router_portgroup.attrib["name"] = "router"
+    router_portgroup = xml.SubElement(net, "portgroup", {"name": "router"})
     router = xml.SubElement(router_portgroup, "vlan")
     router.attrib["trunk"] = "yes"
     routable = False
 
     # create a portgroup for each vlan
     for vlan in vswitch["vlans"]:
-        portgroup = xml.SubElement(net, "portgroup")
-        portgroup.attrib["name"] = vlan["name"]
+        portgroup = xml.SubElement(net, "portgroup", {"name": vlan["name"]})
         vlan_id = vlan["id"]
 
         if vlan["default"]:
@@ -170,8 +169,8 @@ def create_network(vswitch, output_dir):
 
     # save the file and add the virsh commands to the script
     network_xml = vswitch_name + ".xml"
-    xml.indent(template, space="  ")
-    template.write(os.path.join(output_dir, network_xml))
+    xml.indent(net, space="  ")
+    xml.ElementTree(net).write(os.path.join(output_dir, network_xml))
 
 
 def _find_and_set_text(root: xml.Element, element_name: str, text: str):

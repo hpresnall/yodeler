@@ -17,5 +17,8 @@ ACCEPT	$FW	all	ipv6-icmp
 # firewall can send DNS out so it does not depend on local DNS being up
 DNS(ACCEPT)	$FW	inet
 
+# firewall can ping everything
+Ping(ACCEPT) $FW all
+
 # allow SSH in, but at a limited rate and log connections
 SSH(ACCEPT):NFLOG(6)	inet	$FW	-	-	-	-	s:6/min:15

@@ -133,7 +133,7 @@ def _setup_repos(cfg: dict, setup: shell.ShellScript):
 
 
 _SETUP_METRICS = """echo "Configuring Prometheus"
-rc-update add node-exporter default
+rc-update add node-exporter
 
 echo "ARGS=\\\"--log.level=warn \\
 --no-collector.bonding \\

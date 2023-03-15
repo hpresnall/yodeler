@@ -1,12 +1,3 @@
-# ensure the drive running this script is writable
-YODELER_DEV=$$(df $$DIR | grep -E '^(/|share)' | cut -d' ' -f1)
-
-# share when testing in VM with shared host filesystem
-if [ "$$YODELER_DEV" != "share" ]; then
-  YODELER_DEV=$$(realpath $$YODELER_DEV)
-  mount -o remount,rw $$YODELER_DEV
-fi
-
 # use site-level APK cache for this boot
 # will be partially populated by Alpine install
 log "Setting up APK cache for site '$SITE_NAME'"

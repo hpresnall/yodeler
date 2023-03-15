@@ -23,6 +23,12 @@ sed -i -e "s/#uri_default/uri_default/g" /home/$USER/.config/libvirt/libvirt.con
 rc-update add dbus
 rc-update add polkit
 rc-update add libvirtd
+rc-update add libvirt-guests
+
+# shutdown VMs when the server shuts down
+echo "LIBVIRT_SHUTDOWN=\"shutdown\"
+LIBVIRT_MAXWAIT=\"120\"
+LIBVIRT_NET_SHUTDOWN=\"no\"" >> /etc/conf.d/libvirt-guests
 
 log "Starting libvirt"
 # libvirt needs networking; make libvirt think it is started

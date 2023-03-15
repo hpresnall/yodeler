@@ -8,9 +8,7 @@ modprobe openvswitch
 modprobe nbd
 modprobe tun
 
-grep vendor_id /proc/cpuinfo | head -n 1 | grep AMD > /dev/null
-
-if [ $$? == 0 ]; then
+if $$(grep vendor_id /proc/cpuinfo | head -n 1 | grep AMD > /dev/null); then
   modprobe kvm_amd
 else
   modprobe kvm_intel

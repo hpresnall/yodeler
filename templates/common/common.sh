@@ -5,6 +5,8 @@ setup-keymap $KEYMAP
 mv /etc/profile.d/color_prompt.sh.disabled /etc/profile.d/color_prompt.sh
 rootinstall $$DIR/chrony.conf /etc/chrony
 sed -i -e "s/umask 022/umask 027/g" /etc/profile
+rc-update add chronyd
+rc-update add acpid
 
 # colorize ls and ip commands
 echo 'export COLORFGBG=";0"' > /etc/profile.d/aliases.sh
@@ -13,31 +15,29 @@ echo 'alias ls="ls --color"' >> /etc/profile.d/aliases.sh
 echo 'alias ip="ip -c"' >> /etc/profile.d/aliases.sh
 chmod +x /etc/profile.d/aliases.sh
 
-# cleanup TTYs
 if [ "$IS_VM" = "True" ]; then
   # no TTYs on VMs; all access via virsh console
   sed -i -E "s/^tty([1-6])/\#tty\1/g" /etc/inittab
 
   # only 1s at boot menu; faster boot
   sed -i -e "s/TIMEOUT 30/TIMEOUT 10/g" /boot/extlinux.conf
+
+  # create non-root user and allow doas
+  adduser -D $USER
+  addgroup $USER wheel
+  echo "permit persist :wheel" >> /etc/doas.d/doas.conf
 else
   # keep 2 TTYs on physical
   sed -i -E "s/^tty([3-6])/\#tty\1/g" /etc/inittab
 
   # force console video mode in kernel opts
   sed -i -e "s/quiet/video=1920x1080 quiet/g" /boot/grub/grub.cfg
-fi
 
-if [ "$IS_VM" = "False" ]; then
   # non-root user will be configured by Alpine setup
 
-  # enable cpufreqd on physical systems
-  rc-update add cpufreqd default
-else
-  # create non-root user and allow doas
-  adduser -D $USER
-  addgroup $USER wheel
-  echo "permit persist :wheel" >> /etc/doas.d/doas.conf
+  # enable services on physical systems
+  rc-update add cpufreqd
+  rc-update add cgroups sysinit
 fi
 
 # remove root password; only allow access via doas su
@@ -47,10 +47,8 @@ echo "$USER:$PASSWORD" | chpasswd
 
 # setup SSH
 mkdir -p /home/$USER/.ssh
-chmod 700 /home/$USER/.ssh
 echo "$PUBLIC_SSH_KEY" > /home/$USER/.ssh/authorized_keys
-chmod 600 /home/$USER/.ssh/authorized_keys
-chown -R $USER:$USER /home/$USER/.ssh
+rc-update add sshd
 
 if [ "$INSTALL_PRIVATE_SSH_KEY" = "True" ]; then
     echo "Host=*
@@ -58,8 +56,11 @@ User=$USER
 IdentityFile=~/.ssh/$SITE_NAME" > /home/$USER/.ssh/config
 
     echo "$PRIVATE_SSH_KEY" > /home/$USER/.ssh/$SITE_NAME
-    chmod 600 /home/$USER/.ssh/$SITE_NAME
 fi
+
+chmod 600 /home/$USER/.ssh/*
+chmod 700 /home/$USER/.ssh
+chown -R $USER:$USER /home/$USER/.ssh
 
 # only allow private key access
 echo "PermitRootLogin no" >> /etc/ssh/sshd_config

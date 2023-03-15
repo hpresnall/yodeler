@@ -1,6 +1,0 @@
-<network>
-  <name/>
-  <forward mode='bridge'/>
-  <bridge/>
-  <virtualport type='openvswitch'/>
-</network>
