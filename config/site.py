@@ -104,12 +104,15 @@ def _validate_site(site_cfg: dict):
 
         count = len(hostnames)
 
-        if count < role_class.minimum_instances(site_cfg):
-            raise ValueError((f"role '{role_name}' requires at least {role_class.minimum_instances(site_cfg)} host defined;"
-                              f" site '{site_cfg['site_name']}' has {count} hosts: {hostnames}"))
-        if count > role_class.maximum_instances(site_cfg):
-            raise ValueError((f"role '{role_name}' cannot have more than {role_class.maximum_instances(site_cfg)} host defined;"
-                              f" site '{site_cfg['site_name']}' has {count} hosts: {hostnames}"))
+        min = role_class.minimum_instances(site_cfg)
+        max = role_class.maximum_instances(site_cfg)
+
+        if count < min:
+            raise ValueError((f"site '{site_cfg['site_name']}' requires at least {min} hosts with '{role_name}' role;"
+                              f" {count} hosts defined: {hostnames}"))
+        if count > max:
+            raise ValueError((f"site '{site_cfg['site_name']}' requires at least {max} hosts with '{role_name}' role;"
+                              f" {count} hosts defined: {hostnames}"))
 
     # confirm all hostnames and aliases are unique
     aliases = set()

@@ -18,7 +18,7 @@ INTERFACESOPTS="$INSTALL_INTERFACES"
 DNSOPTS="-n $EXTERNAL_DNS_STR"
 
 # add user to wheel and setup doas
-USEROPTS="-a $USER"
+USEROPTS="-a -f $USER $USER"
 
 # install EFI system to $ROOT_DEV
 export DISKLABEL=gpt

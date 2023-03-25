@@ -14,9 +14,6 @@ from roles.role import Role
 class Dns(Role):
     """Dns defines the configuration needed to setup BIND9 DNS."""
 
-    def __init__(self, cfg: dict):
-        super().__init__("dns", cfg)
-
     def additional_packages(self):
         return {"bind", "bind-tools"}
 

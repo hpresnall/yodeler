@@ -15,9 +15,6 @@ _logger = logging.getLogger(__name__)
 class NTP(Role):
     """NTP defines the configuration needed to setup Chrony NTP."""
 
-    def __init__(self, cfg: dict):
-        super().__init__("ntp", cfg)
-
     def additional_packages(self):
         return set()  # create_chrony_conf() already called in common
 

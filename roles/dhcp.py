@@ -16,9 +16,6 @@ from roles.role import Role
 class Dhcp(Role):
     """Dhcp defines the configuration needed to setup Kea DHCP."""
 
-    def __init__(self, cfg: dict):
-        super().__init__("dhcp", cfg)
-
     def additional_packages(self):
         return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-dhcp-ddns", "kea-admin", "kea-ctrl-agent"}
 

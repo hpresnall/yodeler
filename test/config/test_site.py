@@ -6,7 +6,7 @@ import os.path
 import tempfile
 
 import config.site as site
-
+import roles.role as role
 
 class TestSite(unittest.TestCase):
     _base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -40,6 +40,8 @@ class TestSite(unittest.TestCase):
             site.validate({"site_name": ""})
 
     def test_load_test_site(self):
+        role.load_all_roles()
+
         site_cfg = site.load(os.path.join(self._base_path, "sites", "test"))
 
         self.assertEqual(site_cfg["site_name"], "test")

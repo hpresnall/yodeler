@@ -21,7 +21,7 @@ class ShellScript():
         self._script_fragments = [
             "#!/bin/sh",
             "set -o errexit",
-            "trap 'echo \"Installation did not complete successfully; please see logs for details\"' ERR",
+            "trap 'echo \"Installation did not complete successfully; please see logs for details\" >&3' ERR",
             ""
         ]
 

@@ -16,9 +16,6 @@ import util.libvirt as libvirt
 class VmHost(Role):
     """VmHost defines the configuration needed to setup a KVM host using OpenVswitch."""
 
-    def __init__(self, cfg: dict):
-        super().__init__("vmhost", cfg)
-
     def additional_packages(self):
         # packages for openvswitch, qemu, libvirt and alpine-make-vm-image
         return {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",

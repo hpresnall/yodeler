@@ -65,8 +65,10 @@ log "Copying APK cache out of chroot"
 # copy any new APKS back to the site APK cache, deleting old versions
 rsync -r --delete "$$INSTALLED/root/$SITE_NAME/apk_cache" "$$SITE_DIR"
 
-log "Copying logs from chroot to '$$LOG_DIR'"
-rsync -r "$$INSTALLED/root/$SITE_NAME/logs" "$$SITE_DIR"
+if [ -d "$$INSTALLED/root/$SITE_NAME/logs" ]; then
+  log "Copying logs from chroot to '$$LOG_DIR'"
+  rsync -r "$$INSTALLED/root/$SITE_NAME/logs" "$$SITE_DIR"
+fi
 
 # copy back final resolv.conf
 if [ -f "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.orig" ]; then

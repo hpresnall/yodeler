@@ -5,6 +5,7 @@ import logging
 import errno
 
 import config.site as site
+import roles.role
 
 
 def yodel():
@@ -24,6 +25,8 @@ def yodel():
     except OSError as exc:
         if exc.errno == errno.EEXIST and os.path.isdir(output_dir):
             pass
+
+    roles.role.load_all_roles()
 
     site_cfg = site.load(site_path)
     site.write_host_scripts(site_cfg, output_dir)

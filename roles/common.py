@@ -18,9 +18,6 @@ import roles.ntp
 class Common(Role):
     """Common setup required for all systems. This role _must_ be run before any other setup."""
 
-    def __init__(self, cfg: dict):
-        super().__init__("common", cfg)
-
     def additional_packages(self):
         # use dhcpcd for dhcp since it can also handle prefix delegation for routers
         # use better ifupdown-ng  and the Linux ip command, instead of Busybox's built-ins

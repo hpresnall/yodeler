@@ -1,11 +1,15 @@
 """Defines the abstract Role class.
 A role represents various configurations that can be applied to a host to implement a specific functionality."""
+import os
 import importlib
 import inspect
+import logging
 
 from abc import ABC, abstractmethod
 
 import util.shell as shell
+
+_logger = logging.getLogger(__name__)
 
 
 class Role(ABC):
@@ -13,8 +17,8 @@ class Role(ABC):
     functionality on a server.
     """
 
-    def __init__(self, name: str, cfg: dict) -> None:
-        self.name = name
+    def __init__(self, cfg: dict) -> None:
+        self.name = self.__class__.__name__.lower()
         self._cfg = cfg
 
     @abstractmethod
@@ -24,10 +28,12 @@ class Role(ABC):
     def configure_interfaces(self):
         """Add any additional interfaces for the role.
         Interface validation will be run afer all roles have this function called."""
+        pass
 
     def additional_configuration(self):
         """Add any additional default configuration & run validation specific to this role.
         This is run after configure_interfaces()."""
+        pass
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -47,6 +53,7 @@ class Role(ABC):
 
         This will be called before write_config(). All hosts for the site will be loaded so the total site
         layout can be checked, if needed."""
+        pass
 
     @abstractmethod
     def write_config(self, setup: shell.ShellScript, output_dir: str):
@@ -74,42 +81,47 @@ class Role(ABC):
             aliases.add(alias + str(i))
 
 
-# cache loaded Role subclasses
-_role_class_by_name = {}
-
-
 def load(role_name: str, host_cfg: dict) -> Role:
     """Load an Role subclass instance using the given role name."""
     if host_cfg is None:
         raise ValueError("host_cfg cannot be None")
 
-    clazz = _role_class_by_name.setdefault(role_name, _load_role_class(role_name))
+    role_name = role_name.lower()
 
-    # instantiate the class
-    try:
-        return clazz(host_cfg)
-    except TypeError as te:
-        raise KeyError(f"cannot instantiate class '{clazz}'") from te
+    if role_name in _role_class_by_name:
+        clazz = _role_class_by_name[role_name]
+
+        # instantiate the class
+        try:
+            return clazz(host_cfg)
+        except TypeError as te:
+            raise KeyError(f"cannot instantiate class '{clazz}'") from te
+    else:
+        raise KeyError(f"cannot find class for role '{role_name}'")
 
 
-def _load_role_class(role_name: str) -> type:
-    if not role_name:
-        raise ValueError("role_name cannot be empty")
+_role_class_by_name = {}
 
-    try:
-        mod = importlib.import_module("roles." + role_name)
-    except ModuleNotFoundError as mnfe:
-        raise KeyError(f"cannot load module for role '{role_name}' from the roles package") from mnfe
 
-    # find class for role; assume only 1 class in each module
-    role_class = None
+def load_all_roles():
+    """Load all Role subclasses in the 'roles' package.
+    This must be called before loading any host configuration."""
+    roles_dir = os.path.dirname(__file__)
+    ignored_files = ["__init__.py", "role.py"]
 
-    for clazz in inspect.getmembers(mod, inspect.isclass):
-        if clazz[0].lower() == role_name.lower():
-            role_class = clazz[1]
-            break
+    for file in os.listdir(roles_dir):
+        if (file[-3:] != '.py') or (file in ignored_files):
+            continue
 
-    if role_class is None:
-        raise KeyError(f"cannot find class for role '{role_name}' in module '{mod}'")
+        module_name = os.path.basename(roles_dir) + "." + file[:-3]
 
-    return role_class
+        try:
+            mod = importlib.import_module(module_name)
+        except ModuleNotFoundError as mnfe:
+            raise KeyError(f"cannot load module '{module_name}' from '{file}'") from mnfe
+
+        for clazz in inspect.getmembers(mod, inspect.isclass):
+            if clazz[0] != 'Role':
+                role_name = clazz[0].lower()
+                _logger.debug("loaded role '%s' from '%s'", role_name, file)
+                _role_class_by_name[role_name] = clazz[1]

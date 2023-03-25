@@ -23,7 +23,7 @@ if [ "$IS_VM" = "True" ]; then
   sed -i -e "s/TIMEOUT 30/TIMEOUT 10/g" /boot/extlinux.conf
 
   # create non-root user and allow doas
-  adduser -D $USER
+  adduser -D -g $USER $USER
   addgroup $USER wheel
   echo "permit persist :wheel" >> /etc/doas.d/doas.conf
 else
@@ -43,6 +43,7 @@ fi
 # remove root password; only allow access via doas su
 passwd -l root
 echo "doas su -" > /home/$USER/.ash_history
+chown "$USER:$USER" /home/$USER/.ash_history
 echo "$USER:$PASSWORD" | chpasswd
 
 # setup SSH

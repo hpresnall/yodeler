@@ -20,9 +20,6 @@ class Router(Role):
     """Router defines the configuration needed to setup a system that can route from the configured
      vlans to the internet"""
 
-    def __init__(self, cfg: dict):
-        super().__init__("router", cfg)
-
     def additional_packages(self):
         return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "iptables", "ip6tables"}
 
