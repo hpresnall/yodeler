@@ -8,4 +8,4 @@ interfaces:
   - ipv4_address: 192.168.2.2
     ipv6_address:
     vswitch: private
-roles: [vmhost]
+roles: [vmhost, xwindows]
