@@ -1,9 +1,15 @@
-motd: "Minimal Alpine VM on the server vlan"
+motd: "Alpine VM with build tools on the server vlan"
 primary_domain: server.yodeler.internal
+role: build
+disk_size_mb: 2048
 interfaces:
   - ipv4_address: 192.168.210.100
+    ipv6_address: fd24:87e8:06c7:10::100
     vswitch: public
     vlan: server # vlan can be name or id
-  - ipv4_address: 172.16.251.6
+  - ipv4_address: 172.16.251.100
     vswitch: private
     # use default (only) vlan
+# optionally add Java or Go
+go: false
+java11: false

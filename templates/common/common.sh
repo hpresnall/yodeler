@@ -5,8 +5,8 @@ setup-keymap $KEYMAP
 mv /etc/profile.d/color_prompt.sh.disabled /etc/profile.d/color_prompt.sh
 rootinstall $$DIR/chrony.conf /etc/chrony
 sed -i -e "s/umask 022/umask 027/g" /etc/profile
-rc-update add chronyd
-rc-update add acpid
+rc-update add chronyd default
+rc-update add acpid boot
 
 # colorize ls and ip commands
 echo 'export COLORFGBG=";0"' > /etc/profile.d/aliases.sh
@@ -36,8 +36,10 @@ else
   # non-root user will be configured by Alpine setup
 
   # enable services on physical systems
-  rc-update add cpufreqd
+  rc-update add cpufreqd boot
   rc-update add cgroups sysinit
+  # acpid should only be run at boot runlevel
+  rc-update del acpid default
 fi
 
 # remove root password; only allow access via doas su
@@ -49,7 +51,7 @@ echo "$USER:$PASSWORD" | chpasswd
 # setup SSH
 mkdir -p /home/$USER/.ssh
 echo "$PUBLIC_SSH_KEY" > /home/$USER/.ssh/authorized_keys
-rc-update add sshd
+rc-update add sshd default
 
 if [ "$INSTALL_PRIVATE_SSH_KEY" = "True" ]; then
     echo "Host=*

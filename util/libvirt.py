@@ -3,7 +3,7 @@ import xml.etree.ElementTree as xml
 import os.path
 
 
-def write_vm_xml(cfg, output_dir):
+def write_vm_xml(cfg: dict, output_dir: str) -> None:
     """Create the libvirt XML for the given virtual machine."""
     template = xml.parse("templates/vm/server.xml")
     domain = template.getroot()
@@ -17,15 +17,23 @@ def write_vm_xml(cfg, output_dir):
     if devices is None:
         devices = xml.SubElement(domain, "devices")
 
-    source = devices.find("disk/source")
+    disk_devs = set()
+    disks = devices.findall("disk")
 
-    if source is None:
-        disk = devices.find("disk")
-        if disk is None:
-            disk = xml.SubElement(devices, "disk")
-        source = xml.SubElement(disk, "source")
+    for disk in disks:
+        target = disk.find("target")
+        if (target is not None) and "dev" in target.attrib:
+            disk_devs.add(target.attrib["dev"])
 
-    source.attrib["file"] = f"{cfg['vm_images_path']}/{cfg['hostname']}.img"
+    for i, disk_path in enumerate(cfg["vm_disk_paths"]):
+        disk_dev = "vd" + chr(ord('a')+i)  # vda, vdb etc
+
+        # ensure unique dev name for each VM
+        while disk_dev in disk_devs:
+            disk_dev = "vd" + chr(ord('a')+i)
+        disk_devs.add(disk_dev)
+
+        devices.append(create_disk(disk_dev, disk_path))
 
     for iface in cfg["interfaces"]:
         if iface["type"] != "std":
@@ -37,8 +45,25 @@ def write_vm_xml(cfg, output_dir):
     template.write(os.path.join(output_dir, cfg["hostname"] + ".xml"))
 
 
-def interface_from_config(hostname, iface):
-    """Create an <interface>  XML element for the given iface configuration.
+def create_disk(disk_dev: str, disk_path: str) -> xml.Element:
+    """Create a <disk> XML element for the given disk.
+
+        <disk type="file" device="disk">
+        <driver name="qemu" type="raw" />
+        <source file="<path_to_img>" />
+        <target dev="<disk_name>" bus="virtio" />
+        </disk>
+    """
+    disk = xml.Element("disk", {"type": "file", "device": "disk"})
+    xml.SubElement(disk, "driver", {"name": "qemu", "type": "raw"})
+    xml.SubElement(disk, "source", {"file": disk_path})
+    xml.SubElement(disk, "target", {"dev": disk_dev, "bus": "virtio"})
+
+    return disk
+
+
+def interface_from_config(hostname: str, iface: dict) -> xml.Element:
+    """Create an <interface> XML element for the given iface configuration.
 
     <interface type="network">
       <source network="<vswitch>" portgroup="<vlan>" />
@@ -56,7 +81,7 @@ def interface_from_config(hostname, iface):
     return interface
 
 
-def macvtap_interface(cfg, iface_name):
+def macvtap_interface(cfg: dict, iface_name: str) -> xml.Element:
     """Create an <interface> XML element that uses macvtap to connect the host's iface to the VM.
     The given iface_name is the name of the interface _on the host_.
 
@@ -77,7 +102,7 @@ def macvtap_interface(cfg, iface_name):
     return interface
 
 
-def router_interface(hostname, vswitch):
+def router_interface(hostname: str, vswitch: dict) -> xml.Element:
     """Create an <interface> XML element that trunks all routable vlans on the given vswitch.
 
     <interface type="network">
@@ -95,7 +120,7 @@ def router_interface(hostname, vswitch):
     return interface
 
 
-def update_interfaces(hostname, new_interfaces, output_dir):
+def update_interfaces(hostname: str, new_interfaces: list[xml.Element], output_dir: str) -> None:
     """Update the interfaces in XML file for the given host.
 
     The new interfaces are added first, so the /etc/network/interfaces order must match."""
@@ -118,7 +143,7 @@ def update_interfaces(hostname, new_interfaces, output_dir):
     template.write(file_name)
 
 
-def create_network(vswitch, output_dir):
+def create_network(vswitch: dict, output_dir: str) -> None:
     """Create a libvirt XML file for the given vswitch and write it to <vswitch[name]>.xml.
 
     Creates a portgroup for each vlan. For every routable vlan, adds that vlan to a 'router' portgroup that creates a
@@ -173,7 +198,7 @@ def create_network(vswitch, output_dir):
     xml.ElementTree(net).write(os.path.join(output_dir, network_xml))
 
 
-def _find_and_set_text(root: xml.Element, element_name: str, text: str):
+def _find_and_set_text(root: xml.Element, element_name: str, text: str) -> None:
     e = root.find(element_name)
 
     if e is None:

@@ -11,11 +11,6 @@
   </features>
   <cpu mode="host-passthrough" check="none" />
   <devices>
-    <disk type="file" device="disk">
-      <driver name="qemu" type="raw" />
-      <source file="" />
-      <target dev="vda" bus="virtio" />
-    </disk>
     <console type="pty">
       <target type="serial" port="0" />
     </console>

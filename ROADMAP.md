@@ -18,6 +18,7 @@
 ## Router
 - [x] Basic interface configuration for each vswitch & vlan
 - [x] Basic Shorewall configuration with routing
+- [ ] Ability to add per-VLAN custom rules
 - [ ] nftables firewall configuration
 - [ ] SMCroute config for multicast routing
 - [x] dhcrelay config for DHCP between vlans
@@ -52,16 +53,15 @@
 ## Storage
 - [ ] Configure Samba
 - [ ] Add separate storage volume, outside of the VM
-- [ ] Configure XFS
+- [ ] Configure ZFS
 - [ ] Add PCI passthrough support for storage volumes
 - [ ] Add backup and / or shared mount support for durable VM configuration data
 
 ## Build Server
-- [ ] Configure basic build tools
-- [ ] Configure golang builds
+- [x] Configure basic build tools
 - [ ] Create process for building executables and sharing with other VMs
-- [ ] Create durable build partition for builds without network access
+- [x] Create durable build partition for builds without network access
 
 ## XWindows
-- [ ] Configure basic XFCE GUI
+- [x] Configure basic XFCE GUI
 - [ ] Setup simple desktop with standard plugins

@@ -117,6 +117,11 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.add_log_function()
     setup.append_rootinstall()
 
+    if host_cfg["is_vm"]:
+        # load any envvars passed in from create_vm.sh
+        setup.append("source /tmp/envvars")
+        setup.blank()
+
     # add all scripts from each role
     for role in host_cfg["roles"]:
         name = role.name.upper()
@@ -126,7 +131,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
         try:
             role.write_config(setup, host_dir)
         except:
-            _logger.fatal(("cannot run write_config on class %s"), role)
+            _logger.fatal(("cannot run write_config for role '%s'"), role.name)
             raise
         setup.blank()
 
@@ -259,9 +264,6 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
 def _bootstrap_physical(cfg: dict, output_dir: str):
     # boot with install media; run /media/<install_dev>/<site>/<host>/yodel.sh
     # setup.sh will run in the installed host via chroot
-
-    cfg.setdefault("before_chroot", "# no configuration needed before chroot")
-
     yodel = shell.ShellScript("yodel.sh")
     yodel.comment("Run this script to configure a Yodeler physical server")
     yodel.comment("Run in a booted Alpine Linux install image")
@@ -290,12 +292,12 @@ def _bootstrap_vm(cfg: dict, output_dir: str):
     yodel.write_file(output_dir)
 
     # helper script to delete VM image & remove VM
-    delete_vm = shell.ShellScript("delete_vm.sh")
+    delete_vm = shell.ShellScript("delete_vm.sh", errexit=False)
     delete_vm.substitute("templates/vm/delete_vm.sh", cfg)
     delete_vm.write_file(output_dir)
 
     # helper script to start VM
-    start_vm = shell.ShellScript("start_vm.sh")
+    start_vm = shell.ShellScript("start_vm.sh", errexit=False)
     start_vm.substitute("templates/vm/start_vm.sh", cfg)
     start_vm.write_file(output_dir)
 
@@ -350,6 +352,7 @@ DEFAULT_SITE_CONFIG = {
     # if not specified, no SSH access will be possible!
     "user": "nonroot",
     "password": "apassword",
+    "before_chroot": "# no configuration needed before chroot"
 }
 
 _DEFAULT_SITE_CONFIG_TYPES = {
@@ -362,6 +365,7 @@ _DEFAULT_SITE_CONFIG_TYPES = {
     "domain": str,
     "user": str,
     "password": str,
+    "before_chroot": str
 }
 
 # accessible for testing

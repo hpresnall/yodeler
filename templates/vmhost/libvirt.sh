@@ -21,10 +21,10 @@ chown -R "$USER:$USER" /home/$USER/.config
 sed -i -e "s/#uri_default/uri_default/g" /home/$USER/.config/libvirt/libvirt.conf
 
 # run everything at startup
-rc-update add dbus
-rc-update add polkit
-rc-update add libvirtd
-rc-update add libvirt-guests
+rc-update add dbus default
+rc-update add polkit default
+rc-update add libvirtd default
+rc-update add libvirt-guests default
 
 # shutdown VMs when the server shuts down
 echo "LIBVIRT_SHUTDOWN=\"shutdown\"

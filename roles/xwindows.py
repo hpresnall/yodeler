@@ -33,12 +33,12 @@ class XWindows(Role):
         # mimic these scripts to avoid adding additional repo & apk update
         # community repo is required in config!
         setup.append("# mimic setup-org-base & setup-desktop xfce")
-        setup.append("rc-update delete mdev")
-        setup.append("rc-update add udev sysinit")
-        setup.append("rc-update add udev-trigger sysinit")
-        setup.append("rc-update add udev-settle sysinit")
-        setup.append("rc-update add udev-postmount default")
-        setup.append("rc-update add lightdm")
+        setup.append("rc-update -q delete mdev sysinit")
+        setup.service("udev", "sysinit")
+        setup.service("udev-trigger", "sysinit")
+        setup.service("udev-settle", "sysinit")
+        setup.service("udev-postmount")
+        setup.service("lightdm")
         setup.append(f"addgroup {user} audio")
         setup.append(f"addgroup {user} video")
         setup.append(f"addgroup {user} netdev")

@@ -35,6 +35,11 @@ class Common(Role):
         if ("primary_domain" in self._cfg) and self._cfg["primary_domain"]:
             self._cfg["fqdn"] = self._cfg["hostname"] + '.' + self._cfg["primary_domain"]
 
+        if self._cfg["is_vm"]:
+            # define the base disk for the VM image
+            # note that this image file is created and formatted in yodel.sh by alpine-make-vm-image
+            self._cfg["vm_disk_paths"] = [f"{self._cfg['vm_images_path']}/{self._cfg['hostname']}.img"]
+
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         return 0
@@ -73,7 +78,7 @@ class Common(Role):
         file.write("packages", " ".join(self._cfg["packages"]), output_dir)
 
         if self._cfg["is_vm"]:
-            # VMs will use host's configured repo file APK cache
+            # VMs will use host's configured repositories & APK cache
             # packages will be installed as part of image creation
 
             # VMs are setup without USB, so remove the library
@@ -128,9 +133,10 @@ def _setup_repos(cfg: dict, setup: shell.ShellScript):
 
     setup.blank()
 
-
+# ignore all ram, loop, floppy disks and all _partitions_
+# ignore all non-file systems
 _SETUP_METRICS = """echo "Configuring Prometheus"
-rc-update add node-exporter
+rc-update add node-exporter default
 
 echo "ARGS=\\\"--log.level=warn \\
 --no-collector.bonding \\
@@ -147,7 +153,7 @@ echo "ARGS=\\\"--log.level=warn \\
 --no-collector.xfs \\
 --no-collector.zfs \\
 --web.disable-exporter-metrics \\
---collector.diskstats.device-exclude='^(ram|loop|fd|(h|s|v|xv)d[a-z]|nbd|sr|nvme\\\\d+n\\\\d+p)\\\\d+$' \\
---collector.filesystem.fs-types-exclude='^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs|vfat)$'\\"" \\
+--collector.diskstats.device-exclude='^(ram|loop|fd[a-z]|((h|s|v|xv)d[a-z]|nbd|sr|nvme\\\\d+n\\\\d+p))\\\\d+$' \\
+--collector.filesystem.fs-types-exclude='^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs)$'\\"" \\
 > /etc/conf.d/node-exporter
 """

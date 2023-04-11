@@ -1,7 +1,8 @@
 hostname: server
 motd: server
-packages: [ "both_need", "server_needs" ]
-remove_packages: ["both_remove", "site_needs" ]
+packages: ["both_need", "server_needs"]
+remove_packages: ["both_remove", "site_needs"]
+disk_size_mb: 1024
 interfaces:
   - ipv4_address: 192.168.1.5
     ipv6_address: 2001:db8:0:1::5
@@ -11,4 +12,4 @@ interfaces:
   - ipv4_address: 192.168.2.5
     vswitch: private
     firewall_zone: PRIV
-role: test
+roles: [test, build]

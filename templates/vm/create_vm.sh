@@ -1,3 +1,10 @@
+# copy files in /tmp/$HOSTNAME into /tmp on the VM using --fs-skel-dir param
+mkdir -p /tmp/$HOSTNAME/tmp
+rm -f /tmp/$HOSTNAME/tmp/envvars
+touch /tmp/$HOSTNAME/tmp/envvars
+
+$BEFORE_CHROOT
+
 # temporarily change the umask
 # VM creation with a 027 umask results in the nonroot user not being able to
 # run commands due to library permission / loader issues
@@ -12,6 +19,7 @@ $VM_IMAGES_PATH/alpine-make-vm-image/alpine-make-vm-image \
   --image-size ${DISK_SIZE_MB}M \
   --repositories-file /etc/apk/repositories \
   --packages "$$(cat $$DIR/packages)" \
+  --fs-skel-dir "/tmp/$HOSTNAME" \
   --script-chroot \
   $VM_IMAGES_PATH/$HOSTNAME.img \
   $$DIR/setup.sh
