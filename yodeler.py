@@ -1,8 +1,6 @@
 """Yodeler - automated, self-contained, simple Alpine VM setup"""
-import os
 import sys
 import logging
-import errno
 
 import config.site as site
 import roles.role
@@ -17,19 +15,10 @@ def yodel():
         print("usage: yodeler.py <site_path> <output_dir>")
         sys.exit(1)
 
-    site_path = sys.argv[1]
-    output_dir = os.path.join(sys.argv[2], os.path.basename(site_path))
-
-    try:
-        os.makedirs(output_dir)
-    except OSError as exc:
-        if exc.errno == errno.EEXIST and os.path.isdir(output_dir):
-            pass
-
     roles.role.load_all_roles()
 
-    site_cfg = site.load(site_path)
-    site.write_host_scripts(site_cfg, output_dir)
+    site_cfg = site.load(sys.argv[1])
+    site.write_host_scripts(site_cfg, sys.argv[2])
 
 
 if __name__ == "__main__":

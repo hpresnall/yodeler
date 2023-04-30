@@ -4,6 +4,7 @@ It also creates the final, static set of configuration files for each host at th
 import logging
 import os
 import copy
+import errno
 
 import util.file as file
 import util.parse as parse
@@ -84,7 +85,17 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
 
 def write_host_scripts(site_cfg: dict, output_dir: str):
     """Create the configuration scripts and files for the site's hosts and write them to the given directory."""
+    output_dir = os.path.join(output_dir, site_cfg["site_name"])
+
     _logger.info("writing setup scripts for site '%s' to '%s'", site_cfg["site_name"], output_dir)
+
+    try:
+        os.makedirs(output_dir)
+    except OSError as ose:
+        if ose.errno == errno.EEXIST and os.path.isdir(output_dir):
+            pass
+        else:
+            raise ose
 
     _validate_site(site_cfg)
 

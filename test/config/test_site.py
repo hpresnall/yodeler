@@ -8,6 +8,7 @@ import tempfile
 import config.site as site
 import roles.role as role
 
+
 class TestSite(unittest.TestCase):
     _base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -76,7 +77,8 @@ class TestSite(unittest.TestCase):
             for host_cfg in site_cfg["hosts"].values():
                 hostname = host_cfg["hostname"]
 
-                host_dir = os.path.join(config_dir, hostname)
+                host_dir = os.path.join(config_dir, site_cfg["site_name"], hostname)
+
                 self.assertTrue(os.path.isdir(host_dir))
 
                 required_files = ["yodel.sh", "setup.sh", "hosts", "interfaces",
