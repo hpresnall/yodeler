@@ -6,6 +6,8 @@ import util.disk as disk
 
 from roles.role import Role
 
+import util.parse as parse
+
 
 class Build(Role):
     """Role that adds common build tools and compilers."""
@@ -36,6 +38,17 @@ class Build(Role):
 
             self._cfg["before_chroot"] = "log \"Setting up build disk image\"\n" + \
                 disk.create_disk_image(self._cfg['hostname'], disk_path, size, "BUILD_UUID")
+        elif "build_dev" in self._cfg:
+            # optionally use another disk on physcial servers
+            # if not set, a plain /build directory will be created instead
+            build_dev = parse.non_empty_string("build_dev", self._cfg, self._cfg["hostname"])
+
+            if build_dev == self._cfg["root_dev"]:
+                raise ValueError(
+                    f"build_dev={build_dev} cannot be the same as the system install location specified by 'root_dev'")
+
+            self._cfg["before_chroot"] = "log \"Setting up build disk image\"\n" + \
+                disk.format_disk(self._cfg["hostname"], build_dev, "BUILD_UUID")
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -53,6 +66,8 @@ class Build(Role):
         user = self._cfg["user"]
 
         if self._cfg["is_vm"]:
+            setup.append(disk.create_fstab_entry("BUILD_UUID", "/build"))
+        elif "build_dev" in self._cfg:
             setup.append(disk.create_fstab_entry("BUILD_UUID", "/build"))
 
         setup.append("mkdir /build")

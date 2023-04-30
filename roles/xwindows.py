@@ -30,7 +30,7 @@ class XWindows(Role):
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         user = self._cfg["user"]
 
-        # mimic these scripts to avoid adding additional repo & apk update
+        # mimic Alpine setup-xorg-base & setup-devd scripts to avoid adding additional repo & apk update
         # community repo is required in config!
         setup.append("# mimic setup-org-base & setup-desktop xfce")
         setup.append("rc-update -q delete mdev sysinit")

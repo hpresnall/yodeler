@@ -12,8 +12,18 @@ def create_disk_image(hostname: str, disk_path: str, size: int, uuid_envvar_name
   mkfs.ext4 {disk_path}
 # else reuse existing disk image
 fi
+""" + _output_blkid(hostname, disk_path, uuid_envvar_name)
 
-echo "{uuid_envvar_name}=$(blkid {disk_path} | cut -d\\" -f2)" >> /tmp/{hostname}/tmp/envvars"""
+
+def format_disk(hostname: str, disk_path: str, uuid_envvar_name: str) -> str:
+    return f"""# only format the build disk if there is no existing partition
+blkid --match-token TYPE=ext4 {disk_path} || mkfs.ext4 {disk_path}
+""" + _output_blkid(hostname, disk_path, uuid_envvar_name)
+
+
+def _output_blkid(hostname: str, disk_path: str,  uuid_envvar_name: str) -> str:
+    return f"echo \"{uuid_envvar_name}=$(blkid {disk_path} | cut -d\\\" -f2)\" >> /tmp/{hostname}/tmp/envvars"
+
 
 def create_fstab_entry(uuid_envvar_name: str, mount_point: str) -> str:
     """Add an entry to /etc/fstab for the given disk UUID & mount point."""
