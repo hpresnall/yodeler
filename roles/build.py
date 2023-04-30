@@ -34,9 +34,8 @@ class Build(Role):
 
             self._cfg["vm_disk_paths"].append(disk_path)
 
-            self._cfg["before_chroot"] = """# create disk image for builds or reuse existing
-log "Setting up build disk image"
-""" + disk.create_disk_image(self._cfg['hostname'], disk_path, size, "BUILD_UUID")
+            self._cfg["before_chroot"] = "log \"Setting up build disk image\"\n" + \
+                disk.create_disk_image(self._cfg['hostname'], disk_path, size, "BUILD_UUID")
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

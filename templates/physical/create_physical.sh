@@ -41,7 +41,14 @@ cp /etc/resolv.conf "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.conf" # will b
 rm -f "$$INSTALLED/etc/apk/cache"
 ln -s /root/$SITE_NAME/apk_cache "$$INSTALLED/etc/apk/cache"
 
+# setup /tmp/envvars that will be copied into the installed system
+mkdir -p /tmp/$HOSTNAME/tmp
+rm -f /tmp/$HOSTNAME/tmp/envvars
+touch /tmp/$HOSTNAME/tmp/envvars
+
 $BEFORE_CHROOT
+
+cp -r /tmp/$HOSTNAME/tmp/* "$$INSTALLED"/tmp
 
 log "Chrooting to installed system"
 mkdir -p "$$INSTALLED"/proc "$$INSTALLED"/dev "$$INSTALLED"/sys

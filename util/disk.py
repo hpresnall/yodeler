@@ -8,9 +8,11 @@ def create_disk_image(hostname: str, disk_path: str, size: int, uuid_envvar_name
     # assume VM and UUID is written to /tmp/envvars
     return f"""if [ ! -f "{disk_path}" ]; then
   truncate -s {size}M {disk_path}
-  mkfs.ext4 {disk_path}
   sync
+  mkfs.ext4 {disk_path}
+# else reuse existing disk image
 fi
+
 echo "{uuid_envvar_name}=$(blkid {disk_path} | cut -d\\" -f2)" >> /tmp/{hostname}/tmp/envvars"""
 
 def create_fstab_entry(uuid_envvar_name: str, mount_point: str) -> str:

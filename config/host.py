@@ -117,10 +117,9 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.add_log_function()
     setup.append_rootinstall()
 
-    if host_cfg["is_vm"]:
-        # load any envvars passed in from create_vm.sh
-        setup.append("source /tmp/envvars")
-        setup.blank()
+    # load any envvars passed in from bootstrap scripts
+    setup.append("source /tmp/envvars")
+    setup.blank()
 
     # add all scripts from each role
     for role in host_cfg["roles"]:
