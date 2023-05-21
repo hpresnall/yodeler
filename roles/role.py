@@ -67,7 +67,7 @@ class Role(ABC):
         The alias will be numbered if other hosts in the site have the same role"""
         self._cfg["aliases"].add(alias)
 
-        # assume this is called _after_ _load_roles() and will not raise KeyError
+        # assume this is called _after_ load_all_roles() and will not raise KeyError
         existing_hosts = self._cfg["roles_to_hostnames"][self.name]
 
         # only instance of the role, do not rename

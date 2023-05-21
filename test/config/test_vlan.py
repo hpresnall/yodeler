@@ -136,12 +136,16 @@ class TestVlan(base.TestCfgBase):
         self.build_error()
 
     def test_non_array_access_vlans(self):
-        self._site_yaml["vswitches"][0]["vlans"][0]["access_vlans"] = 20
+        self._site_yaml["vswitches"][0]["vlans"][0]["access_vlans"] = 10
         self.build_error()
 
     def test_str_access_vlans(self):
-        self._site_yaml["vswitches"][0]["vlans"][0]["access_vlans"] = "20"
+        self._site_yaml["vswitches"][0]["vlans"][0]["access_vlans"] = "10"
         self.build_error()
+
+    def test_all_access_vlans(self):
+        self._site_yaml["vswitches"][0]["vlans"][0]["access_vlans"] = "all"
+        self.build_cfg()
 
     def test_invalid_domain_vlan(self):
         # vlan domain not in top-level domain
@@ -233,8 +237,12 @@ class TestVlan(base.TestCfgBase):
 
         self.assertIsNone(cfg["vswitches"]["public"]["vlans"][0]["ipv6_subnet"])
 
-    def test_vlan_ipv6_invalid_pd_network(self):
+    def test_vlan_ipv6_non_int_pd_network(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_pd_network"] = "foo"
+        self.build_error()
+
+    def test_vlan_ipv6_small_int_pd_network(self):
+        self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_pd_network"] = 0
         self.build_error()
 
     def test_vlan_ipv6_big_pd_network(self):

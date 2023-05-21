@@ -219,22 +219,19 @@ def _load_roles(cfg: dict):
 
 
 def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
-    # manually merge packages use set for uniqueness and union/interection operations
+    # manually merge packages use set for uniqueness and union/intersection operations
     for key in ["packages", "remove_packages"]:
         site = site_cfg.get(key)
         host = host_yaml.get(key)
 
-        if site is None and host is None:
-            host_cfg[key] = set()
-        elif site is None:
-            host = list(host)
-            host_cfg[key] = set(host)
-        elif host is None:
-            host_cfg[key] = set(site)
-        else:
-            # combine; host overwrites site
-            host_cfg[key] = set(site)
-            host_cfg[key] |= set(host)
+        if site is None:
+            site = set()
+        if host is None:
+            host = set()
+    
+        # combine; host overwrites site
+        host_cfg[key] = set(site)
+        host_cfg[key] |= set(host)
 
     for role in host_cfg["roles"]:
         host_cfg["packages"] |= role.additional_packages()

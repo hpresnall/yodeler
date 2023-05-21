@@ -53,7 +53,7 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
 
         # optional list of other vlans this vlan can access _without_ firewall restrictions
         # allows special value 'all' to indicate access to every vlan on the vswitch
-        vlan["access_vlans"] = parse.read_string_list("access_vlans", vlan, cfg_name)
+        vlan["access_vlans"] = parse.read_string_list_plurals({"access_vlan", "access_vlans"}, vlan, cfg_name)
 
         _validate_vlan_subnet(vswitch_name, vlan, "ipv4")
         _validate_vlan_subnet(vswitch_name, vlan, "ipv6")
@@ -206,10 +206,7 @@ def _validate_access_vlans(vswitch: dict):
     for vlan in vswitch["vlans"]:
         vlan_name = vlan["name"]
 
-        access_vlans = vlan["access_vlans"]
-
-        # set() to make unique
-        for vlan_id in set(access_vlans):
+        for vlan_id in vlan["access_vlans"]:
             if vlan_id == "all":  # if any value is all, only value is all
                 vlan["access_vlans"] = ["all"]
                 break

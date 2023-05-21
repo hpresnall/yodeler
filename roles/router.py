@@ -43,9 +43,9 @@ class Router(Role):
                 iface_counter += 1
             elif vswitch["uplinks"]:
                 # TODO handle multiple uplinks; maybe just error instead of creating physical bond ifaces
-                # TODO if site also have a separate, physical vmhost, then need a way to
+                # TODO if site also has a separate, physical vmhost, then need a way to
                 # differentiate uplinks for vmhost vs router; maybe router_iface in vswitch config?
-                iface_name = next(iter(vswitch["uplinks"]))
+                iface_name = vswitch["uplinks"][0] # next(iter(vswitch["uplinks"]))
                 # vswitch validation already confirmed uplink uniqueness
             else:
                 # note that this assumes ethernet layout of non-vm hosts
@@ -170,6 +170,10 @@ class Router(Role):
                     # new libvirt interface to trunk the vlans
                     libvirt_interfaces.append(util.libvirt.router_interface(self._cfg['hostname'], vswitch))
 
+        # blank line after vlan to firewall ping rules
+        shorewall["rules"].append("")
+        shorewall["rules6"].append("")
+
         if self._cfg["is_vm"]:
             util.libvirt.update_interfaces(self._cfg['hostname'], libvirt_interfaces, output_dir)
 
@@ -252,11 +256,6 @@ def _write_dhcrelay_config(cfg: dict, setup: util.shell.ShellScript, dhrelay4_if
         setup.service("dhcrelay6")
         setup.blank()
 
-        shorewall["rules6"].append("# allow DHCPv6 for relay")
-        shorewall["rules6"].append("ACCEPT\t$FW\tall\tudp\t546:547")
-        shorewall["rules6"].append("ACCEPT\tall\t$FW\tudp\t546:547")
-        shorewall["rules6"].append("")
-
 
 def _init_shorewall(cfg: dict):
     # dict of shorewall config files; will be appended for each vswitch / vlan
@@ -309,6 +308,9 @@ def _configure_shorewall_vlan(shorewall, vswitch_name, vlan):
         shorewall["policy"].append(f"{vlan_name}\tinet\tACCEPT")
         shorewall["policy"].append("")
 
+    shorewall["rules"].append(f"Ping(ACCEPT)\t{vlan_name}\t$FW")
+    shorewall["rules6"].append(f"Ping(ACCEPT)\t{vlan_name}\t$FW")
+
     # snat only on ipv4; ipv6 will be routable
     shorewall["snat"].append(f"MASQUERADE\t{vlan['ipv4_subnet']}\t$INTERNET")
 
@@ -351,7 +353,7 @@ def _configure_shorewall_rules(cfg: dict, shorewall: dict, routable_vlans: list[
                     if not output4:
                         output4 = True
                         shorewall["params"].append(f"{param}={param4}")
-                        shorewall["rules"].append(f"# allow access to {host['hostname']}")
+                        shorewall["rules"].append(f"# allow access to host {host['hostname']}")
 
                     # allow ping on all hosts
                     shorewall["rules"].append(f"Ping(ACCEPT)\t{routable_vlan['name']}\t${param}")
@@ -363,13 +365,18 @@ def _configure_shorewall_rules(cfg: dict, shorewall: dict, routable_vlans: list[
                         if (role == "ntp"):
                             shorewall["rules"].append(f"NTP(ACCEPT)\t{routable_vlan['name']}\t${param}")
                             shorewall["rules"].append(f"NTP(ACCEPT)\t$FW\t${param}")
-                        # DHCP4 is broadcast and does not need special handling
+                        if (role == "dhcp"):
+                            # DHCP4 is broadcast but renew requests need to be allowd
+                            shorewall["rules"].append("# DHCP broadcast handled by dhcp option in interfaces")
+                            shorewall["rules"].append("# allow direct DHCP renew requests")
+                            shorewall["rules"].append(f"DHCPfwd(ACCEPT)\t{routable_vlan['name']}\t${param}")
+                            shorewall["rules"].append(f"DHCPfwd(ACCEPT)\t$FW\t${param}")
 
                 if param6:
                     if not output6 and param4:
                         output6 = True
                         shorewall["params6"].append(f"{param}={param6}")
-                        shorewall["rules6"].append(f"# allow access to {host['hostname']}")
+                        shorewall["rules6"].append(f"# allow access to host {host['hostname']}")
 
                     shorewall["rules6"].append(f"Ping(ACCEPT)\t{routable_vlan['name']}\t${param}")
 
@@ -380,7 +387,10 @@ def _configure_shorewall_rules(cfg: dict, shorewall: dict, routable_vlans: list[
                         if (role == "ntp"):
                             shorewall["rules6"].append(f"NTP(ACCEPT)\t{routable_vlan['name']}\t${param}")
                             shorewall["rules6"].append(f"NTP(ACCEPT)\t$FW\t${param}")
-                        # DHCP6 is handled by separate rules for the relay
+                        if (role == "dhcp"):
+                            shorewall["rules6"].append("# allow DHCPv6 relay")
+                            shorewall["rules6"].append(f"ACCEPT\t{routable_vlan['name']}\t${param}\tudp\t546:547")
+                            shorewall["rules6"].append(f"ACCEPT\t$FW\t${param}\tudp\t546:547")
 
         if output4:
             shorewall["rules"].append("")

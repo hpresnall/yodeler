@@ -103,7 +103,7 @@ def _create_uplink_ports(vswitch: dict) -> list[dict]:
     if not uplinks:
         return []
     elif len(uplinks) == 1:
-        uplink = next(iter(uplinks))
+        uplink = uplinks[0]
         return [interface.for_port(uplink, f"uplink for vswitch {vswitch_name}", vswitch_name, uplink)]
     else:
         ports = []

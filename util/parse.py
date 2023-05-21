@@ -6,7 +6,6 @@ from typing import cast
 
 
 def non_empty_dict(name: str, value: object) -> dict:
-    # type: ignore
     return cast(dict, _non_empty(name, value, dict))
 
 
@@ -22,8 +21,6 @@ def _non_empty(name: str, value, kind: type) -> object:
     if not kind:
         raise ValueError("kind cannot be empty")
 
-    if value is None:
-        raise ValueError(f"{name} cannot be empty")
     if not isinstance(value, kind):
         raise ValueError(f"{name} must be a {kind}, not a {type(value)}")
     if len(value) == 0:
@@ -32,7 +29,7 @@ def _non_empty(name: str, value, kind: type) -> object:
     return value
 
 
-def non_empty_string(key: str, cfg: dict, dict_name: str) -> str:
+def non_empty_string(key: str, cfg: None | dict, dict_name: str) -> str:
     if not key:
         raise ValueError("key cannot be empty")
     if cfg is None:
@@ -72,9 +69,11 @@ def read_string_list(key: str, cfg: dict, value_name: str) -> list[str]:
     return read_string_list_plurals({key}, cfg, value_name)
 
 
-def read_string_list_plurals(keys: set[str], cfg: dict, value_name: str) -> list[str]:
+def read_string_list_plurals(keys: set[str], cfg: None | dict, value_name: str) -> list[str]:
     # combine all all the values from all the keys into a single set
     # this allows something like foo: bar or foos: [ bar, baz ]
+    if not keys:
+        raise KeyError("keys cannot be empty")
     if cfg is None:
         raise ValueError("cfg cannot be None")
     if not value_name:
@@ -91,14 +90,15 @@ def read_string_list_plurals(keys: set[str], cfg: dict, value_name: str) -> list
             continue
 
         if isinstance(cfg[key], str):
-            if key and key not in unique_values:
-                values.append(cfg[key])
-                unique_values.add(cfg[key])
+            value = cfg[key]
+            if value and value not in unique_values:
+                values.append(value)
+                unique_values.add(value)
         elif isinstance(cfg[key], list):
             for value in cfg[key]:
                 if not isinstance(value, str):
-                    raise KeyError(f"invalid {value_name} value '{value}'; it must be a string")
-                if key and key not in unique_values:
+                    raise ValueError(f"invalid {value_name} value '{value}'; it must be a string")
+                if value and value not in unique_values:
                     values.append(value)
                     unique_values.add(value)
         else:
