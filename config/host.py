@@ -228,7 +228,7 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
             site = set()
         if host is None:
             host = set()
-    
+
         # combine; host overwrites site
         host_cfg[key] = set(site)
         host_cfg[key] |= set(host)
@@ -242,7 +242,7 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
 
      # remove iptables if there is no local firewall
     if not host_cfg["local_firewall"]:
-        host_cfg["remove_packages"] |= {"iptables", "ip6tables"}
+        host_cfg["remove_packages"] |= {"iptables"}
         host_cfg["packages"].discard("awall")
 
     if not host_cfg["is_vm"]:

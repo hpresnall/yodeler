@@ -21,7 +21,7 @@ class Router(Role):
      vlans to the internet"""
 
     def additional_packages(self):
-        return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "iptables", "ip6tables"}
+        return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay"}
 
     def configure_interfaces(self):
         uplink = interface.configure_uplink(self._cfg)

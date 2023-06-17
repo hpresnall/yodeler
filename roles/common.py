@@ -90,6 +90,9 @@ class Common(Role):
             setup.append("apk cache sync")
             setup.blank()
             setup.append("log \"Installing required packages\"")
+            setup.comment("this server could be using a repo with newer package versions")
+            setup.comment("upgrade any packages added by alpine installer, then install the required packages")
+            setup.append("apk -q --no-progress upgrade")
             setup.append("apk -q --no-progress add $(cat $DIR/packages)")
             setup.blank()
 
@@ -132,6 +135,7 @@ def _setup_repos(cfg: dict, setup: shell.ShellScript):
         setup.append(f"echo {repo} >> /etc/apk/repositories")
 
     setup.blank()
+
 
 # ignore all ram, loop, floppy disks and all _partitions_
 # ignore all non-file systems
