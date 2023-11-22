@@ -5,7 +5,7 @@ external_ntp:
   - 2.us.pool.ntp.org
   - 3.us.pool.ntp.org
 timezone: US/Eastern
-motd: Welcome to Yodeler's Standard Example Site!\n
+motd: Welcome to Yodeler's Standard Example Site!
 alpine_repositories:
   - http://dl-cdn.alpinelinux.org/alpine/edge/main
   - http://dl-cdn.alpinelinux.org/alpine/edge/community
@@ -61,7 +61,8 @@ vswitches:
         dhcp_min_address_ipv4: 16
         dhcp_max_address_ipv4: 128
         # dhcp6_managed defaults to false so DHCP6 will be information only
-        # allow unrescricted access to the internet
+        # allow unrescricted access to the internet, supercedes later firewall rules
+        # allow_internet: true
         allow_internet: true
         dhcp_reservations:
           - hostname: laptop
@@ -85,3 +86,48 @@ vswitches:
         ipv6_disabled: true
         dhcp_min_address_ipv4: 2
         dhcp_max_address_ipv4: 16
+firewall:
+  # optionally add 'ipsets' or 'static hosts'
+  # static_hosts: # for systems with staticly assigned IPs, not controlled by Yodeler
+  #   - hostname: appliance
+  #     ipv4_address: 192.168.220.101 # subnet must match a vlan
+  #     # optional ipv6_address
+  # ipsets: # must be homogenous: all subnets or all address, all of the same IP version
+  #   - name: other
+  #     addresses: [10.10.10.0/24, 10.20.0.0/16]
+  rules:
+    - comment: all vlans have basic internet access
+      # source and destination can also be plural and a list of locations
+      # multiple values will be multiplexed into a rule for each source / destination combo
+      source:
+        vlan: all # source vlan name; 'all' for all routable networks; 'internet' for outbound
+      destination:
+        vlan: internet
+      allow:
+        # named services ...
+        - web
+        - ping
+        - ntp
+        # or, proto / port combinations
+        # 'port' or 'ports' can be a single value or an array
+        # values can be a single (integer) port or a string range
+        - { proto: udp, port: 443, comment: Google QUIC } #
+        - { proto: tcp, ports: "8000:8999", comment: faux HTTP ports }
+        - { proto: tcp, ports: 5228, comment: Android and Chrome sync }
+       # 'allow' can also be 'forward' to route the traffic to a single destination host or IP
+    # server vlan  has access_vlans=all so no rules needed
+    - comment: clients can SSH to servers
+      source: 
+        # vswitch required when vlan is not 'all' or 'internet'
+        vswitch: public
+        vlan: client
+        # optional ipv4_address, ipv6_address, ipset or hostname to narrow application from the entire vlan
+        # if only ipv4 or ipv6 specified, rule will only exist for that version
+        # hostname can be from a host YAML, DHCP reservation or static_hostname
+        # configured host will use ipv4 and/org ipv6 addresses as defined
+      destination:
+        vswitch: public
+        vlan: server
+      allow:
+        - ssh
+      # client has allow_internet=true so no extra rules needed

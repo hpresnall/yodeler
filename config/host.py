@@ -52,18 +52,23 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     site_cfg = parse.non_empty_dict("site_cfg", site_cfg)
     host_yaml = parse.non_empty_dict("host_yaml", host_yaml)
 
-    hostname = parse.non_empty_string("hostname", host_yaml, "host_yaml")
+    hostname = parse.non_empty_string("hostname", host_yaml, "host_yaml").lower()  # lowercase for consistency
 
     if hostname in site_cfg["hosts"]:
-        raise ValueError(f"duplicate hostname '{host_yaml['hostname']}'")
+        raise ValueError(f"duplicate hostname '{hostname}'")
+    if hostname in site_cfg["firewall"]["static_hosts"]:
+        raise ValueError(f"duplicate hostname '{hostname}' in firewall.static_hosts")
+    host_yaml["hostname"] = hostname
 
     # silently ignore attempts to overwrite site config
     host_yaml.pop("vswitches", None)
+    host_yaml.pop("firewall", None)
+    host_yaml.pop("external_ntp", None)
 
     # shallow copy site config; host values overwrite site values
     host_cfg = {**site_cfg, **host_yaml}
 
-    # since site_cfg is shared with host config, all hosts can find other hosts
+    # since site_cfg is shared with all host's config, all hosts can find other hosts
     site_cfg["hosts"][hostname] = host_cfg
 
     _set_defaults(host_cfg)
@@ -76,18 +81,45 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     interface.validate(host_cfg)
 
     # allow both 'alias' and 'aliases'; only store 'aliases'
-    host_cfg["aliases"] = set(parse.read_string_list_plurals(
-        {"alias", "aliases"}, host_cfg, "alias for " + host_cfg["hostname"]))
+    aliases = parse.read_string_list_plurals(
+        {"alias", "aliases"}, host_cfg, "alias for " + host_cfg["hostname"])
     host_cfg.pop("alias", None)
+
+    # final set of aliases is all defined values plus roles
+    host_cfg["aliases"] = set()
+
+    for alias in aliases:
+        host_cfg["aliases"].add(alias.lower())
 
     for role in host_cfg["roles"]:
         role.additional_configuration()
 
         if role.name != "common":
-            role.add_alias(role.name)
+            role.add_alias(role.name)  # role names are already lowercase
 
     # ensure hostname is not duplicated by a role
     host_cfg["aliases"].discard(host_cfg["hostname"])
+
+    for alias in host_cfg["aliases"]:
+        if alias in site_cfg["firewall"]["static_hosts"]:
+            raise ValueError(f"alias '{alias}' for host '{hostname}' is already used in firewall.static_hosts")
+
+    # ensure no clashes with DHCP reservations
+    aliases = set(host_cfg["aliases"])
+    aliases.add(host_cfg["hostname"])
+
+    for iface in host_cfg["interfaces"]:
+        if iface["type"] not in {"std", "vlan"}:
+            continue
+
+        vlan = iface["vlan"]["name"]
+        vlan_aliases = iface["vlan"]["known_aliases"]
+
+        if not aliases.isdisjoint(vlan_aliases):
+            raise ValueError(
+                f"vlan '{vlan}' contains DHCP reservations {aliases.intersection(vlan_aliases)} that conflict with a global hostname or alias")
+
+    # cannot check against all aliases in the site here since all hosts may not have been defined
 
     _configure_packages(site_cfg, host_yaml, host_cfg)
 

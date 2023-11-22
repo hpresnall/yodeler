@@ -1,8 +1,8 @@
 diff --git a/alpine-make-vm-image b/alpine-make-vm-image
-index 90f756e..3884859 100755
+index 6c962d5..c91c57b 100755
 --- a/alpine-make-vm-image
 +++ b/alpine-make-vm-image
-@@ -241,6 +241,10 @@ prepare_chroot() {
+@@ -288,6 +288,10 @@ prepare_chroot() {
  	mount_bind /dev "$dest"/dev
  	mount_bind /sys "$dest"/sys
  
@@ -13,7 +13,7 @@ index 90f756e..3884859 100755
  	install -D -m 644 /etc/resolv.conf "$dest"/etc/resolv.conf
  	echo "$RESOLVCONF_MARK" >> "$dest"/etc/resolv.conf
  }
-@@ -479,8 +483,10 @@ else
+@@ -590,8 +594,10 @@ else
  fi
  
  # Use APK cache if available.
@@ -24,8 +24,8 @@ index 90f756e..3884859 100755
 +	ln -s "$apk_cache_dir" etc/apk/cache
  fi
  
- _apk add --root . --update-cache --initdb alpine-base
-@@ -546,11 +552,6 @@ if [ "$PACKAGES" ]; then
+ _apk add --root . ${ARCH:+--arch "$ARCH"} --update-cache --initdb alpine-base
+@@ -694,11 +700,6 @@ if [ "$PACKAGES" ]; then
  	_apk add --root . $PACKAGES
  fi
  
@@ -37,13 +37,13 @@ index 90f756e..3884859 100755
  #-----------------------------------------------------------------------
  if [ "$FS_SKEL_DIR" ]; then
  	einfo "Copying content of $FS_SKEL_DIR into image"
-@@ -588,7 +589,11 @@ if grep -qw "$RESOLVCONF_MARK" etc/resolv.conf 2>/dev/null; then
+@@ -736,7 +737,11 @@ if grep -qw "$RESOLVCONF_MARK" etc/resolv.conf 2>/dev/null; then
  	EOF
  fi
  
 -rm -Rf var/cache/apk/* ||:
 +if [ -n "$apk_cache_dir" ]; then
-+    rm etc/apk/cache ||:
++    rm etc/apk/cache >/dev/null 2>&1
 +else
 +    rm -Rf var/cache/apk/* ||:
 +fi

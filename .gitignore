@@ -3,3 +3,5 @@ __pycache__
 htmlcov
 .DS_STORE
 .vscode
+# location for private sites, outside of git
+sites/private

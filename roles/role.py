@@ -51,8 +51,7 @@ class Role(ABC):
     def validate(self):
         """Run any additional validation needed for this role.
 
-        This will be called before write_config(). All hosts for the site will be loaded so the total site
-        layout can be checked, if needed."""
+        This should be called after all hosts for the site will be loaded so the total site layout can be checked, if needed."""
         pass
 
     @abstractmethod
@@ -65,7 +64,7 @@ class Role(ABC):
         """Add an alias to the host.
 
         The alias will be numbered if other hosts in the site have the same role"""
-        self._cfg["aliases"].add(alias)
+        self._cfg["aliases"].add(alias)  # add to this host's config
 
         # assume this is called _after_ load_all_roles() and will not raise KeyError
         existing_hosts = self._cfg["roles_to_hostnames"][self.name]
@@ -101,6 +100,14 @@ def load(role_name: str, host_cfg: dict) -> Role:
 
 
 _role_class_by_name = {}
+
+
+def names() -> set[str]:
+    return set(_role_class_by_name.keys())
+
+
+def class_for_name(name: str) -> Role:
+    return _role_class_by_name[name]
 
 
 def load_all_roles():

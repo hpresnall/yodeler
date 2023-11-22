@@ -3,6 +3,7 @@
 These functions will raise ValueErrors or KeyErrors for invalid values.
 """
 from typing import cast
+from typing import Hashable
 
 
 def non_empty_dict(name: str, value: object) -> dict:
@@ -15,11 +16,11 @@ def non_empty_list(name: str, value: object) -> list:
 
 def _non_empty(name: str, value, kind: type) -> object:
     if not name:
-        raise ValueError("name cannot be empty")
+        raise ValueError(f"name cannot be empty for value {value}")
     if value is None:
-        raise ValueError("value cannot be None")
+        raise ValueError(f"value cannot be None for name {name}")
     if not kind:
-        raise ValueError("kind cannot be empty")
+        raise ValueError(f"kind cannot be empty for name {name}, value {value}")
 
     if not isinstance(value, kind):
         raise ValueError(f"{name} must be a {kind}, not a {type(value)}")
@@ -49,7 +50,7 @@ def non_empty_string(key: str, cfg: None | dict, dict_name: str) -> str:
     return value
 
 
-def set_default_string(key: str, cfg: None | dict, default: str):
+def set_default_string(key: str, cfg: dict, default: str):
     if not key:
         raise ValueError("key cannot be empty")
     if cfg is None:
@@ -70,6 +71,14 @@ def read_string_list(key: str, cfg: dict, value_name: str) -> list[str]:
 
 
 def read_string_list_plurals(keys: set[str], cfg: None | dict, value_name: str) -> list[str]:
+    return _read_list_plurals(keys, cfg, value_name, str)
+
+
+def read_dict_list_plurals(keys: set[str], cfg: None | dict, value_name: str) -> list[dict]:
+    return _read_list_plurals(keys, cfg, value_name, dict)
+
+
+def _read_list_plurals(keys: set[str], cfg: None | dict, value_name: str, value_type: type) -> list:
     # combine all all the values from all the keys into a single set
     # this allows something like foo: bar or foos: [ bar, baz ]
     if not keys:
@@ -89,20 +98,34 @@ def read_string_list_plurals(keys: set[str], cfg: None | dict, value_name: str) 
         if key not in cfg:
             continue
 
-        if isinstance(cfg[key], str):
+        # allow list of value_type or a single value
+        if isinstance(cfg[key], value_type):
             value = cfg[key]
-            if value and value not in unique_values:
-                values.append(value)
-                unique_values.add(value)
-        elif isinstance(cfg[key], list):
-            for value in cfg[key]:
-                if not isinstance(value, str):
-                    raise ValueError(f"invalid {value_name} value '{value}'; it must be a string")
-                if value and value not in unique_values:
+
+            if value:
+                # only add hashable values once
+                if isinstance(value, Hashable):
+                    if value not in unique_values:
+                        unique_values.add(value)
+                        values.append(value)
+                else:
                     values.append(value)
-                    unique_values.add(value)
+        elif isinstance(cfg[key], list):
+            # for lists, check each value
+            for value in cfg[key]:
+                if not isinstance(value, value_type):
+                    raise ValueError(f"invalid {value_name} value '{value}'; it must be a {value_type}")
+                if value:
+                    # only add hashable values once
+                    if isinstance(value, Hashable):
+                        if value not in unique_values:
+                            unique_values.add(value)
+                            values.append(value)
+                    else:
+                        values.append(value)
         else:
-            raise KeyError(f"{key} for {value_name} must be a str or list, not {type(cfg[key])}")
+            raise KeyError(
+                f"{key} for {value_name} must be a {value_type} or list of {value_type}, not {type(cfg[key])}")
 
     return values
 

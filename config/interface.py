@@ -23,7 +23,7 @@ def validate(cfg: dict):
 
     names = set()
 
-    for i, iface in enumerate(ifaces):
+    for i, iface in enumerate(ifaces, start=1):
         parse.non_empty_dict("iface " + str(i), iface)
 
         if "name" in iface:

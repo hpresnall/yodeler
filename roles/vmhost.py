@@ -107,9 +107,9 @@ def _create_uplink_ports(vswitch: dict) -> list[dict]:
         return [interface.for_port(uplink, f"uplink for vswitch {vswitch_name}", vswitch_name, uplink)]
     else:
         ports = []
-        for n, iface in enumerate(uplinks):
+        for n, iface in enumerate(uplinks, start=1):
             ports.append(interface.for_port(
-                iface, f"uplink {n+1} of {len(uplinks)} for vswitch {vswitch_name}", vswitch_name, iface))
+                iface, f"uplink {n} of {len(uplinks)} for vswitch {vswitch_name}", vswitch_name, iface))
         return ports
 
 

@@ -5,11 +5,13 @@ import logging
 import os
 import copy
 import errno
+import ipaddress
 
 import util.file as file
 import util.parse as parse
 
 import config.vswitch as vswitch
+import config.firewall as firewall
 import config.host as host
 
 import roles.role
@@ -57,7 +59,9 @@ def validate(site_yaml: dict | str | None) -> dict:
 
     host.validate_site_defaults(site_cfg)
 
+    # order matters here; vswitch / vlans first since the firewall config needs that information
     vswitch.validate(site_cfg)
+    firewall.validate(site_cfg)
 
     # map hostname to host config
     site_cfg["hosts"] = {}
@@ -80,6 +84,8 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
 
         host.load(site_cfg, os.path.join(site_dir, host_path))
 
+    _validate_full_site(site_cfg)
+
     _logger.debug("loaded %d hosts for site '%s'", len(site_cfg["hosts"]), site_cfg["site_name"])
 
 
@@ -97,17 +103,13 @@ def write_host_scripts(site_cfg: dict, output_dir: str):
         else:
             raise ose
 
-    _validate_site(site_cfg)
-
     for host_cfg in site_cfg["hosts"].values():
         host.write_scripts(host_cfg, output_dir)
 
 
-def _validate_site(site_cfg: dict):
+def _validate_full_site(site_cfg: dict):
     # confirm site contains all necessary roles
-    for role_class in roles.role.Role.__subclasses__():
-        role_name = role_class.__name__.lower()
-
+    for role_name in roles.role.names():
         if role_name == "common":
             hostnames = site_cfg["hosts"].keys()
         else:
@@ -115,8 +117,9 @@ def _validate_site(site_cfg: dict):
 
         count = len(hostnames)
 
-        min = role_class.minimum_instances(site_cfg)
-        max = role_class.maximum_instances(site_cfg)
+        clazz = roles.role.class_for_name(role_name)
+        min = clazz.minimum_instances(site_cfg)
+        max = clazz.maximum_instances(site_cfg)
 
         if count < min:
             raise ValueError((f"site '{site_cfg['site_name']}' requires at least {min} hosts with '{role_name}' role;"
@@ -125,22 +128,23 @@ def _validate_site(site_cfg: dict):
             raise ValueError((f"site '{site_cfg['site_name']}' requires at least {max} hosts with '{role_name}' role;"
                               f" {count} hosts defined: {hostnames}"))
 
-    # confirm all hostnames and aliases are unique
+    # hostname uniqueness already determined as hosts were loaded but _not_ against all aliases; see host.validate()
     aliases = set()
-    for host_cfg in site_cfg["hosts"].values():
-        aliases.update(host_cfg["aliases"])
 
-    hostnames = set()
+    for host_cfg in site_cfg["hosts"].values():
+        aliases.update(host_cfg["aliases"])  # this includes role names for the host
+
+        # validate here to avoid an additional all hosts loop
+        for role in host_cfg["roles"]:
+            role.validate()
+
+    _logger.debug("all_aliases=%s", aliases)
+
     for host_cfg in site_cfg["hosts"].values():
         hostname = host_cfg["hostname"]
 
-        if hostname in hostnames:
-            raise KeyError(f"duplicate hostname '{hostname}'")
         if hostname in aliases:
             raise KeyError(f"hostname '{hostname}' cannot be the same as another host's alias")
+        aliases.add(host_cfg["hostname"])
 
-        hostnames.add(hostname)
-
-    for host_cfg in site_cfg["hosts"].values():
-        for role in host_cfg["roles"]:
-            role.validate()
+    firewall.validate_rule_hostnames(site_cfg)

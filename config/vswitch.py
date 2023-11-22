@@ -18,8 +18,9 @@ def validate(cfg: dict):
     for i, vswitch in enumerate(vswitches, start=1):
         parse.non_empty_dict("vswitch " + str(i), vswitch)
 
-        # name is required and must be unique
-        vswitch_name = parse.non_empty_string("name", vswitch, "vswitch" + str(i))
+        # name is required and must be unique; lowercase for consistency
+        vswitch_name = parse.non_empty_string("name", vswitch, "vswitch" + str(i)).lower()
+        vswitch["name"] = vswitch_name
 
         if vswitches_by_name.get(vswitch_name) is not None:
             raise KeyError(f"duplicate name {vswitch_name} defined for vswitch {i}")

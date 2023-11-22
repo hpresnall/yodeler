@@ -21,13 +21,6 @@ sed -i -E 's/(IP_FORWARDING=)Keep/\1Yes/' /etc/shorewall6/shorewall6.conf
 sed -i -E 's/(SAVE_IPSETS=)No/\1Yes/' /etc/shorewall6/shorewall6.conf
 sed -i -E 's/(USE_NFLOG_SIZE=)No/\1Yes/' /etc/shorewall6/shorewall6.conf
 
-# shorewall can use and save ipsets, but cannot create
-BANNED="create banned hash:ip family inet hashsize 1024 maxelem 65536"
-echo "$$BANNED" > /var/lib/shorewall/ipsets.save
-chown root:root /var/lib/shorewall/ipsets.save
-chmod 600 /var/lib/shorewall/ipsets.save
-ipset $$BANNED
-
 # setup ulogd
 install -o root -g root -m 600 $$DIR/ulogd.conf /etc/
 install -o root -g root -m 600 $$DIR/ulogd /etc/logrotate.d/

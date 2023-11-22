@@ -1,4 +1,7 @@
 ?SECTION ALL
+# drop traffic from banned list
+DROP:NFLOG(6)	inet:+banned6	$FW
+
 ?SECTION ESTABLISHED
 ?SECTION RELATED
 ?SECTION INVALID

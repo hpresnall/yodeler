@@ -12,13 +12,13 @@
 - [x] Minimal KVM Server Configuration
 - [x] Open vSwitch configuration with multiple switches and vlans
 - [x] Automated VM setup for an entire site
-- [x] Confiture apk_cache and pass it to install media & VMs
+- [x] Configure apk_cache and pass it to install media & VMs
 - [ ] Let's Encrypt support for wildcard domains and distribution to VMs
 
 ## Router
 - [x] Basic interface configuration for each vswitch & vlan
 - [x] Basic Shorewall configuration with routing
-- [ ] Ability to add per-VLAN custom rules
+- [x] Ability to add custom firewall rules based on vlans, hosts, ipsets and ip addresses
 - [ ] nftables firewall configuration
 - [ ] SMCroute config for multicast routing
 - [x] dhcrelay config for DHCP between vlans
@@ -29,7 +29,7 @@
 ## DNS
 - [x] Basic BIND 9 configuration
 - [x] YAML-based configuration for additional DNS entries
-- [ ] Bind alternatives? PowerDNS?
+- [ ] Replace Bind with PowerDNS
 - [ ] Add / update IPv6 SLAAC addresses
 - [ ] DNSSEC
 

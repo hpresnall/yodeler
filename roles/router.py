@@ -12,8 +12,11 @@ import util.dhcpcd
 from roles.role import Role
 
 import config.interface as interface
+import config.vlan as vlans
+import config.firewall as firewall
 
 import util.parse as parse
+import util.address as address
 
 
 class Router(Role):
@@ -45,7 +48,8 @@ class Router(Role):
                 # TODO handle multiple uplinks; maybe just error instead of creating physical bond ifaces
                 # TODO if site also has a separate, physical vmhost, then need a way to
                 # differentiate uplinks for vmhost vs router; maybe router_iface in vswitch config?
-                iface_name = vswitch["uplinks"][0] # next(iter(vswitch["uplinks"]))
+                # next(iter(vswitch["uplinks"]))
+                iface_name = vswitch["uplinks"][0]
                 # vswitch validation already confirmed uplink uniqueness
             else:
                 # note that this assumes ethernet layout of non-vm hosts
@@ -68,12 +72,12 @@ class Router(Role):
                 vlan_interfaces.append(vlan_iface)
 
                 # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
-                network = vlan["ipv6_pd_network"]
-                if network is None:
-                    network = prefix_counter
+                pd_network = vlan["ipv6_pd_network"]
+                if pd_network is None:
+                    pd_network = prefix_counter
                     prefix_counter += 1
-                _validate_vlan_pd_network(uplink["ipv6_pd_prefixlen"], network)
-                uplink["ipv6_delegated_prefixes"].append(f"{vlan_iface['name']}/{network}")
+                _validate_vlan_pd_network(uplink["ipv6_pd_prefixlen"], pd_network)
+                uplink["ipv6_delegated_prefixes"].append(f"{vlan_iface['name']}/{pd_network}")
 
             if vlan_interfaces:
                 # create the parent interface for the vlan interfaces
@@ -82,7 +86,9 @@ class Router(Role):
                 if untagged:  # interface with no vlan tag already created; add the comment on the first interface
                     vlan_interfaces[0]["comment"] = comment
                 else:  # add the base interface as a port
+                    # append to vswitch_interfaces to ensure it is the first definition
                     vswitch_interfaces.append(interface.for_port(iface_name, comment))
+
                 vswitch_interfaces.extend(vlan_interfaces)
 
         # set uplink then vswitch interfaces first in /etc/interfaces
@@ -183,9 +189,13 @@ class Router(Role):
             setup.service("radvd", "boot")
             setup.append("rootinstall radvd.conf /etc")
 
-        _configure_shorewall_rules(self._cfg, shorewall, routable_vlans)
-        _write_dhcrelay_config(self._cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces, shorewall)
+        _add_shorewall_host_config(self._cfg, shorewall, routable_vlans)
+
+        _add_shorewall_rules(self._cfg, shorewall)
+
         _write_shorewall_config(self._cfg, shorewall, setup, output_dir)
+        _write_ipsets(self._cfg, setup)
+        _write_dhcrelay_config(self._cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces, shorewall)
 
 
 def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
@@ -308,6 +318,7 @@ def _configure_shorewall_vlan(shorewall, vswitch_name, vlan):
         shorewall["policy"].append(f"{vlan_name}\tinet\tACCEPT")
         shorewall["policy"].append("")
 
+    # allow all hosts to ping the firewall
     shorewall["rules"].append(f"Ping(ACCEPT)\t{vlan_name}\t$FW")
     shorewall["rules6"].append(f"Ping(ACCEPT)\t{vlan_name}\t$FW")
 
@@ -315,90 +326,273 @@ def _configure_shorewall_vlan(shorewall, vswitch_name, vlan):
     shorewall["snat"].append(f"MASQUERADE\t{vlan['ipv4_subnet']}\t$INTERNET")
 
 
-def _configure_shorewall_rules(cfg: dict, shorewall: dict, routable_vlans: list[dict]):
-    # add a rule for each host role so other vlans can acess that host
+def _add_shorewall_host_config(cfg: dict, shorewall: dict, routable_vlans: list[dict]):
+    # for each router interface (vlan) add a rule for each host role so other vlans can acess that host
     for host in cfg["hosts"].values():
-        if len(host["roles"]) < 2:
+        if len(host["roles"]) < 2:  # any role besides common
             continue
 
-        # only comment once in rules and add param
-        output4 = False
-        output6 = False
+        valid_host_vlans = _find_valid_vlans_for_host(host, routable_vlans, shorewall)
 
-        for iface in host["interfaces"]:
-            if (iface["type"] not in {"std", "vlan"}) or (not iface["vlan"]["routable"]):
+        if not valid_host_vlans:
+            continue
+
+        ping = True
+        rules = []
+        rules6 = []
+
+        for role in host["roles"]:
+            if role.name == "common":
+                continue
+            if role.name == "router":
+                ping = False  # pings to the firewall have already been added
+
+            start = len(rules)
+            start6 = len(rules)
+
+            for idx, host_vlan in enumerate(valid_host_vlans):
+                name = host_vlan['name']
+                vlan = host_vlan['vlan']
+                ipv4 = host_vlan['ipv4']
+                ipv6 = host_vlan['ipv4']
+
+                if role.name == "dns":
+                    rule = f"DNS(ACCEPT)\t{vlan}\t{name}"
+                    if idx == 0:
+                        rule = f"# {role.name.upper()} role for {host['hostname']}\nDNS(ACCEPT)\t$FW\t{name}\n{rule}"
+                    if ipv4:
+                        rules.append(rule)
+                    if ipv6:
+                        rules6.append(rule)
+
+                if role.name == "ntp":
+                    rule = f"NTP(ACCEPT)\t{vlan}\t{name}"
+                    if idx == 0:
+                        rule = f"# {role.name.upper()} role for {host['hostname']}\nNTP(ACCEPT)\t$FW\t{name}\n{rule}"
+                    if ipv4:
+                        rules.append(rule)
+                    if ipv6:
+                        rules6.append(rule)
+
+                if role.name == "dhcp":
+                    if ipv4:
+                        if idx == 0:
+                            # DHCP4 is broadcast but renew requests need to be allowed
+                            rules.append(f"# {role.name.upper()} role for {host['hostname']}")
+                            rules.append("# DHCP broadcast handled by dhcp option in interfaces")
+                            rules.append("# allow direct DHCP renew requests")
+                            rules.append(f"DHCPfwd(ACCEPT)\t$FW\t{name}")
+                        rules.append(f"DHCPfwd(ACCEPT)\t{vlan}\t{name}")
+                    if ipv6:
+                        if idx == 0:
+                            rules6.append(f"# {role.name.upper()} role for {host['hostname']}")
+                            rules6.append("# allow DHCPv6 relay")
+                            rules6.append(f"ACCEPT\t$FW\t{name}\tudp\t546:547")
+                        rules6.append(f"ACCEPT\t{vlan}\t{name}\tudp\t546:547")
+
+            if (len(rules) - start) > 0:
+                rules.append("")
+            if (len(rules6) - start6) > 0:
+                rules6.append("")
+
+        if ping or rules:
+            shorewall["rules"].append(f"# allow access to host {host['hostname']}")
+        if ping or rules6:
+            shorewall["rules6"].append(f"# allow access to host {host['hostname']}")
+
+        if ping:
+            output = False
+            output6 = False
+
+            for host_vlan in valid_host_vlans:
+                if host_vlan['ipv4']:
+                    output = True
+                    shorewall["rules"].append(f"Ping(ACCEPT)\t{host_vlan['vlan']}\t{host_vlan['name']}")
+                if host_vlan['ipv4']:
+                    output6 = True
+                    shorewall["rules6"].append(f"Ping(ACCEPT)\t{host_vlan['vlan']}\t{host_vlan['name']}")
+
+            if output:
+                shorewall["rules"].append("")
+            if output6:
+                shorewall["rules6"].append("")
+
+        if rules:
+            shorewall["rules"].extend(rules)
+        if rules6:
+            shorewall["rules6"].extend(rules6)
+
+    # for additional hosts, add params for each ip address
+    for host in cfg["firewall"]["static_hosts"].values():
+        hostname = host["hostname"].upper()
+        vlan = host["vlan"].upper()
+        if host["ipv4_address"]:
+            shorewall["params"].append(f"{hostname}_{vlan}={vlan}:{host['ipv4_address']}")
+        if host["ipv6_address"]:
+            shorewall["params6"].append(f"{hostname}_{vlan}={vlan}:{host['ipv6_address']}")
+
+    # for DHCP reservations, add a param if an ip address exists
+    # firewall will not allow rules if there is no address and ensures aliases are not used
+    for vswitch in cfg["vswitches"].values():
+        for vlan in vswitch["vlans"]:
+            vlan_name = vlan['name'].upper()
+            for res in vlan["dhcp_reservations"]:
+                if res["ipv4_address"]:
+                    shorewall["params"].append(
+                        f"{res['hostname'].upper()}_{vlan_name}={vlan_name}:{res['ipv4_address']}")
+                if res["ipv6_address"]:
+                    shorewall["params6"].append(
+                        f"{res['hostname'].upper()}_{vlan_name}={vlan_name}:{res['ipv6_address']}")
+
+
+def _find_valid_vlans_for_host(host: dict, routable_vlans: list[dict], shorewall: dict) -> list[dict]:
+    # find all routable vlans for the host that need firewall rules for each role
+    valid_host_vlans = []
+
+    for iface in host["interfaces"]:
+        if (iface["type"] not in {"std", "vlan"}) or (not iface["vlan"]["routable"]):
+            continue
+
+        vlan_name = iface["vlan"]["name"]
+        host_vlan = (host["hostname"] + "_" + vlan_name).upper()
+        needs_param4 = needs_param6 = False
+
+        for routable_vlan in routable_vlans:
+            if routable_vlan["name"] == vlan_name:
+                continue  # no rule needed for same vlan
+
+            # no need for more specific rule if vlan can already access the host's entire vlan
+            access_vlans = routable_vlan["access_vlans"]
+            if (vlan_name in access_vlans) or ("all" in access_vlans):
                 continue
 
-            vlan_name = iface["vlan"]["name"]
-            host_roles = [role.name for role in host["roles"] if role != "common"]
+            ipv4 = ipv6 = False
 
-            # add param for host's ip address
-            param = (host["hostname"] + "_" + vlan_name).upper()
-            param4 = param6 = None
             if iface["ipv4_address"] != "dhcp":
-                param4 = f"{vlan_name}:{iface['ipv4_address']}"
+                ipv4 = True
+                needs_param4 = True
             if iface["ipv6_address"]:
-                param6 = f"{vlan_name}:{iface['ipv6_address']}"
+                ipv6 = True
+                needs_param6 = True
 
-            for routable_vlan in routable_vlans:
-                if routable_vlan["name"] == vlan_name:
-                    continue  # no rule needed for same vlan
+            if ipv4 or ipv6:
+                valid_host_vlans.append({
+                    "name": "$" + host_vlan,  # add $ for param substitution
+                    "vlan":  routable_vlan["name"],
+                    "ipv4": ipv4,
+                    "ipv6": ipv6})
 
-                # no need for more specific rule if vlan can already access this host
-                access_vlans = routable_vlan["access_vlans"]
-                if (routable_vlan["name"] in access_vlans) or ("all" in access_vlans):
-                    continue
+        # add param for host/vlan combo
+        if needs_param4:
+            shorewall["params"].append(f"{host_vlan}={vlan_name}:{iface['ipv4_address']}")
+        if needs_param6:
+            shorewall["params6"].append(f"{host_vlan}={vlan_name}:{iface['ipv6_address']}")
 
-                if param4:
-                    if not output4:
-                        output4 = True
-                        shorewall["params"].append(f"{param}={param4}")
-                        shorewall["rules"].append(f"# allow access to host {host['hostname']}")
-
-                    # allow ping on all hosts
-                    shorewall["rules"].append(f"Ping(ACCEPT)\t{routable_vlan['name']}\t${param}")
-
-                    for role in host_roles:
-                        if (role == "dns"):
-                            shorewall["rules"].append(f"DNS(ACCEPT)\t{routable_vlan['name']}\t${param}")
-                            shorewall["rules"].append(f"DNS(ACCEPT)\t$FW\t${param}")
-                        if (role == "ntp"):
-                            shorewall["rules"].append(f"NTP(ACCEPT)\t{routable_vlan['name']}\t${param}")
-                            shorewall["rules"].append(f"NTP(ACCEPT)\t$FW\t${param}")
-                        if (role == "dhcp"):
-                            # DHCP4 is broadcast but renew requests need to be allowd
-                            shorewall["rules"].append("# DHCP broadcast handled by dhcp option in interfaces")
-                            shorewall["rules"].append("# allow direct DHCP renew requests")
-                            shorewall["rules"].append(f"DHCPfwd(ACCEPT)\t{routable_vlan['name']}\t${param}")
-                            shorewall["rules"].append(f"DHCPfwd(ACCEPT)\t$FW\t${param}")
-
-                if param6:
-                    if not output6 and param4:
-                        output6 = True
-                        shorewall["params6"].append(f"{param}={param6}")
-                        shorewall["rules6"].append(f"# allow access to host {host['hostname']}")
-
-                    shorewall["rules6"].append(f"Ping(ACCEPT)\t{routable_vlan['name']}\t${param}")
-
-                    for role in host_roles:
-                        if (role == "dns"):
-                            shorewall["rules6"].append(f"DNS(ACCEPT)\t{routable_vlan['name']}\t${param}")
-                            shorewall["rules6"].append(f"DNS(ACCEPT)\t$FW\t${param}")
-                        if (role == "ntp"):
-                            shorewall["rules6"].append(f"NTP(ACCEPT)\t{routable_vlan['name']}\t${param}")
-                            shorewall["rules6"].append(f"NTP(ACCEPT)\t$FW\t${param}")
-                        if (role == "dhcp"):
-                            shorewall["rules6"].append("# allow DHCPv6 relay")
-                            shorewall["rules6"].append(f"ACCEPT\t{routable_vlan['name']}\t${param}\tudp\t546:547")
-                            shorewall["rules6"].append(f"ACCEPT\t$FW\t${param}\tudp\t546:547")
-
-        if output4:
-            shorewall["rules"].append("")
-        if output6:
-            shorewall["rules6"].append("")
+    return valid_host_vlans
 
 
-def _write_shorewall_config(cfg, shorewall, setup, output_dir):
+# map firewall keywords to shorwall macro names
+_allowed_macros = {
+    "ping": "Ping",
+    "ssh": "SSH",
+    "telnet": "Telnet",
+    "dns": "DNS",
+    "ntp": "NTP",
+    "smb": "SMB",
+    "samba": "SMB",
+    "web": "Web",
+    "ftp": "FTP",
+    "mail": "Mail",
+    "pop3": "POP3",
+    "imap": "IMAP",
+    "imaps": "IMAPS"
+}
+
+
+def _parse_firewall_location(cfg: dict, location: dict, ip_version: int,  loc_name: str) -> str:
+    vlan = location["vlan"]
+
+    if vlan == "internet":
+        vlan = "inet"  # match Shorewall interfaces file
+
+    # location from firewall.py has optional hostname, ipset or ip address
+    if "hostname" in location:
+        # match value in Shorewall params
+        return f"${location['hostname'].upper()}_{vlan.upper()}"
+    elif "ipset" in location:
+        return f"{vlan}:+{location['ipset']}"
+    elif "ipaddress" in location:
+        # assume config already confirmed address matches ip version
+        return f"{vlan}:{location['ipaddress']}"
+    else:
+        return vlan
+
+
+def _add_shorewall_rules(cfg: dict, shorewall: dict):
+    for idx, rule in enumerate(cfg["firewall"]["rules"], start=1):
+        _add_shorewall_action(cfg, rule, idx, 4, shorewall)
+        _add_shorewall_action(cfg, rule, idx, 6, shorewall)
+
+
+def _add_shorewall_action(cfg: dict, rule: dict, rule_idx: int,  ip_version: int, shorewall: dict):
+    key = "ipv4" if ip_version == 4 else "ipv6"
+    actions = []
+
+    # for every source/destination combo
+    for source in rule[key]["sources"]:
+        for destination in rule[key]["destinations"]:
+            loc = f"firewall rule {rule_idx}"
+            s = _parse_firewall_location(cfg, source, ip_version, loc)
+            d = _parse_firewall_location(cfg, destination, ip_version, loc)
+
+            # _parse_firewall_location returns empty string on invalid hostnames
+            if not s or not d:
+                continue
+
+            for action in rule["actions"]:
+                a = action["action"]
+                if a == "allow":
+                    a = "ACCEPT"
+                elif a == "forward":
+                    a = "DNAT"
+                else:
+                    a = a.upper()
+
+                if action["type"] == "named":
+                    if action["protocol"] in _allowed_macros:
+                        a = _allowed_macros[action["protocol"]] + '(' + a + ')'
+                    else:
+                        raise ValueError(
+                            f"invalid firewall rule {rule_idx}; {action['protocol']} is not a valid protocol")
+
+                    actions.append(a + '\t' + s + '\t' + d)
+                elif action["type"] == "protoport":
+                    protocol = action["protocol"]
+                    n = len(action["ports"])
+
+                    # add comment at the end of the line if there is only one line of output
+                    if n > 1 and action["comment"]:
+                        actions.append("# " + action["comment"])
+
+                    for i, port in enumerate(action["ports"]):
+                        if (i == 0) and (n == 1) and action["comment"]:
+                            comment = '\t' + "# " + action["comment"]
+                        else:
+                            comment = ""
+
+                        actions.append(a + '\t' + s + '\t' + d + '\t' + protocol + '\t' + port + comment)
+                else:
+                    raise ValueError(f"invalid firewall rule {rule_idx}; unknown action type '{action['type']}'")
+
+    if len(actions) > 0:
+        key = "rules" + ("" if ip_version == 4 else "6")
+        if rule["comment"]:
+            shorewall[key].append("# " + rule["comment"])
+        shorewall[key].extend(actions)
+        shorewall[key].append("")
+
+
+def _write_shorewall_config(cfg: dict, shorewall: dict, setup: util.shell.ShellScript, output_dir: str):
     shorewall4 = os.path.join(output_dir, "shorewall")
     shorewall6 = os.path.join(output_dir, "shorewall6")
 
@@ -429,7 +623,6 @@ all all REJECT  NFLOG({0})
 
     file.write("snat", "\n".join(shorewall["snat"]), shorewall4)
 
-    # TODO add ability to customize rules
     file.write("rules", "\n".join(shorewall["rules"]), shorewall4)
     file.write("rules", "\n".join(shorewall["rules6"]), shorewall6)
 
@@ -438,3 +631,27 @@ all all REJECT  NFLOG({0})
 
     setup.comment("# shorewall config")
     setup.substitute("templates/router/shorewall.sh", cfg)
+
+
+def _write_ipsets(cfg: dict, setup: util.shell.ShellScript):
+    setup.append(file.read("templates/router/ipsets.sh"))
+
+    for name, ipset in cfg["firewall"]["ipsets4"].items():
+        setup.blank()
+        setup.append(
+            f"echo \"create {name} hash:{ipset['type']} family {ipset['family']} hashsize {ipset['hashsize']} maxelem {len(ipset['addresses'])}\"  >> $IPSETS_4")
+
+        for address in ipset["addresses"]:
+            setup.append(f"echo \"add {name} {address}\" >> $IPSETS_4")
+
+    for name, ipset in cfg["firewall"]["ipsets6"].items():
+        setup.blank()
+        setup.append(
+            f"echo \"create {name} hash:{ipset['type']} family {ipset['family']} hashsize {ipset['hashsize']} maxelem {len(ipset['addresses'])}\"  >> $IPSETS_6")
+
+        for address in ipset["addresses"]:
+            setup.append(f"echo \"add {name} {address}\" >> $IPSETS_6")
+
+    setup.blank()
+    setup.append("ipset restore < $IPSETS_4")
+    setup.append("ipset restore < $IPSETS_6")
