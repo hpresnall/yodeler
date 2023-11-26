@@ -41,6 +41,10 @@ class Dns(Role):
         if accessible_vlans:
             raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {accessible_vlans}")
 
+    @staticmethod
+    def minimum_instances(site_cfg: dict) -> int:
+        return 0 if 'fakeisp' in site_cfg["roles_to_hostnames"] else 1
+    
     def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
 

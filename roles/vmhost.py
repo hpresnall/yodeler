@@ -133,6 +133,7 @@ def _setup_open_vswitch(cfg, setup):
             continue
 
         port = f"{cfg['hostname']}-{iface['vlan']['name']}"
+        port = port[:15] # Linux device names much be < 16 characters
 
         setup.comment(f"setup switch port for host interface on vswitch {iface['vswitch']['name']}")
         setup.append(

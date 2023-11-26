@@ -22,7 +22,7 @@ def write_vm_xml(cfg: dict, output_dir: str) -> None:
 
     for disk in disks:
         target = disk.find("target")
-        if (target is not None) and "dev" in target.attrib:
+        if (target is not None) and ("dev" in target.attrib):
             disk_devs.add(target.attrib["dev"])
 
     for i, disk_path in enumerate(cfg["vm_disk_paths"]):
@@ -74,8 +74,9 @@ def interface_from_config(hostname: str, iface: dict) -> xml.Element:
     vlan_name = iface["vlan"]["name"]
     interface = xml.Element("interface")
     interface.attrib["type"] = "network"
+    device = f"{hostname}-{vlan_name}"[:15]  # Linux device names much be < 16 characters
     xml.SubElement(interface, "source", {"network": iface["vswitch"]["name"], "portgroup": vlan_name})
-    xml.SubElement(interface, "target", {"dev": f"{hostname}-{vlan_name}"})
+    xml.SubElement(interface, "target", {"dev": device})
     xml.SubElement(interface, "model", {"type": "virtio"})
 
     return interface

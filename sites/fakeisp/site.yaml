@@ -1,0 +1,43 @@
+# Test site for verifying _other_ Yodeler sites
+# Creates a physical VM host and a VM that can use used for testing. This VM can act as a 'physcial' host for another
+# Yodeler install. The VM host shields the upstream network's addresses from the nested Yodeler config by creating an
+# intermediate 'fake ISP' set of IP addresses and routes between the networks.
+# This will allow testing of a Yodeler site while running on an older version with the same network configuration.
+timezone: US/Eastern
+public_ssh_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQDUm9cygZUGhKE4RWte9MK3+j7UhO6nAhOfsds4vDO/9XvX3VX1jj1Gl6PE4kjnjTKd6FOI08oa4EYZyTr04Ce2F46JCOXvVq9+YbZOVMDhBVQ0qsvKpRgwoGO7afaFhYO3daaU+bloZQDTxpm7SeNX+PwrvqZxCrjcl/IJAsoFTQ== fakeisp
+private_ssh_key: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAlwAAAAdzc2gtcn
+  NhAAAAAwEAAQAAAIEA1JvXMoGVBoShOEVrXvTCt/o+1ITupwITn7HbOLwzv/V7191V9Y49
+  RpejxOJI540ynehTiNPKGuBGGck69OAntheOiQjl71avfmG2TlTA4QVUNKrLyqUYMKBju2
+  n2hYWDt3WmlPm5aGUA08aZu0njV/j8K76mcQq43JfyCQLKBU0AAAIYMrxZyDK8WcgAAAAH
+  c3NoLXJzYQAAAIEA1JvXMoGVBoShOEVrXvTCt/o+1ITupwITn7HbOLwzv/V7191V9Y49Rp
+  ejxOJI540ynehTiNPKGuBGGck69OAntheOiQjl71avfmG2TlTA4QVUNKrLyqUYMKBju2n2
+  hYWDt3WmlPm5aGUA08aZu0njV/j8K76mcQq43JfyCQLKBU0AAAADAQABAAAAgAi6BNE75G
+  QKGZv3rXqOTVfD28RZWHpeaXPKlxbzEqS0bMrleNvFZNp66uvv5dIrR4KXwKYDG26S+g2g
+  5tyaPsb1YUUe5sO12F9ByKFw+3EqPGu88d7nj/bssF5hIrXdwDnGo0R9GMe/u/qxszzVzU
+  CDnaeXZVHvpDP+Jys+TWFBAAAAQGcuvKvxI7dS0muLc5as+oIHsCxsexsiKaK5kRs7Rbn7
+  liHXGy4DNa8DvoeBFiyfgfw7qnapbL5+UHNl4Dyxe8AAAABBAP+TItoVvOHmNzAxPiTEeh
+  bI7bIuvEsPge6B+Nt6TMh/EoGpu60MeeqKDAbwDmTMXYMOhGy4UovB3JLFTvJBaykAAABB
+  ANT2Zx5D3L9juZHW+xjfE5iNX5WtP7PKBBfHM6mZcBTxp+qP3sjX3d7L0a008weIMobaH+
+  Rmqhwq/wje7/rGsYUAAAAgaHVudGVyQFB0YWgudXNlci5mb3J0YXdlc29tZS54eXoBAgM=
+  -----END OPENSSH PRIVATE KEY-----
+vswitches:
+  # placeholder vswitch only used for connecting the fake ISP to the upstream network / internet
+  - name: fakeinternet
+    uplink: eth0 # interface that is plugged into the existing network
+    vlans:
+      - name: fakeinet
+        routable: false # disable need for 'router' role; 'fakeisp' role will route using a different configuration
+        ipv4_subnet: 0.0.0.0/24
+        ipv6_subnet: "::/64"
+  # vswitch used to link the test server VM to the fake ISP
+  # physical ISP server will route from this netork to the uplink vswitch
+  - name: fakeisp
+    # add uplink interface to allow external systems to route through the 'isp'
+    vlans:
+      - name: fakeisp
+        routable: false
+        ipv4_subnet: 172.17.119.0/24
+        # use the 0 subnet for static and DHCP addresses; use the rest of the /48 for prefix delegation
+        ipv6_subnet: fdff:dead:beef:0::/64

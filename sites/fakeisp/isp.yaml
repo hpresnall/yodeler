@@ -1,0 +1,23 @@
+is_vm: false
+root_dev: "/dev/vda"
+motd: "Alpine physical fake ISP for testing nested Yodeler installs"
+roles: [ vmhost, fakeisp ]
+# /etc/network/interfaces used during initial Alpine Linux install
+# if not set, install will prompt
+# this is the direct file contents, in _BusyBox's_ interfaces file format, not ifupdown-ng
+install_interfaces: |
+  auto lo
+  iface lo inet loopback
+  auto eth0
+  iface eth0 inet dhcp
+# private key will be put on this server and it can be used as a jump box
+install_private_ssh_key: true
+interfaces:
+  # dhcp from existing network; could also hardcode IP addresses
+  - ipv4_address: dhcp
+    vswitch: fakeinet
+  # fake isp interface and subnets
+  - ipv4_address: 172.17.119.1
+    ipv6_address: fdff:dead:beef:0::1
+    accept_ra: false # do no auto configure any IPv6 addresses
+    vswitch: fakeisp
