@@ -15,7 +15,7 @@ install_private_ssh_key: true
 interfaces:
   # dhcp from existing network; could also hardcode IP addresses
   - ipv4_address: dhcp
-    vswitch: fakeinet
+    vswitch: fakeinternet
   # fake isp interface and subnets
   - ipv4_address: 172.17.119.1
     ipv6_address: fdff:dead:beef:0::1

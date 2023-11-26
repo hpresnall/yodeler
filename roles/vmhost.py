@@ -43,16 +43,17 @@ class VmHost(Role):
 
         # change original interface names to the open vswitch port name
         for iface in self._cfg["interfaces"]:
-            # ifaces not net validated; manually look up vlan name
+            # ifaces not yet validated; manually look up vlan name
             iface_vswitch = self._cfg["vswitches"].get(iface.get("vswitch"))
-            if not iface_vswitch:
-                iface_vlan = "error"  # interface validation will error before exposing this name in config files
-            else:
+            if iface_vswitch:
                 iface_vlan = vlan.lookup(iface.get("vlan"), iface_vswitch)["name"]
+                iface["parent"] = iface_vswitch["name"]
+            else:
+                # bubble up to host's interface.validate() call, which will fail with an invalid vswitch
+                iface_vlan = "error"
 
             iface["name"] = f"{self._cfg['hostname']}-{iface_vlan}"
             iface["comment"] = "host interface"
-            iface["parent"] = iface_vswitch["name"]
 
         self._cfg["interfaces"] = vswitch_interfaces + self._cfg["interfaces"]
 
@@ -91,7 +92,11 @@ class VmHost(Role):
             setup.append("log \"\"")
             setup.blank()
 
-        # directly copy patch if it exists
+        # add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity
+        for vswitch in self._cfg["vswitches"].values():
+            _create_vswitch_uplink(vswitch, setup)
+
+        # directly copy patch for alpine-make-vm-image if it exists
         if os.path.isfile("templates/vmhost/patch"):
             shutil.copyfile("templates/vmhost/patch", os.path.join(output_dir, "patch"))
 
@@ -121,11 +126,9 @@ def _setup_open_vswitch(cfg, setup):
     for vswitch in cfg["vswitches"].values():
         vswitch_name = vswitch["name"]
 
-        setup.comment(f"setup {vswitch_name} vswitch")
+        setup.comment(f"setup vswitch '{vswitch_name}'")
         setup.append(f"ovs-vsctl add-br {vswitch_name}")
         setup.blank()
-
-        _create_vswitch_uplink(vswitch, setup)
 
     # each host interface needs a port on the vswitch
     for iface in cfg["interfaces"]:
@@ -133,9 +136,9 @@ def _setup_open_vswitch(cfg, setup):
             continue
 
         port = f"{cfg['hostname']}-{iface['vlan']['name']}"
-        port = port[:15] # Linux device names much be < 16 characters
+        port = port[:15]  # Linux device names much be < 16 characters
 
-        setup.comment(f"setup switch port for host interface on vswitch {iface['vswitch']['name']}")
+        setup.comment(f"setup switch port for host interface on vswitch '{iface['vswitch']['name']}'")
         setup.append(
             f"ovs-vsctl add-port {iface['vswitch']['name']} {port} -- set interface {port} type=internal")
 
@@ -166,7 +169,7 @@ def _create_vswitch_uplink(vswitch, setup):
     else:
         uplink_name = next(iter(uplinks))
 
-        setup.comment("uplink")
+        setup.comment(f"uplink for vswitch '{vswitch_name}'")
         setup.append(f"ovs-vsctl add-port {vswitch_name} {uplink_name}")
 
     setup.blank()
