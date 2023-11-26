@@ -160,7 +160,7 @@ class Router(Role):
                     dhrelay4_ifaces.append(vlan["router_iface"])
 
                 if not vlan["ipv6_disabled"]:
-                    # dhcp_managed== True => AdvManagedFlag on
+                    # dhcp6_managed== True => AdvManagedFlag on
                     radvd_config.append(radvd_template.format(
                         vlan["router_iface"], "on" if vlan["dhcp6_managed"] else "off"))
 

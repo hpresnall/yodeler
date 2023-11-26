@@ -21,7 +21,7 @@ ACCEPT	$FW	all	ipv6-icmp
 SSH(ACCEPT):NFLOG(6)	inet	$FW	-	-	-	-	s:6/min:15
 
 # allow traceroute from the firewall
-Trcrt(ACCEPT)	$FW	net
+Trcrt(ACCEPT)	$FW	inet
 
 # firewall can send DNS out so it does not depend on local DNS being up
 DNS(ACCEPT)	$FW	inet
