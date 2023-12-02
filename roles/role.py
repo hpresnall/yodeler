@@ -23,7 +23,8 @@ class Role(ABC):
 
     @abstractmethod
     def additional_packages(self) -> set[str]:
-        """The packages needed to implement this role."""
+        """The packages needed to implement this role.
+        This will be called after configure_interfaces() and additional_configuration()."""
 
     def configure_interfaces(self):
         """Add any additional interfaces for the role.
@@ -31,7 +32,7 @@ class Role(ABC):
         pass
 
     def additional_configuration(self):
-        """Add any additional default configuration & run validation specific to this role.
+        """Add any additional default configuration specific to this role.
         This is run after configure_interfaces()."""
         pass
 
@@ -51,7 +52,7 @@ class Role(ABC):
     def validate(self):
         """Run any additional validation needed for this role.
 
-        This should be called after all hosts for the site will be loaded so the total site layout can be checked, if needed."""
+        This will called after all hosts for the site are loaded so the total site layout can be checked, if needed."""
         pass
 
     @abstractmethod

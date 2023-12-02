@@ -147,4 +147,5 @@ def _validate_full_site(site_cfg: dict):
             raise KeyError(f"hostname '{hostname}' cannot be the same as another host's alias")
         aliases.add(host_cfg["hostname"])
 
+    # finally, confirm that all the firewall rules point to valid hostnames
     firewall.validate_rule_hostnames(site_cfg)

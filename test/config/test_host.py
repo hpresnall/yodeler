@@ -184,7 +184,11 @@ class TestHost(base.TestCfgBase):
         self.build_error()
 
     def test_invalid_external_dns(self):
+        # host's external dns should be silently ignored
         self._host_yaml["external_dns"] = ["invalid"]
+        self.build_cfg()
+
+        self._site_yaml["external_dns"] = ["invalid"]
         self.build_error()
 
     def test_package_conflict(self):

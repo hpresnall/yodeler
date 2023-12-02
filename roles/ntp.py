@@ -77,7 +77,8 @@ def create_chrony_conf(cfg: dict, output_dir: str):
             buffer.append(_pool_or_server(server))
 
         if at_boot:
-            external = next(iter(cfg['external_ntp']))
+            # just use the first server
+            external = cfg['external_ntp'][0]
             buffer.append("")
             buffer.append(f"initstepslew 10 {external}")
 

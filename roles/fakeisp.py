@@ -11,3 +11,7 @@ class FakeISP(Role):
 
     def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         pass
+
+    @staticmethod
+    def minimum_instances(site_cfg: dict) -> int:
+       return 0

@@ -17,7 +17,7 @@ class Dns(Role):
     def additional_packages(self):
         return {"bind", "bind-tools"}
 
-    def additional_configuration(self):
+    def validate(self):
         if len(self._cfg["external_dns"]) == 0:
             raise KeyError("cannot configure DNS server with no external_dns addresses defined")
 
@@ -27,9 +27,8 @@ class Dns(Role):
             if not domain:
                 raise KeyError(("cannot configure DNS server with no primary_domain or top-level site domain"))
         self._cfg["dns_domain"] = domain
-        # note, no top-level domain => vlans will not have domains and DNS will only have the single, top-levle zone
+        # note, no top-level domain => vlans will not have domains and DNS will only have the single, top-level zone
 
-    def validate(self):
         for iface in self._cfg["interfaces"]:
             if (iface["type"] == "std") and (iface["ipv4_address"] == "dhcp"):
                 raise KeyError(
