@@ -23,7 +23,8 @@ private_ssh_key: |
   Rmqhwq/wje7/rGsYUAAAAgaHVudGVyQFB0YWgudXNlci5mb3J0YXdlc29tZS54eXoBAgM=
   -----END OPENSSH PRIVATE KEY-----
 vswitches:
-  # placeholder vswitch only used for connecting the fake ISP to the upstream network / internet
+  # for the fakeisp role, these vswitch and vlan names are _required_
+  # vswitch only used for connecting the fake ISP to the upstream network / internet
   - name: fakeinternet
     uplink: eth0 # interface that is plugged into the existing network
     vlans:

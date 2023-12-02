@@ -237,6 +237,10 @@ class TestVlan(base.TestCfgBase):
 
         self.assertIsNone(cfg["vswitches"]["public"]["vlans"][0]["ipv6_subnet"])
 
+    def test_vlan_ipv6_big_prefixlen(self):
+        self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_subnet"] = "2001:db8:0:2::/68"
+        self.build_error()
+
     def test_vlan_ipv6_non_int_pd_network(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_pd_network"] = "foo"
         self.build_error()

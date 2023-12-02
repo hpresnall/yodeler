@@ -96,14 +96,17 @@ def _validate_vlan_subnet(vswitch_name: str, vlan: dict, ip_version: str):
     subnet = str(subnet)
 
     # remove the subnet if the vlan disables ipv6
-    if ip_version == "ipv6" and vlan["ipv6_disabled"]:
+    if (ip_version == "ipv6") and (vlan["ipv6_disabled"]):
         vlan["ipv6_subnet"] = None
         return
 
     try:
         vlan[ip_version + "_subnet"] = subnet = ipaddress.ip_network(subnet)
     except ValueError as ve:
-        raise KeyError(f"invalid {ip_version}_subnet for {cfg_name}") from ve
+        raise ValueError(f"invalid {ip_version}_subnet for {cfg_name}") from ve
+
+    if (ip_version == "ipv6") and (subnet.prefixlen> 64):
+        raise ValueError(f"invalid {ip_version}_subnet for {cfg_name}; the prefix length cannot be greater than 64")
 
     # default to DHCP range over all addresses except the router
     min_key = "dhcp_min_address_" + ip_version

@@ -157,7 +157,7 @@ def validate_site_defaults(site_cfg: dict):
         try:
             ipaddress.ip_address(dns)
         except ValueError as ve:
-            raise KeyError(f"invalid external_dns IP address {dns}") from ve
+            raise KeyError(f"invalid 'external_dns' IP address {dns}") from ve
 
 
 def _set_defaults(cfg: dict):

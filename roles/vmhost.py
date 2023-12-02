@@ -44,9 +44,18 @@ class VmHost(Role):
         # change original interface names to the open vswitch port name
         for iface in self._cfg["interfaces"]:
             # ifaces not yet validated; manually look up vlan name
-            iface_vswitch = self._cfg["vswitches"].get(iface.get("vswitch"))
+            # vswitch and vlan could be objects if another role created the interface
+            iface_vswitch = iface.get("vswitch")
+            if not isinstance(iface_vswitch, dict):
+                iface_vswitch = self._cfg["vswitches"].get(iface_vswitch)
+
             if iface_vswitch:
-                iface_vlan = vlan.lookup(iface.get("vlan"), iface_vswitch)["name"]
+                iface_vlan = iface.get("vlan")
+                if isinstance(iface_vlan, dict):
+                    iface_vlan = iface_vlan["name"]
+                else:
+                    iface_vlan = vlan.lookup(iface_vlan, iface_vswitch)["name"]
+
                 iface["parent"] = iface_vswitch["name"]
             else:
                 # bubble up to host's interface.validate() call, which will fail with an invalid vswitch

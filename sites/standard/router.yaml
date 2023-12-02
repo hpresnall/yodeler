@@ -1,4 +1,4 @@
-# note that the router _does not_ define any interfaces
+# note that the router _does not_ need to define any interfaces
 # instead it defines an uplink that connects to the WAN/ISP
 # router configuration will automatically create and configure interfaces for all routable vlans
 motd: "Alpine router VM built by Yodeler"

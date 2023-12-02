@@ -15,6 +15,8 @@ log "Blocking incoming network traffic"
 apk -q add iptables
 iptables -P INPUT DROP
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+ip6tables -P INPUT DROP
+ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
 # copy back original
 cp /tmp/world /etc/apk
