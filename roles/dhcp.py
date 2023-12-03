@@ -94,8 +94,8 @@ class Dhcp(Role):
 
         if not self._cfg["domain"]:
             # no top-level domain => no vlans will have domains, so there is no need for DDNS updates
-            dhcp4_config["dhcp-ddns", "enable-updates"] = False
-            dhcp6_config["dhcp-ddns", "enable-updates"] = False
+            dhcp4_config["dhcp-ddns"]["enable-updates"] = False
+            dhcp6_config["dhcp-ddns"]["enable-updates"] = False
 
             ddns_config = {}
             ddns_dns_addresses = []

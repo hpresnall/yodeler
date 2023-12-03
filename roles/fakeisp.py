@@ -1,5 +1,6 @@
 import util.shell
 
+import logging
 import ipaddress
 
 from roles.role import Role
@@ -8,6 +9,8 @@ import config.vlan
 import config.interface
 
 import util.file
+
+_logger = logging.getLogger(__name__)
 
 
 class FakeISP(Role):
@@ -51,8 +54,20 @@ class FakeISP(Role):
             }
 
         fakeisp.setdefault("ipv4_address", str(fisp_vlan["ipv4_subnet"].network_address + 1))
+
         if fisp_vlan.get("ipv6_subnet"):
-            fakeisp.setdefault("ipv6_address",  str(fisp_vlan["ipv6_subnet"].network_address + 1))
+            subnet = fisp_vlan["ipv6_subnet"]
+
+            # for ipv6, subdivide into 2 seprate networks
+            # the first will be used for this servers ip and DHCP; the second will be used for prefix delegation
+            subnets = list(subnet.subnets())
+            fisp_vlan["ipv6_subnet"] = subnets[0]
+            fisp_vlan["ipv6_delegation_subnet"] = subnets[1]
+
+            _logger.debug(
+                f"splitting {subnet}; will use {subnets[0]} for server & DHCP address and {subnets[1]} for prefix delegation")
+
+            fakeisp.setdefault("ipv6_address",  str(subnets[0].network_address + 1))
             # disable passing through existing ipv6 config
             fakeisp["accept_ra"] = False
             fakeisp["ipv6_dhcp"] = False
@@ -112,13 +127,13 @@ class FakeISP(Role):
         dhcp4_json = util.file.load_json("templates/kea/kea-dhcp4.conf")
         dhcp4_config = dhcp4_json["Dhcp4"]
         dhcp4_config["interfaces-config"]["interfaces"] = [fakeisp["name"]]
+        dhcp4_config["dhcp-ddns"] = {"enable-updates": False}
         dhcp4_config["ddns-update-on-renew"] = False
         dhcp4_config["subnet4"] = [{
             "subnet": str(subnet),
             "pools": [{"pool": str(subnet.network_address + vlan["dhcp_min_address_ipv4"])
                        + " - " + str(subnet.network_address + vlan["dhcp_max_address_ipv4"])}],
-            "option-data": [{"name": "routers", "data": str(fakeisp["ipv4_address"])}],
-            "dhcp-ddns": {"enable-updates": False}
+            "option-data": [{"name": "routers", "data": str(fakeisp["ipv4_address"])}]
         }]
         if dns:
             dhcp4_config["subnet4"][0]["option-data"].append({"name": "domain-name-servers", "data":  ", ".join(dns)})
@@ -127,6 +142,7 @@ class FakeISP(Role):
         setup.append("rootinstall $DIR/kea-dhcp4.conf /etc/kea")
 
         subnet = vlan["ipv6_subnet"]
+        delegation_subnet = vlan["ipv6_delegation_subnet"]
 
         if subnet:
             dns = [str(ip) for ip in external_dns if ip.version == 6]
@@ -134,13 +150,15 @@ class FakeISP(Role):
             dhcp6_json = util.file.load_json("templates/kea/kea-dhcp6.conf")
             dhcp6_config = dhcp6_json["Dhcp6"]
             dhcp6_config["interfaces-config"]["interfaces"] = [fakeisp["name"] + "/" + str(fakeisp["ipv6_address"])]
+            dhcp6_config["dhcp-ddns"] = {"enable-updates": False}
             dhcp6_config["ddns-update-on-renew"] = False
             dhcp6_config["subnet6"] = [{
                 "subnet": str(subnet),
                 "pools": [{"pool": str(subnet.network_address + vlan["dhcp_min_address_ipv6"])
                            + " - " + str(subnet.network_address + vlan["dhcp_max_address_ipv6"])}],
-                "dhcp-ddns": {"enable-updates": False},
-                "rapid-commit": True
+                "pd-pools": _create_pd_pool(delegation_subnet),
+                "rapid-commit": True,
+                "interface": fakeisp["name"]
             }]
             if dns:
                 dhcp4_config["subnet6"][0]["option-data"] = [{"name": "dns-servers", "data":  ", ".join(dns)}]
@@ -151,3 +169,43 @@ class FakeISP(Role):
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         return 0
+
+
+def _create_pd_pool(subnet: ipaddress.IPv6Network) -> list[dict]:
+    prefixlen = subnet.prefixlen
+
+    # prefix length determines the delegation size
+    if prefixlen >= 62:
+        # do not allow /63 or /64 prefix delegations; they are too small
+        raise ValueError(f"cannot create prefix delegation pool from {subnet} when it has less than 2 bits available")
+    elif prefixlen >= 60:
+        delegation_size = 62
+    elif prefixlen >= 56:
+        delegation_size = 60
+    elif prefixlen >= 48:
+        delegation_size = 56
+    else:
+        # assume test environment; no need for more than 256 prefix delegations
+        delegation_size = 56
+        prefixlen = 48
+        subnet = ipaddress.IPv6Network(str(subnet.network_address) + "/48")
+        _logger.info(f"treating {subnet} as a /48 for prefix delegation")
+
+    prefix_delegation_bits = delegation_size - prefixlen
+    subnet_iter = subnet.subnets(prefixlen_diff=prefix_delegation_bits)
+
+    if _logger.isEnabledFor(logging.DEBUG):
+        subnets = list(subnet_iter)
+        prefix_count = 2**prefix_delegation_bits
+        _logger.debug(
+            f"subnet {subnet} prefix delegation will have {prefix_count} /{delegation_size} networks; from {subnets[0]} to {subnets[-1]}")
+
+        subnet_start = subnets[0]
+    else:
+        subnet_start = next(subnet_iter)
+
+    return [{
+        "prefix": str(subnet_start.network_address),
+        "prefix-len": prefixlen,
+        "delegated-len": delegation_size
+    }]

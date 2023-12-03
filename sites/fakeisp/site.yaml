@@ -40,5 +40,9 @@ vswitches:
       - name: fakeisp
         routable: false
         ipv4_subnet: 172.17.119.0/24
-        # use the 0 subnet for static and DHCP addresses; use the rest of the /48 for prefix delegation
-        ipv6_subnet: fdff:dead:beef:0::/64
+        # to allow for prefix delegation, this subnet should be /60 or larger
+        # the 0000 subnet will be used for static and DHCP addresses
+        # the upper half of the subnet will be used for prefix delegation
+        # with a /48, the upper /49 will create 128 /56 delegations, each with 256 subnets (vlans)
+        # with a /60, the upper /61 will create 2 /62 networks, each with 4 subnets (vlans)
+        ipv6_subnet: fdff:dead:beef::/48
