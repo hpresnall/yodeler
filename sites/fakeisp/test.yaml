@@ -4,5 +4,10 @@ memory_mb: 4096
 disk_size_mb: 16384
 motd: "Yodeler test VM"
 interfaces:
+    # request both DHCP for ipv4 and ipv6
   - ipv4_address: dhcp
+    ipv6_dhcp: true
+    # this allocates, but does not assign a prefix delegation
+    # meant for testing to confirm the fakeisp server is working correctly
+    ipv6_ask_for_prefix: true 
     vswitch: fakeisp

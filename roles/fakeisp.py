@@ -15,7 +15,7 @@ _logger = logging.getLogger(__name__)
 
 class FakeISP(Role):
     def additional_packages(self) -> set[str]:
-        return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-admin", "kea-ctrl-agent", "iptables"}
+        return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-admin", "kea-ctrl-agent", "iptables", "ip6tables", "radvd"}
 
     def configure_interfaces(self):
         # ensure required vswitches and vlans exist
@@ -27,6 +27,8 @@ class FakeISP(Role):
         # note vlan=fakeinet but vswitch=fakeinternet
         finet_vlan = config.vlan.lookup("fakeinet", self._cfg["vswitches"]["fakeinternet"])
         fisp_vlan = config.vlan.lookup("fakeisp", self._cfg["vswitches"]["fakeisp"])
+
+        fisp_vlan["dhcp6_managed"] = True # allow DHCP6 requests
 
         # define interfaces for both vswitches, if not already configured
         interfaces = self._cfg.pop("interfaces", [])
@@ -53,7 +55,10 @@ class FakeISP(Role):
                 "vswitch": "fakeisp"
             }
 
-        fakeisp.setdefault("ipv4_address", str(fisp_vlan["ipv4_subnet"].network_address + 1))
+        # act as router with well known address
+        fakeisp["forward"] = True
+        fakeisp.setdefault("ipv4_address", str(fisp_vlan["ipv4_subnet"].
+        network_address + 1))
 
         if fisp_vlan.get("ipv6_subnet"):
             subnet = fisp_vlan["ipv6_subnet"]
@@ -68,8 +73,8 @@ class FakeISP(Role):
                 f"splitting {subnet}; will use {subnets[0]} for server & DHCP address and {subnets[1]} for prefix delegation")
 
             fakeisp.setdefault("ipv6_address",  str(subnets[0].network_address + 1))
-            # disable passing through existing ipv6 config
-            fakeisp["accept_ra"] = False
+            # accept router advertisements, but do not use the local DHCP server
+            fakeisp["accept_ra"] = True
             fakeisp["ipv6_dhcp"] = False
 
         # order so fakeinternet, then fakeisp with parent interfaces first
@@ -140,6 +145,8 @@ class FakeISP(Role):
 
         util.file.write("kea-dhcp4.conf", util.file.output_json(dhcp4_json), output_dir)
         setup.append("rootinstall $DIR/kea-dhcp4.conf /etc/kea")
+        setup.service("kea-dhcp4")
+        setup.blank()
 
         subnet = vlan["ipv6_subnet"]
         delegation_subnet = vlan["ipv6_delegation_subnet"]
@@ -164,7 +171,19 @@ class FakeISP(Role):
                 dhcp4_config["subnet6"][0]["option-data"] = [{"name": "dns-servers", "data":  ", ".join(dns)}]
 
             util.file.write("kea-dhcp6.conf", util.file.output_json(dhcp6_json), output_dir)
+
             setup.append("rootinstall $DIR/kea-dhcp6.conf /etc/kea")
+            setup.service("kea-dhcp6")
+            setup.blank()
+
+        # setup radvd on the fakeisp interface
+        radvd_template = util.file.read("templates/router/radvd.conf")
+        radvd_template = radvd_template.format(fakeisp["name"], "on") # AdvManagedFlag on => use DHCP6
+        util.file.write("radvd.conf", radvd_template, output_dir)
+
+        setup.append("rootinstall radvd.conf /etc")
+        setup.service("radvd", "boot")
+
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

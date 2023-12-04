@@ -1,8 +1,8 @@
 # setup basic iptables rules
 
 # block incoming
-iptables -P INPUT DROP
-iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+# block incoming already set up in yodel.sh
+# these rules will also be saved
 
 # allow ping & SSH
 iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT

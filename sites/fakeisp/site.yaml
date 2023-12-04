@@ -46,3 +46,4 @@ vswitches:
         # with a /48, the upper /49 will create 128 /56 delegations, each with 256 subnets (vlans)
         # with a /60, the upper /61 will create 2 /62 networks, each with 4 subnets (vlans)
         ipv6_subnet: fdff:dead:beef::/48
+        dhcp6_managed: true # DHCP6 will run on this network

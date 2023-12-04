@@ -163,6 +163,11 @@ def _validate_iface(iface: dict):
             if not ("wifi_ssid" in iface) and not ("wifi_psk" in iface):
                 raise KeyError("both 'wifi_ssd' and 'wifi_psk' must be defined for WiFi interfaces")
 
+        # for testing, allow asking for, but not assigning a prefix delegation
+        iface["ipv6_ask_for_prefix"] = bool(iface.get("ipv6_ask_for_prefix"))
+        if iface["ipv6_ask_for_prefix"]:
+            _validate_prefix_len(iface)
+
 
 def _validate_ipaddress(iface: dict, ip_version: str):
     key = ip_version + "_address"
@@ -406,7 +411,7 @@ def configure_uplink(cfg: dict):
         if "macvtap" in uplink:
             if not isinstance(uplink["macvtap"], str):
                 raise KeyError(("invald uplink; 'macvtap' must be a string"))
-            # set name here to distinguish from vswitch; validate will covert to full object
+            # set name here to distinguish from vswitch; validate will convert to full object
             uplink["vswitch"] = "__unknown__"
             uplink["vlan"] = _uplink_vlan
         elif "vswitch" not in uplink:
@@ -415,16 +420,20 @@ def configure_uplink(cfg: dict):
         uplink["vswitch"] = "__unknown__"
         uplink["vlan"] = _uplink_vlan
 
-    prefixlen = uplink.get("ipv6_pd_prefixlen")
+    _validate_prefix_len(uplink)
+
+    # validate will check IP addresses
+    return uplink
+
+
+def _validate_prefix_len(iface: dict):
+    prefixlen = iface.get("ipv6_pd_prefixlen")
 
     if prefixlen is None:
-        uplink["ipv6_pd_prefixlen"] = 56
+        iface["ipv6_pd_prefixlen"] = 56
     elif not isinstance(prefixlen, int):
         raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be an integer")
     elif prefixlen >= 64:
         raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be < 64")
     elif prefixlen < 48:
         raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be >= 48")
-
-    # validate will check IP addresses
-    return uplink

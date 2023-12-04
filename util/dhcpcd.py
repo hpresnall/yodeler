@@ -35,17 +35,21 @@ def create_conf(cfg: dict, output_dir: str):
 
         prefixes = iface.get("ipv6_delegated_prefixes")
 
-        if (prefixes is not None) and (len(prefixes) > 0):
+        if ((prefixes is not None) and (len(prefixes) > 0)) or iface.get("ipv6_ask_for_prefix"):
             if not ipv6:
                 buffer.append("  ipv6")
                 if not iface["accept_ra"]:
                     buffer.append("  noipv6rs")
 
-            prefixes.insert(0, f"  ia_pd 1/::{iface['ipv6_pd_prefixlen']}")
-
             buffer.append(" ")
-            buffer.append("  # request prefix delegation and distribute to all routable vlans")
-            buffer.append(" ".join(prefixes))
+
+            if iface["ipv6_ask_for_prefix"]:
+                buffer.append("  # request prefix delegation, but do not assign to any interfaces")
+                buffer.append(f"  ia_pd 1/::{iface['ipv6_pd_prefixlen']}")
+            else:
+                prefixes.insert(0, f"  ia_pd 1/::{iface['ipv6_pd_prefixlen']}")
+                buffer.append("  # request prefix delegation and distribute to all routable vlans")
+                buffer.append(" ".join(prefixes))
 
         if len(buffer) > 0:
             interfaces[iface["name"]] = buffer

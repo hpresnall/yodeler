@@ -45,9 +45,6 @@ def _standard(iface: dict):
         buffer.append("  requires {parent}")
         buffer.append("")
 
-    if iface.get("forward"):
-        buffer.append("  use forward")  # enable IPv4 and IPv6 forwarding
-
     space = dhcp = (iface["ipv4_address"] == "dhcp") or iface["ipv6_dhcp"]
     if dhcp:
         buffer.append("  use dhcp")
@@ -64,6 +61,8 @@ def _standard(iface: dict):
     if space:
         buffer.append("")
         space = False
+
+    _output_forward(iface, buffer)
 
     if not dhcp:
         buffer.append("  address {ipv4_address}/{ipv4_prefixlen}")
@@ -153,6 +152,9 @@ def _vlan(iface: dict):
     if vlan["id"] is not None:
         buffer.append(f"  requires {iface['parent']}")
         buffer.append("")
+
+    _output_forward(iface, buffer)
+
     subnet = vlan["ipv4_subnet"] if "ipv4_subnet" else iface["ipv4_subnet"]
     buffer.append("  address " + str(iface["ipv4_address"]) + "/" + str(subnet.prefixlen))
     # this interface _is_ the gateway, so gateway is not needed
@@ -165,6 +167,14 @@ def _vlan(iface: dict):
     buffer.append("")
 
     return "\n".join(buffer)
+
+def _output_forward(iface:dict, buffer: list[str]):
+    if iface.get("forward"):
+        # enable IPv4 and IPv6 forwarding
+        buffer.append("  forward-ipv4 yes")
+        if not iface["ipv6_disabled"]:
+            buffer.append("  forward-ipv6 yes")
+        buffer.append("")
 
 
 def _output_wifi(iface: dict, buffer: list[str]):

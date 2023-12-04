@@ -69,6 +69,7 @@ class Router(Role):
 
                 vlan_iface = interface.for_vlan(iface_name, vswitch, vlan)
                 vlan["router_iface"] = vlan_iface["name"]
+                vlan_iface["forward"] = True
                 vlan_interfaces.append(vlan_iface)
 
                 # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
@@ -186,8 +187,8 @@ class Router(Role):
         if radvd_config:
             file.write("radvd.conf", "\n".join(radvd_config), output_dir)
 
-            setup.service("radvd", "boot")
             setup.append("rootinstall radvd.conf /etc")
+            setup.service("radvd", "boot")
 
         _add_shorewall_host_config(self._cfg, shorewall, routable_vlans)
 
