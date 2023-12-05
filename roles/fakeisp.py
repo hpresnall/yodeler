@@ -1,5 +1,5 @@
-import util.shell
-
+import shutil
+import os
 import logging
 import ipaddress
 
@@ -8,6 +8,7 @@ from roles.role import Role
 import config.vlan
 import config.interface
 
+import util.shell
 import util.file
 
 _logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ _logger = logging.getLogger(__name__)
 
 class FakeISP(Role):
     def additional_packages(self) -> set[str]:
-        return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-admin", "kea-ctrl-agent", "iptables", "ip6tables", "radvd"}
+        return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-admin", "kea-ctrl-agent", "kea-hook-run-script", "iptables", "ip6tables", "radvd"}
 
     def configure_interfaces(self):
         # ensure required vswitches and vlans exist
@@ -28,7 +29,7 @@ class FakeISP(Role):
         finet_vlan = config.vlan.lookup("fakeinet", self._cfg["vswitches"]["fakeinternet"])
         fisp_vlan = config.vlan.lookup("fakeisp", self._cfg["vswitches"]["fakeisp"])
 
-        fisp_vlan["dhcp6_managed"] = True # allow DHCP6 requests
+        fisp_vlan["dhcp6_managed"] = True  # allow DHCP6 requests
 
         # define interfaces for both vswitches, if not already configured
         interfaces = self._cfg.pop("interfaces", [])
@@ -57,8 +58,7 @@ class FakeISP(Role):
 
         # act as router with well known address
         fakeisp["forward"] = True
-        fakeisp.setdefault("ipv4_address", str(fisp_vlan["ipv4_subnet"].
-        network_address + 1))
+        fakeisp.setdefault("ipv4_address", str(fisp_vlan["ipv4_subnet"].network_address + 1))
 
         if fisp_vlan.get("ipv6_subnet"):
             subnet = fisp_vlan["ipv6_subnet"]
@@ -170,6 +170,14 @@ class FakeISP(Role):
             if dns:
                 dhcp4_config["subnet6"][0]["option-data"] = [{"name": "dns-servers", "data":  ", ".join(dns)}]
 
+            # enabled shell script hook to update routes for prefix delegation
+            dhcp6_config["hooks-libraries"] = {
+                "library": "/usr/lib/kea/hooks/libdhcp_run_script.so",
+                "parameters": {
+                    "name": "usr/lib/kea/hooks/pdroute.sh"
+                }
+            }
+
             util.file.write("kea-dhcp6.conf", util.file.output_json(dhcp6_json), output_dir)
 
             setup.append("rootinstall $DIR/kea-dhcp6.conf /etc/kea")
@@ -178,12 +186,18 @@ class FakeISP(Role):
 
         # setup radvd on the fakeisp interface
         radvd_template = util.file.read("templates/router/radvd.conf")
-        radvd_template = radvd_template.format(fakeisp["name"], "on") # AdvManagedFlag on => use DHCP6
+        radvd_template = radvd_template.format(fakeisp["name"], "on")  # AdvManagedFlag on => use DHCP6
         util.file.write("radvd.conf", radvd_template, output_dir)
 
         setup.append("rootinstall radvd.conf /etc")
         setup.service("radvd", "boot")
+        setup.blank()
 
+        # directly copy the kea hook script
+        shutil.copyfile("templates/fakeisp/pdroute.sh", os.path.join(output_dir, "pdroute.sh"))
+        setup.comment("allow kea to modify routes for prefix delegation")
+        setup.append("echo \"permit nopass kea cmd /sbin/ip\" >> /etc/doas.d/doas.conf")
+        setup.append("install -o kea -g kea -m 750 $DIR/pdroute.sh /usr/lib/kea/hooks/")
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
