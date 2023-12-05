@@ -336,7 +336,7 @@ def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:
         "type": "vlan",
         "vswitch": vswitch,
         "vlan": vlan,
-        "accept_ra": False,
+        "accept_ra": False, # assume prefix delgation assigns addresses and router configures next hop
         "ipv6_dhcp": False
     }
 
