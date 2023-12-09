@@ -45,7 +45,9 @@ def _standard(iface: dict):
         buffer.append("  requires {parent}")
         buffer.append("")
 
-    space = dhcp = (iface["ipv4_address"] == "dhcp") or iface["ipv6_dhcp"]
+    dhcp4 = iface["ipv4_address"] == "dhcp"
+    space = dhcp = dhcp4 or iface["ipv6_dhcp"]
+
     if dhcp:
         buffer.append("  use dhcp")
 
@@ -64,9 +66,9 @@ def _standard(iface: dict):
 
     _output_forward(iface, buffer)
 
-    if not dhcp:
+    if not dhcp4:
         buffer.append("  address {ipv4_address}/{ipv4_prefixlen}")
-        if iface["vlan"]["routable"]:
+        if iface["vlan"]["routable"] or "ipv4_gateway" in iface:
             buffer.append("  gateway {ipv4_gateway}")
         space = True
 

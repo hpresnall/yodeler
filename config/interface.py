@@ -143,7 +143,7 @@ def _validate_iface(iface: dict):
                 try:
                     iface["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
                 except ValueError as ve:
-                    raise KeyError("invalid ipv6_subnet defined") from ve
+                    raise ValueError("invalid ipv6_subnet defined") from ve
 
             _validate_ipaddress(iface, "ipv6")
         else:
@@ -173,11 +173,11 @@ def _validate_ipaddress(iface: dict, ip_version: str):
     key = ip_version + "_address"
     value = iface.get(key)
     if not value:
-        raise KeyError(f"invalid {key} '{value}'")
+        raise ValueError(f"invalid {key} '{value}'")
     try:
         iface[key] = address = ipaddress.ip_address(value)
     except ValueError as ve:
-        raise KeyError(f"invalid {key} '{value}'") from ve
+        raise ValueError(f"invalid {key} '{value}'") from ve
 
     if ip_version + "_subnet" in iface["vlan"]:
         subnet = iface["vlan"].get(ip_version + "_subnet")
@@ -185,14 +185,23 @@ def _validate_ipaddress(iface: dict, ip_version: str):
         subnet = iface.get(ip_version + "_subnet")
 
     if subnet is None:
-        raise KeyError(f"subnet must be defined when setting an IP address")
+        raise ValueError(f"subnet must be defined when setting an IP address")
 
     if address not in subnet:
-        raise KeyError(f"invalid address {address}; it is not in subnet {subnet}")
+        raise ValueError(f"invalid address {address}; it is not in subnet {subnet}")
 
     if ip_version == "ipv4":
         iface["ipv4_prefixlen"] = subnet.prefixlen
-        iface["ipv4_gateway"] = subnet.network_address + 1
+        if "ipv4_gateway" in  iface:
+            gateway = iface["ipv4_gateway"]
+            try:
+                iface["ipv4_gateway"] = ipaddress.ip_address(iface["ipv4_gateway"])
+            except ValueError as ve:
+                raise ValueError(f"invalid 'ipv4_gateway' '{gateway}'") from ve
+            if iface["ipv4_gateway"] not in subnet:
+                raise ValueError(f"invalid 'ipv4_gateway' '{gateway}'; it is not in subnet {subnet}")
+        else:
+            iface["ipv4_gateway"] = subnet.network_address + 1
     if ip_version == "ipv6":
         iface["ipv6_prefixlen"] = subnet.prefixlen
         # gateway provided by router advertisements
@@ -410,12 +419,12 @@ def configure_uplink(cfg: dict):
         # uplink can be an existing vswitch or a physical iface on the host via macvtap
         if "macvtap" in uplink:
             if not isinstance(uplink["macvtap"], str):
-                raise KeyError(("invald uplink; 'macvtap' must be a string"))
+                raise ValueError(("invald uplink; 'macvtap' must be a string"))
             # set name here to distinguish from vswitch; validate will convert to full object
             uplink["vswitch"] = "__unknown__"
             uplink["vlan"] = _uplink_vlan
         elif "vswitch" not in uplink:
-            raise KeyError(("invald uplink; it must define a vswitch+vlan or a macvtap host interface"))
+            raise ValueError(("invald uplink; it must define a vswitch+vlan or a macvtap host interface"))
     else:  # physical host uplinks are treated like normal ifaces, but without a vswitch+vlan
         uplink["vswitch"] = "__unknown__"
         uplink["vlan"] = _uplink_vlan
@@ -432,8 +441,8 @@ def _validate_prefix_len(iface: dict):
     if prefixlen is None:
         iface["ipv6_pd_prefixlen"] = 56
     elif not isinstance(prefixlen, int):
-        raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be an integer")
+        raise ValueError(f"ipv6_pd_prefixlen {prefixlen} must be an integer")
     elif prefixlen >= 64:
-        raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be < 64")
+        raise ValueError(f"ipv6_pd_prefixlen {prefixlen} must be < 64")
     elif prefixlen < 48:
-        raise KeyError(f"ipv6_pd_prefixlen {prefixlen} must be >= 48")
+        raise ValueError(f"ipv6_pd_prefixlen {prefixlen} must be >= 48")
