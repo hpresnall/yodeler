@@ -37,7 +37,7 @@ def create_conf(cfg: dict, output_dir: str):
         buffer.append(f"domain {cfg['primary_domain']}")
 
     dns_addresses = None
-    if cfg["roles_to_hostnames"]["dns"]:
+    if "dns" in cfg["roles_to_hostnames"] and cfg["roles_to_hostnames"]["dns"] :
         dns_server = cfg["hosts"][cfg["roles_to_hostnames"]["dns"][0]]
         dns_addresses = interface.find_ips_to_interfaces(cfg, dns_server["interfaces"])
 
