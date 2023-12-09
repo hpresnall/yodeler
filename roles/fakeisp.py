@@ -171,12 +171,14 @@ class FakeISP(Role):
                 dhcp4_config["subnet6"][0]["option-data"] = [{"name": "dns-servers", "data":  ", ".join(dns)}]
 
             # enabled shell script hook to update routes for prefix delegation
-            dhcp6_config["hooks-libraries"] = {
-                "library": "/usr/lib/kea/hooks/libdhcp_run_script.so",
-                "parameters": {
-                    "name": "usr/lib/kea/hooks/pdroute.sh"
+            dhcp6_config["hooks-libraries"] = [
+                {
+                    "library": "/usr/lib/kea/hooks/libdhcp_run_script.so",
+                    "parameters": {
+                        "name": "usr/lib/kea/hooks/pdroute.sh"
+                    }
                 }
-            }
+            ]
 
             util.file.write("kea-dhcp6.conf", util.file.output_json(dhcp6_json), output_dir)
 

@@ -408,7 +408,7 @@ def configure_uplink(cfg: dict):
     parse.set_default_string("name", uplink, "eth0")
 
     # allow some end user configuration of the uplink interface YAML
-    # but it will always forwarding
+    # but it will always use forwarding
     uplink["type"] = "uplink"
     uplink["comment"] = "internet uplink"
     uplink["forward"] = True
