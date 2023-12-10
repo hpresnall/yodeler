@@ -1,7 +1,12 @@
-# setup basic ip6tables rules
+# setup additional ip6tables rules
+# rules to block incoming already set up in yodel.sh
+# iptables save will be called on shutdown
 
-# block incoming already set up in yodel.sh
-# these rules will also be saved
+# forward from fakeisp to fakeinternet
+ip6tables -A FORWARD -i $FAKEINTERNET_IFACE -o $FAKEISP_IFACE -m state --state RELATED,ESTABLISHED -j ACCEPT
+ip6tables -A FORWARD -i $FAKEISP_IFACE -o $FAKEINTERNET_IFACE -j ACCEPT
+ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+#  to forward all traffic: ip6tables -A FORWARD -i $FAKEINTERNET_IFACE -o $FAKEISP_IFACE -j ACCEPT
 
 # allow ping & SSH
 ip6tables -A INPUT -p ipv6-icmp -j ACCEPT

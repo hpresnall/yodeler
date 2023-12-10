@@ -117,6 +117,20 @@ def _validate_iface(iface: dict):
     else:
         _validate_ipaddress(iface, "ipv4")
 
+    if "ipv4_gateway" in iface:
+        gateway = iface["ipv4_gateway"]
+        subnet = iface["vlan"]["ipv4_subnet"]
+        try:
+            iface["ipv4_gateway"] = ipaddress.ip_address(iface["ipv4_gateway"])
+        except ValueError as ve:
+            raise ValueError(f"invalid 'ipv4_gateway' '{gateway}'") from ve
+        if iface["ipv4_gateway"] not in subnet:
+            raise ValueError(f"invalid 'ipv4_gateway' '{gateway}'; it is not in subnet {subnet}")
+    elif iface["vlan"]["routable"]:
+        iface["ipv4_gateway"] = iface["vlan"]["ipv4_subnet"].network_address + 1
+    else:
+        iface["ipv4_gateway"] = None
+
     # default to False, SLAAC only; will not preclude using DHCP6 for options
     iface["ipv6_dhcp"] = bool(iface.get("ipv6_dhcp"))
 
@@ -133,40 +147,41 @@ def _validate_iface(iface: dict):
             _logger.warning(
                 f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'dhcp6_disabled'; no DHCP request will be made")
         iface["ipv6_dhcp"] = False
+        return
+
+    address = iface.get("ipv6_address")
+    if address is not None:
+        if (iface["type"] == "uplink") and (vlan["id"] == -1):
+            # for uplinks with hardcoded ip addresess, a subnet is required
+            if "ipv6_subnet" not in iface:
+                raise KeyError("ipv6_subnet must be set when using static ipv6_address")
+            try:
+                iface["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
+            except ValueError as ve:
+                raise ValueError("invalid ipv6_subnet defined") from ve
+
+        _validate_ipaddress(iface, "ipv6")
     else:
-        address = iface.get("ipv6_address")
-        if address is not None:
-            if (iface["type"] == "uplink") and (vlan["id"] == -1):
-                # for uplinks with hardcoded ip addresess, a subnet is required
-                if "ipv6_subnet" not in iface:
-                    raise KeyError("ipv6_subnet must be set when using static ipv6_address")
-                try:
-                    iface["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
-                except ValueError as ve:
-                    raise ValueError("invalid ipv6_subnet defined") from ve
+        iface["ipv6_address"] = None
 
-            _validate_ipaddress(iface, "ipv6")
-        else:
-            iface["ipv6_address"] = None
+    if iface["ipv6_dhcp"] and not vlan["dhcp6_managed"]:
+        _logger.warning(
+            f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'dhcp6_managed' set to false; no DHCP request will be made")
 
-        if iface["ipv6_dhcp"] and not vlan["dhcp6_managed"]:
-            _logger.warning(
-                f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'dhcp6_managed' set to false; no DHCP request will be made")
+    # default to False; dhcpcd will use another temporary address method
+    iface["ipv6_tempaddr"] = bool(iface.get("ipv6_tempaddr"))
 
-        # default to False; dhcpcd will use another temporary address method
-        iface["ipv6_tempaddr"] = bool(iface.get("ipv6_tempaddr"))
+    # default to True
+    iface["accept_ra"] = True if "accept_ra" not in iface else bool(iface.get("accept_ra"))
 
-        # default to True
-        iface["accept_ra"] = True if "accept_ra" not in iface else bool(iface.get("accept_ra"))
+    if iface["name"].startswith("wl"):  # wlxx or wlanx
+        if not ("wifi_ssid" in iface) and not ("wifi_psk" in iface):
+            raise KeyError("both 'wifi_ssd' and 'wifi_psk' must be defined for WiFi interfaces")
 
-        if iface["name"].startswith("wl"):  # wlxx or wlanx
-            if not ("wifi_ssid" in iface) and not ("wifi_psk" in iface):
-                raise KeyError("both 'wifi_ssd' and 'wifi_psk' must be defined for WiFi interfaces")
-
-        # for testing, allow asking for, but not assigning a prefix delegation
-        iface["ipv6_ask_for_prefix"] = bool(iface.get("ipv6_ask_for_prefix"))
-        if iface["ipv6_ask_for_prefix"]:
-            _validate_prefix_len(iface)
+    # for testing, allow asking for, but not assigning a prefix delegation
+    iface["ipv6_ask_for_prefix"] = bool(iface.get("ipv6_ask_for_prefix"))
+    if iface["ipv6_ask_for_prefix"]:
+        _validate_prefix_len(iface)
 
 
 def _validate_ipaddress(iface: dict, ip_version: str):
@@ -192,16 +207,7 @@ def _validate_ipaddress(iface: dict, ip_version: str):
 
     if ip_version == "ipv4":
         iface["ipv4_prefixlen"] = subnet.prefixlen
-        if "ipv4_gateway" in  iface:
-            gateway = iface["ipv4_gateway"]
-            try:
-                iface["ipv4_gateway"] = ipaddress.ip_address(iface["ipv4_gateway"])
-            except ValueError as ve:
-                raise ValueError(f"invalid 'ipv4_gateway' '{gateway}'") from ve
-            if iface["ipv4_gateway"] not in subnet:
-                raise ValueError(f"invalid 'ipv4_gateway' '{gateway}'; it is not in subnet {subnet}")
-        else:
-            iface["ipv4_gateway"] = subnet.network_address + 1
+
     if ip_version == "ipv6":
         iface["ipv6_prefixlen"] = subnet.prefixlen
         # gateway provided by router advertisements
@@ -345,7 +351,7 @@ def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:
         "type": "vlan",
         "vswitch": vswitch,
         "vlan": vlan,
-        "accept_ra": False, # assume prefix delgation assigns addresses and router configures next hop
+        "accept_ra": False,  # assume prefix delgation assigns addresses and router configures next hop
         "ipv6_dhcp": False
     }
 

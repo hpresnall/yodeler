@@ -200,6 +200,16 @@ class FakeISP(Role):
         setup.comment("allow kea to modify routes for prefix delegation")
         setup.append("echo \"permit nopass kea cmd /sbin/ip\" >> /etc/doas.d/doas.conf")
         setup.append("install -o kea -g kea -m 750 $DIR/pdroute.sh /usr/lib/kea/hooks/")
+        setup.blank()
+
+        sysctl_conf = []
+        sysctl_conf.append("# enable ipv6 forwarding globally\n")
+        sysctl_conf.append(
+            "# see https://unix.stackexchange.com/questions/348533/is-net-ipv6-conf-all-forwarding-1-equivalent-to-enabling-forwarding-for-all-indi\n")
+        sysctl_conf.append("net.ipv6.conf.all.forwarding = 1\n")
+        util.file.write("ipv6_forwarding.conf", "\n".join(sysctl_conf), output_dir)
+        setup.append("rootinstall $DIR/ipv6_forwarding.conf /etc/sysctl.d")
+        setup.blank()
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

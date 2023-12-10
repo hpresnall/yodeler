@@ -101,9 +101,21 @@ class VmHost(Role):
             setup.append("log \"\"")
             setup.blank()
 
+        sysctl_conf = []
+        sysctl_conf.append("# prevent vswitch interfaces from autoconfiguring ipv6\n")
+
         # add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity
-        for vswitch in self._cfg["vswitches"].values():
+        for name, vswitch in self._cfg["vswitches"].items():
             _create_vswitch_uplink(vswitch, setup)
+
+            sysctl_conf.append(f"net.ipv6.conf.{name}.accept_ra = 0")
+            sysctl_conf.append(f"net.ipv6.conf.{name}.autoconf = 0")
+            sysctl_conf.append("")
+
+        file.write("ovs_no_ipv6.conf", "\n".join(sysctl_conf), output_dir)
+
+        setup.append("rootinstall $DIR/ovs_no_ipv6.conf /etc/sysctl.d")
+        setup.blank()
 
         # directly copy patch for alpine-make-vm-image if it exists
         if os.path.isfile("templates/vmhost/patch"):

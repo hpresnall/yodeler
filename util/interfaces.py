@@ -68,7 +68,7 @@ def _standard(iface: dict):
 
     if not dhcp4:
         buffer.append("  address {ipv4_address}/{ipv4_prefixlen}")
-        if iface["vlan"]["routable"] or "ipv4_gateway" in iface:
+        if iface["ipv4_gateway"] and (iface["ipv4_gateway"] != iface["ipv4_address"]):
             buffer.append("  gateway {ipv4_gateway}")
         space = True
 
@@ -170,7 +170,8 @@ def _vlan(iface: dict):
 
     return "\n".join(buffer)
 
-def _output_forward(iface:dict, buffer: list[str]):
+
+def _output_forward(iface: dict, buffer: list[str]):
     if iface.get("forward"):
         # enable IPv4 and IPv6 forwarding
         buffer.append("  forward-ipv4 yes")
