@@ -81,6 +81,10 @@ def _standard(iface: dict):
         buffer.append("  address {ipv6_address}")
         space = True
 
+    for address in iface["additional_ipv6_addresses"]:
+        buffer.append(f"  address {address}")
+        space = True
+
     if space:
         buffer.append("")
 

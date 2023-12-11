@@ -147,6 +147,7 @@ def _validate_iface(iface: dict):
             _logger.warning(
                 f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'dhcp6_disabled'; no DHCP request will be made")
         iface["ipv6_dhcp"] = False
+        iface["additional_ipv6_addresses"] = []
         return
 
     address = iface.get("ipv6_address")
@@ -163,6 +164,17 @@ def _validate_iface(iface: dict):
         _validate_ipaddress(iface, "ipv6")
     else:
         iface["ipv6_address"] = None
+
+    additional = parse.read_string_list_plurals(
+        {"additional_ipv6_address", "additional_ipv6_address"}, iface, "additional_ip_addresses")
+    iface.pop("additional_ipv6_address", None)
+    iface["additional_ipv6_addresses"] = []
+
+    for address in additional:
+        try:
+            iface["additional_ipv6_addresses"].append(ipaddress.ip_address(address))
+        except ValueError as ve:
+            raise ValueError(f"invalid additional_ipv6_address '{address}'") from ve
 
     if iface["ipv6_dhcp"] and not vlan["dhcp6_managed"]:
         _logger.warning(
