@@ -2,6 +2,10 @@
 # rules to block incoming already set up in yodel.sh
 # iptables save will be called on shutdown
 
+# ensure default policy
+ip6tables -P INPUT DROP
+ip6tables -P FORWARD DROP
+
 # forward from fakeisp to fakeinternet
 ip6tables -A FORWARD -i $FAKEINTERNET_IFACE -o $FAKEISP_IFACE -m state --state RELATED,ESTABLISHED -j ACCEPT
 ip6tables -A FORWARD -i $FAKEISP_IFACE -o $FAKEINTERNET_IFACE -j ACCEPT

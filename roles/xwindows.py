@@ -9,11 +9,16 @@ from roles.role import Role
 class XWindows(Role):
     """XWindows setup for XFCE."""
 
-    def additional_packages(self):
-        return {"xorg-server", "xf86-input-libinput", "eudev", "udev-init-scripts", "udev-init-scripts-openrc",
-                "mesa-dri-gallium", "consolekit2", "gvfs", "gvfs-smb", "udisks2", "lightdm", "lightdm-gtk-greeter", "polkit",
-                "xfce4", "xfce4-session", "xfce4-terminal", "xfce4-screensaver", "xfce4-taskmanager", "xfce4-cpugraph-plugin",
-                "firefox", "mousepad"}
+    def additional_packages(self) -> set[str]:
+        packages = {"xorg-server", "xf86-input-libinput", "eudev", "udev-init-scripts", "udev-init-scripts-openrc",
+                    "mesa-dri-gallium", "consolekit2", "gvfs", "gvfs-smb", "udisks2", "lightdm", "lightdm-gtk-greeter", "polkit",
+                    "xfce4", "xfce4-session", "xfce4-terminal", "xfce4-screensaver", "xfce4-taskmanager", "xfce4-cpugraph-plugin",
+                    "firefox", "mousepad"}
+
+        if "vmhost" in [role.name for role in self._cfg["roles"]]:
+            packages.add("virt-manager")
+
+        return packages
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
