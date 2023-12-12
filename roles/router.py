@@ -7,6 +7,7 @@ import util.file as file
 import util.interfaces
 import util.libvirt
 import util.shell
+import util.sysctl
 import util.dhcpcd
 
 from roles.role import Role
@@ -197,6 +198,9 @@ class Router(Role):
         _write_shorewall_config(self._cfg, shorewall, setup, output_dir)
         _write_ipsets(self._cfg, setup)
         _write_dhcrelay_config(self._cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces, shorewall)
+
+        if dhrelay6_ifaces:  # at least one interface needs ipv6
+            util.sysctl.enable_ipv6_forwarding(setup, output_dir)
 
 
 def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):

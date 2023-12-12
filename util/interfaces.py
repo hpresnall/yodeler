@@ -135,15 +135,16 @@ def _port(cfg: dict, iface: dict):
 
 
 def _vlan(iface: dict):
-    """ Create a router interface for the given vlan.
+    """ Create an interface for the given vlan.
+    This interface should already have its address(es) set to the valid gateway address.
 
     # <name> vlan, id <id>
     auto <iface_name>.<id>
     iface <iface_name>.<id>
     requires <iface_name>
 
-    address <ipv4_subnet>.1/<prefixlen>
-    address <ipv6_subnet>::1/<prefixlen> # if vlan has an ipv6_subnet
+    address <ipv4_address>/<prefixlen>
+    address <ipv6_address>/<prefixlen> # if vlan has an ipv6_subnet
     """
     vlan = iface["vlan"]
     iface_name = iface["name"]

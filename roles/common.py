@@ -7,6 +7,7 @@ import util.shell as shell
 import util.file as file
 import util.interfaces
 import util.libvirt
+import util.sysctl
 import util.awall
 import util.resolv
 import util.dhcpcd
@@ -113,6 +114,8 @@ class Common(Role):
             util.awall.configure(self._cfg["interfaces"], self._cfg["roles"], setup, output_dir)
 
         file.write("interfaces", util.interfaces.from_config(self._cfg), output_dir)
+
+        util.sysctl.disable_ipv6(self._cfg, setup, output_dir)
 
         util.resolv.create_conf(self._cfg, output_dir)
         util.dhcpcd.create_conf(self._cfg, output_dir)
