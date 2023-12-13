@@ -83,7 +83,7 @@ def _parse_static_hosts(cfg: dict, firewall: dict):
             raise KeyError(f"ipv4 or ipv6 address required for {location}")
 
         valid_4 = valid_6 = False
-        vlan_4 = vlan_6 = None
+        vlan_4 = vlan_6 = {}
 
         for vswitch in cfg["vswitches"].values():
             for vlan in vswitch["vlans"]:
@@ -95,11 +95,11 @@ def _parse_static_hosts(cfg: dict, firewall: dict):
                 # ip addresses must be in the same valid vlan
                 if not valid_4 and ipv4_address and (ipv4_address in vlan["ipv4_subnet"]):
                     valid_4 = True
-                    vlan_4 = vlan["name"]
+                    vlan_4 = vlan
 
                 if not valid_6 and ipv6_address and vlan["ipv6_subnet"] and (ipv6_address in vlan["ipv6_subnet"]):
                     valid_6 = True
-                    vlan_6 = vlan["name"]
+                    vlan_6 = vlan
 
         if ipv4_address and not valid_4:
             raise ValueError(f"{location} ipv4_address does not match any vlan subnets")
@@ -108,11 +108,16 @@ def _parse_static_hosts(cfg: dict, firewall: dict):
         if vlan_4 and vlan_6 and vlan_4["name"] != vlan_6["name"]:
             raise ValueError(f"ipv6_address is not in the same vlan as the ipv4_address for {location}")
 
+        vlan = vlan_4 if vlan_4 else vlan_6
+
+        if not vlan["routable"]:
+            raise ValueError(f"cannot add host {hostname} to non-routable vlan for {location}")
+
         static_hosts[hostname] = {
             "hostname": hostname,
             "ipv4_address": ipv4_address,
             "ipv6_address": ipv6_address,
-            "vlan": vlan_4 if vlan_4 else vlan_6
+            "vlan": vlan["name"]
         }
 
     return static_hosts
@@ -395,6 +400,8 @@ def validate_rule_hostnames(cfg: dict):
 
 
 def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str, src_or_dest: str):
+    locations_to_remove = []
+
     for i, location in enumerate(rule[ip_version][src_or_dest], start=1):
         if not "hostname" in location:
             continue
@@ -420,7 +427,12 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
         # else not an aliases, check static_hosts
 
         if hostname in cfg["firewall"]["static_hosts"]:
-            _logger.debug("%s found '%s' as a firewall static_host", loc_name, hostname)
+            if cfg["firewall"]["static_hosts"][ip_version + "_address"]:
+                _logger.debug("%s found '%s' as a firewall static_host", loc_name, hostname)
+            else:
+                locations_to_remove.append(i-1)
+                _logger.debug("%s found '%s' as a firewall static_host without an %s address; removing rule",
+                              loc_name, hostname, ip_version)
             continue
         # else not a static host, check dhcp rerservations
 
@@ -436,10 +448,17 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
         for reservation in vlan["dhcp_reservations"]:
             if (hostname == reservation["hostname"]):
                 host = True
-                break
             elif hostname in reservation["aliases"]:
                 location["hostname"] = reservation["hostname"]
                 host = True
+
+            if host:
+                if reservation[ip_version + "_address"]:
+                    _logger.debug("%s found '%s' as a dhcp reservation", loc_name, hostname)
+                else:
+                    locations_to_remove.append(i-1)
+                    _logger.debug("%s found '%s' as a dhcp reservation without an %s address; removing rule",
+                                  loc_name, hostname, ip_version)
                 break
 
         if host:
@@ -447,3 +466,11 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
             continue
         else:
             raise ValueError(f"invalid hostname '{hostname}' in {loc_name}")
+    # for locations
+
+    for location in locations_to_remove:
+        del rule[ip_version][src_or_dest][location]
+
+    if not rule[ip_version]:
+        del rule[ip_version]
+        _logger.debug(f"removing firewall.rule[{idx}].{src_or_dest} with no valid locations")

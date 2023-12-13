@@ -430,24 +430,27 @@ def _add_shorewall_host_config(cfg: dict, shorewall: dict, routable_vlans: list[
     # for additional hosts, add params for each ip address
     for host in cfg["firewall"]["static_hosts"].values():
         hostname = host["hostname"].upper()
-        vlan = host["vlan"].upper()
+        vlan = host["vlan"]
         if host["ipv4_address"]:
-            shorewall["params"].append(f"{hostname}_{vlan}={vlan}:{host['ipv4_address']}")
+            shorewall["params"].append(f"{hostname}_{vlan.upper()}={vlan}:{host['ipv4_address']}")
         if host["ipv6_address"]:
-            shorewall["params6"].append(f"{hostname}_{vlan}={vlan}:{host['ipv6_address']}")
+            shorewall["params6"].append(f"{hostname}_{vlan.upper()}={vlan}:{host['ipv6_address']}")
 
     # for DHCP reservations, add a param if an ip address exists
     # firewall will not allow rules if there is no address and ensures aliases are not used
     for vswitch in cfg["vswitches"].values():
         for vlan in vswitch["vlans"]:
-            vlan_name = vlan['name'].upper()
+            if not vlan["routable"]:
+                continue  # no need to add non-routable reservations to the firewall
+
+            vlan_name = vlan['name']
             for res in vlan["dhcp_reservations"]:
                 if res["ipv4_address"]:
                     shorewall["params"].append(
-                        f"{res['hostname'].upper()}_{vlan_name}={vlan_name}:{res['ipv4_address']}")
+                        f"{res['hostname'].upper()}_{vlan_name.upper()}={vlan_name}:{res['ipv4_address']}")
                 if res["ipv6_address"]:
                     shorewall["params6"].append(
-                        f"{res['hostname'].upper()}_{vlan_name}={vlan_name}:{res['ipv6_address']}")
+                        f"{res['hostname'].upper()}_{vlan_name.upper()}={vlan_name}:{res['ipv6_address']}")
 
 
 def _find_valid_vlans_for_host(host: dict, routable_vlans: list[dict], shorewall: dict) -> list[dict]:
@@ -603,6 +606,10 @@ def _write_shorewall_config(cfg: dict, shorewall: dict, setup: util.shell.ShellS
 
     os.mkdir(shorewall4)
     os.mkdir(shorewall6)
+
+    # end with blank line for all generated files; policy templates already include
+    for key in ["params", "params6", "zones", "zones6", "interfaces", "interfaces6", "rules", "rules6", "snat"]:
+        shorewall[key].append("")
 
     file.write("params", "\n".join(shorewall["params"]), shorewall4)
     file.write("params", "\n".join(shorewall["params6"]), shorewall6)
