@@ -91,11 +91,11 @@ class FakeISP(Role):
         if ("vmhost") in self._cfg["roles_to_hostnames"] and (self._cfg["hostname"] not in self._cfg["roles_to_hostnames"]["vmhost"]):
             if (fisp_vlan["id"] is not None):
                 parent = fakeisp.get("name", "eth1")
-                self._cfg["interfaces"].insert(1, config.interface.for_port(parent, "vlans on 'fakeisp' vswitch"))
+                self._cfg["interfaces"].insert(1, config.interface.for_port(parent, "vlans on 'fakeisp' vswitch", "vswitch"))
 
             if (finet_vlan["id"] is not None):
                 parent = fakeinternet.get("name", "eth0")
-                self._cfg["interfaces"].insert(0, config.interface.for_port(parent, "vlans on 'fakeiternet' vswitch"))
+                self._cfg["interfaces"].insert(0, config.interface.for_port(parent, "vlans on 'fakeiternet' vswitch", "vswitch"))
 
     def additional_configuration(self):
         # configure iptables manually; no need for awall

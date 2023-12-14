@@ -1,0 +1,12 @@
+#!/bin/sh
+# see https://www.libvirt.org/hooks.html
+# expecting command line args like 'network_name started begin -'
+
+if [ "$2" = "started" ]; then
+  # disble ivp6 for vswitches on boot
+  # assume libvirt network name == vswitch name
+  network=$1
+  sysctl -w net.ipv6.conf.$network.disable_ipv6=1
+  sysctl -w net.ipv6.conf.$network.accept_ra=0
+  sysctl -w net.ipv6.conf.$network.autoconf=0
+fi

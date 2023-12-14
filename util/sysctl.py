@@ -16,6 +16,11 @@ def disable_ipv6(cfg: dict, setup: shell.ShellScript, output_dir: str):
 
     for iface in cfg["interfaces"]:
         if iface["ipv6_disabled"]:
+            if iface["type"] == "port" and iface["subtype"] == "vswitch":
+                # vswitch interfaces (and vmhost ports for vms) are not defined at boot
+                # they will be handled via libvirt hook scripts
+                continue
+
             disabled = True
             name = iface["name"]
 

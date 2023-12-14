@@ -396,13 +396,14 @@ _uplink_vlan = {
     "routable": False, "dhcp4_enabled": True, "ipv6_disabled": False, "dhcp6_managed": True}
 
 
-def for_port(name: str, comment: str, parent=None, uplink=None) -> dict:
+def for_port(name: str, comment: str, subtype:str, parent=None, uplink=None) -> dict:
     """ Create an interface configuration for "port" interfaces like vswitches and vlan parents.
     Ports must be configured but will never have IP addressed assigned.
     """
 
     return {
         "type": "port",
+        "subtype": subtype,
         "name": name,
         "comment": comment,
         "parent": parent,

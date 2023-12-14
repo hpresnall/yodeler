@@ -20,7 +20,7 @@ class VmHost(Role):
         # packages for openvswitch, qemu, libvirt and alpine-make-vm-image
         return {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
                 "libvirt", "libvirt-daemon", "libvirt-qemu", "ovmf", "dbus", "polkit",
-                "e2fsprogs", "rsync", "sfdisk", "git"}
+                "virtiofsd", "e2fsprogs", "rsync", "sfdisk", "git", "xmlstarlet"}
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -37,7 +37,7 @@ class VmHost(Role):
             vswitch_name = vswitch["name"]
 
             # iface for switch itself
-            vswitch_interfaces.append(interface.for_port(vswitch_name, "vswitch"))
+            vswitch_interfaces.append(interface.for_port(vswitch_name, "vswitch", "vswitch"))
 
             vswitch_interfaces.extend(_create_uplink_ports(vswitch))
 
@@ -101,13 +101,23 @@ class VmHost(Role):
             setup.append("log \"\"")
             setup.blank()
 
-        # add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity
-        for vswitch in self._cfg["vswitches"].values():
-            _create_vswitch_uplink(vswitch, setup)
-
         # directly copy patch for alpine-make-vm-image if it exists
         if os.path.isfile("templates/vmhost/patch"):
             shutil.copyfile("templates/vmhost/patch", os.path.join(output_dir, "patch"))
+
+        shutil.copyfile("templates/vmhost/network_hook", os.path.join(output_dir, "network_hook"))
+        shutil.copyfile("templates/vmhost/qemu_hook", os.path.join(output_dir, "qemu_hook"))
+        setup.comment("add hook scripts for disabling ipv6 on vswitch and vm interfaces")
+        setup.append("mkdir -p /etc/libvirt/hooks")
+        setup.append("chmod 750 /etc/libvirt/hooks")
+        setup.append("chown root:libvirt /etc/libvirt/hooks")
+        setup.append("install -o root -g libvirt -m 750 $DIR/network_hook /etc/libvirt/hooks/network")
+        setup.append("install -o root -g libvirt -m 750 $DIR/qemu_hook /etc/libvirt/hooks/qemu")
+        setup.blank()
+
+        setup.comment("add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity")
+        for vswitch in self._cfg["vswitches"].values():
+            _create_vswitch_uplink(vswitch, setup)
 
 
 def _create_uplink_ports(vswitch: dict) -> list[dict]:

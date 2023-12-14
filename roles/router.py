@@ -89,7 +89,7 @@ class Router(Role):
                     vlan_interfaces[0]["comment"] = comment
                 else:  # add the base interface as a port
                     # append to vswitch_interfaces to ensure it is the first definition
-                    vswitch_interfaces.append(interface.for_port(iface_name, comment))
+                    vswitch_interfaces.append(interface.for_port(iface_name, comment, "vlan"))
 
                 vswitch_interfaces.extend(vlan_interfaces)
 
