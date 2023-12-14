@@ -65,19 +65,22 @@ class FakeISP(Role):
         if fisp_vlan.get("ipv6_subnet"):
             subnet = fisp_vlan["ipv6_subnet"]
 
-            # for ipv6, subdivide into 2 seprate networks
-            # the first will be used for this servers ip and DHCP; the second will be used for prefix delegation
-            subnets = list(subnet.subnets())
-            fisp_vlan["ipv6_subnet"] = subnets[0]
-            fisp_vlan["ipv6_delegation_subnet"] = subnets[1]
+            # for ipv6, subdivide into prefix delegations
+            # the first /64 subnet will be used for this servers ip and DHCP
+            first_64 = next(subnet.subnets(new_prefix=64))
+            fisp_vlan["ipv6_subnet"] = first_64
+            fisp_vlan["ipv6_delegation_subnet"] = subnet
 
             _logger.debug(
-                f"splitting {subnet}; will use {subnets[0]} for server & DHCP address and {subnets[1]} for prefix delegation")
+                f"splitting {subnet}; will use {first_64} for server & DHCP addresses")
 
-            fakeisp.setdefault("ipv6_address",  str(subnets[0].network_address + 1))
+            fakeisp.setdefault("ipv6_address",  str(first_64.network_address + 1))
             # accept router advertisements, but do not use the local DHCP server
             fakeisp["accept_ra"] = True
             fakeisp["ipv6_dhcp"] = False
+        else:
+            fisp_vlan["ipv6_subnet"] = None
+            fisp_vlan["ipv6_delegation_subnet"] = None
 
         # order so fakeinternet, then fakeisp with parent interfaces first
         # note, this silently ignores interfaces on other vswitches
@@ -151,7 +154,6 @@ class FakeISP(Role):
         setup.blank()
 
         subnet = vlan["ipv6_subnet"]
-        delegation_subnet = vlan["ipv6_delegation_subnet"]
 
         if subnet:
             dns = [str(ip) for ip in external_dns if ip.version == 6]
@@ -165,7 +167,7 @@ class FakeISP(Role):
                 "subnet": str(subnet),
                 "pools": [{"pool": str(subnet.network_address + vlan["dhcp_min_address_ipv6"])
                            + " - " + str(subnet.network_address + vlan["dhcp_max_address_ipv6"])}],
-                "pd-pools": _create_pd_pool(delegation_subnet),
+                "pd-pools": _create_pd_pools(vlan["ipv6_delegation_subnet"]),
                 "rapid-commit": True,
                 "interface": fakeisp["name"]
             }]
@@ -177,7 +179,7 @@ class FakeISP(Role):
                 {
                     "library": "/usr/lib/kea/hooks/libdhcp_run_script.so",
                     "parameters": {
-                        "name": "usr/lib/kea/hooks/pdroute.sh"
+                        "name": "/usr/lib/kea/hooks/pdroute.sh"
                     }
                 }
             ]
@@ -211,7 +213,7 @@ class FakeISP(Role):
         return 0
 
 
-def _create_pd_pool(subnet: ipaddress.IPv6Network) -> list[dict]:
+def _create_pd_pools(subnet: ipaddress.IPv6Network) -> list[dict]:
     prefixlen = subnet.prefixlen
 
     # prefix length determines the delegation size
@@ -231,21 +233,32 @@ def _create_pd_pool(subnet: ipaddress.IPv6Network) -> list[dict]:
         subnet = ipaddress.IPv6Network(str(subnet.network_address) + "/48")
         _logger.info(f"treating {subnet} as a /48 for prefix delegation")
 
-    prefix_delegation_bits = delegation_size - prefixlen
-    subnet_iter = subnet.subnets(prefixlen_diff=prefix_delegation_bits)
+    # carve out successively smaller pools until the delegation size is reached
+    # this creates 2^(64-delegation_size) - 1 networks, excluding the first /64 used by the host
+    pools = []
+    delegation_subnet = subnet
 
-    if _logger.isEnabledFor(logging.DEBUG):
-        subnets = list(subnet_iter)
-        prefix_count = 2**prefix_delegation_bits
-        _logger.debug(
-            f"subnet {subnet} prefix delegation will have {prefix_count} /{delegation_size} networks; from {subnets[0]} to {subnets[-1]}")
+    while subnet.prefixlen < delegation_size:
+        subnets = list(subnet.subnets())
 
-        subnet_start = subnets[0]
-    else:
-        subnet_start = next(subnet_iter)
+        pool_net = subnets[1]  # 'top' subnet
 
-    return [{
-        "prefix": str(subnet_start.network_address),
-        "prefix-len": prefixlen,
-        "delegated-len": delegation_size
-    }]
+        pools.append({
+            "prefix": str(pool_net.network_address),
+            "prefix-len": pool_net.prefixlen,
+            "delegated-len": delegation_size
+        })
+
+        if _logger.isEnabledFor(logging.DEBUG):
+            pds = list(pool_net.subnets(new_prefix=delegation_size))
+
+            _logger.debug(f"dividing subnet {pool_net} into"
+                          f" {2**(delegation_size-pool_net.prefixlen)} ::/{delegation_size} networks;"
+                          f" from {pds[0]} to {pds[-1]}")
+
+        subnet = subnets[0]  # proceed to the next smaller network
+
+    _logger.debug(f"divided {delegation_subnet} into {len(pools)} pools "
+                  f"with {2**(delegation_size-delegation_subnet.prefixlen)-1} total ::/{delegation_size} networks")
+
+    return pools

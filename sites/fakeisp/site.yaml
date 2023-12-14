@@ -42,8 +42,8 @@ vswitches:
         ipv4_subnet: 172.17.119.0/24
         # to allow for prefix delegation, this subnet should be /60 or larger
         # the 0000 subnet will be used for static and DHCP addresses
-        # the upper half of the subnet will be used for prefix delegation
-        # with a /48, the upper /49 will create 128 /56 delegations, each with 256 subnets (vlans)
-        # with a /60, the upper /61 will create 2 /62 networks, each with 4 subnets (vlans)
+        # delegation size is based on subnet size
+        # with a /48, 255 /56 delegations will be created, each with 256 subnets (vlans)
+        # with a /56, 15 /60 delegations will be created, each with 16 subnets (vlans)
         ipv6_subnet: fdff:dead:beef::/48
         dhcp6_managed: true # DHCP6 will run on this network
