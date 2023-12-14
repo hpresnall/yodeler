@@ -18,7 +18,7 @@ _logger = logging.getLogger(__name__)
 
 class FakeISP(Role):
     def additional_packages(self) -> set[str]:
-        return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-admin", "kea-ctrl-agent", "kea-hook-run-script", "iptables", "ip6tables", "radvd"}
+        return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-admin", "kea-ctrl-agent", "kea-hook-run-script", "iptables", "ip6tables", "radvd", "python3"}
 
     def configure_interfaces(self):
         # ensure required vswitches and vlans exist
@@ -190,20 +190,25 @@ class FakeISP(Role):
             setup.service("kea-dhcp6")
             setup.blank()
 
-        # setup radvd on the fakeisp interface
-        radvd_template = util.file.read("templates/router/radvd.conf")
-        radvd_template = radvd_template.format(fakeisp["name"], "on")  # AdvManagedFlag on => use DHCP6
-        util.file.write("radvd.conf", radvd_template, output_dir)
+            # directly copy the kea hook script
+            shutil.copyfile("templates/fakeisp/pdroute.sh", os.path.join(output_dir, "pdroute.sh"))
+            setup.comment("allow kea to modify routes for prefix delegation")
+            setup.append("echo \"permit nopass kea cmd /sbin/ip\" >> /etc/doas.d/doas.conf")
+            setup.append("install -o kea -g kea -m 750 $DIR/pdroute.sh /usr/lib/kea/hooks/")
+            setup.blank()
 
-        setup.append("rootinstall radvd.conf /etc")
-        setup.service("radvd", "boot")
-        setup.blank()
+            # setup radvd on the fakeisp interface
+            radvd_template = util.file.read("templates/router/radvd.conf")
+            radvd_template = radvd_template.format(fakeisp["name"], "on")  # AdvManagedFlag on => use DHCP6
+            util.file.write("radvd.conf", radvd_template, output_dir)
 
-        # directly copy the kea hook script
-        shutil.copyfile("templates/fakeisp/pdroute.sh", os.path.join(output_dir, "pdroute.sh"))
-        setup.comment("allow kea to modify routes for prefix delegation")
-        setup.append("echo \"permit nopass kea cmd /sbin/ip\" >> /etc/doas.d/doas.conf")
-        setup.append("install -o kea -g kea -m 750 $DIR/pdroute.sh /usr/lib/kea/hooks/")
+            setup.append("rootinstall radvd.conf /etc")
+            setup.service("radvd", "boot")
+            setup.blank()
+
+        for file in ["add_boot_iso.py", "add_boot_iso.sh", "rm_boot_iso.py", "rm_boot_iso.sh"]:
+            shutil.copyfile(f"templates/fakeisp/{file}", os.path.join(output_dir, file))
+            setup.append(f"install -o nobody -g libvirt -m 770 $DIR/{file} {self._cfg['vm_images_path']}")
         setup.blank()
 
         util.sysctl.enable_ipv6_forwarding(setup, output_dir)
