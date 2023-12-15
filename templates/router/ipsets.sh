@@ -10,5 +10,5 @@ chown root:root $IPSETS_6
 chmod 600 $IPSETS_6
 
 # default set of banned ips
-echo "create banned hash:ip family inet hashsize 2048 maxelem 16384" >$IPSETS_4
-echo "create banned6 hash:ip family inet6 hashsize 2048 maxelem 16384" >$IPSETS_6
+echo "create banned hash:ip family inet hashsize 2048 maxelem 16384" > $IPSETS_4
+echo "create banned6 hash:ip family inet6 hashsize 2048 maxelem 16384" > $IPSETS_6

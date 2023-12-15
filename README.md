@@ -17,15 +17,15 @@ Yodeler is a standalone program. _No extra software is required to run on each V
 Configuration changes imply destroying the old VM and creating a new one. This is a manual process and there are no
 processes running on the KVM host that will trigger a VM rebuild.
 
-Yodeler will (_eventually_) know how to configure the following:
+Yodeler will (_eventually_) know how to do the following:
 
-1. An Alpine based KVM host
-1. Minimal, basic Alpine VMs
-1. Awall based firewalls 
-1. Multiple Open vSwitch vswitches with multiple VLANs
-1. Routers based on Shorewall / iptables
-1. DNS / DHCP servers based on PowerDNS and Kea
-1. Dynamic IPv6 prefix delegation with radvd (internal) and dhcpcd (external)
-1. Metrics servers based on Grafana and Prometheus
+1. Setup an [Alpine](https://www.alpinelinux.org) based KVM host
+1. Create minimal, basic Alpine VMs with small footprints and memory requirements
+1. Configure basic [Awall](https://wiki.alpinelinux.org/wiki/How-To_Alpine_Wall) firewalls 
+1. Manage [Open vSwitch](https://www.openvswitch.org) vswitches with VLAN support
+1. Configure routers using Shorewall & iptables (eventually nftables)
+1. Configure DNS / DHCP servers based on [PowerDNS](https://www.powerdns.com) and [Kea](https://www.isc.org/kea/)
+1. Make IPv6 prefix delegation requests via [dhcpcd](https://github.com/NetworkConfiguration/dhcpcd) and distribute to subnets via radvd
+1. Configure metrics & monitoring using Grafana and Prometheus
 
 See [the roadmap](ROADMAP.md) for plans & progress.

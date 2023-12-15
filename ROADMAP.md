@@ -65,3 +65,8 @@
 ## XWindows
 - [x] Configure basic XFCE GUI
 - [ ] Setup simple desktop with standard plugins
+
+## Fake ISP
+- [x] Basic configuration of an intermediate router / firewall for testing
+- [x] Support for running a VM that can host _another_ Yodler site for testing
+- [x] Full IPv4 & IPv6 address support, including prefix delegation to mimic an upstream ISP

@@ -75,6 +75,10 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
     """Load and validate all host YAML files for the given site."""
     _logger.debug("loading hosts for site '%s'", site_cfg["site_name"])
 
+    total_vcpus = 0
+    total_mem = 0
+    total_disk = 0
+
     for host_path in os.listdir(site_dir):
         if host_path == "site.yaml":
             continue
@@ -82,11 +86,17 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
             _logger.debug("skipping file %s", host_path)
             continue
 
-        host.load(site_cfg, os.path.join(site_dir, host_path))
+        host_cfg = host.load(site_cfg, os.path.join(site_dir, host_path))
+        
+        if host_cfg["is_vm"]:
+            total_vcpus += host_cfg["vcpus"]
+            total_mem += host_cfg["memory_mb"]
+            total_disk += host_cfg["disk_size_mb"]
 
     _validate_full_site(site_cfg)
 
-    _logger.debug("loaded %d hosts for site '%s'", len(site_cfg["hosts"]), site_cfg["site_name"])
+    _logger.info("loaded %d hosts for site '%s'", len(site_cfg["hosts"]), site_cfg["site_name"])
+    _logger.info("total VM resources used: %d vcpus, %d GB memory & %d GB disk", total_vcpus, round(total_mem / 1024), round(total_disk / 1024))
 
 
 def write_host_scripts(site_cfg: dict, output_dir: str):

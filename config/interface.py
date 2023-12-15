@@ -166,7 +166,7 @@ def _validate_iface(iface: dict):
         iface["ipv6_address"] = None
 
     additional = parse.read_string_list_plurals(
-        {"additional_ipv6_address", "additional_ipv6_address"}, iface, "additional_ip_addresses")
+        {"additional_ipv6_address", "additional_ipv6_address"}, iface, "additional_ipv6_addresses")
     iface.pop("additional_ipv6_address", None)
     iface["additional_ipv6_addresses"] = []
 
@@ -396,7 +396,7 @@ _uplink_vlan = {
     "routable": False, "dhcp4_enabled": True, "ipv6_disabled": False, "dhcp6_managed": True}
 
 
-def for_port(name: str, comment: str, subtype:str, parent=None, uplink=None) -> dict:
+def for_port(name: str, comment: str, subtype: str, parent=None, uplink=None) -> dict:
     """ Create an interface configuration for "port" interfaces like vswitches and vlan parents.
     Ports must be configured but will never have IP addressed assigned.
     """

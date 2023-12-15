@@ -35,7 +35,7 @@ def create_conf(cfg: dict, output_dir: str):
 
         prefixes = iface.get("ipv6_delegated_prefixes")
 
-        if ((prefixes is not None) and (len(prefixes) > 0)) or iface.get("ipv6_ask_for_prefix"):
+        if prefixes or iface.get("ipv6_ask_for_prefix"):
             if not ipv6:
                 buffer.append("  ipv6")
                 if not iface["accept_ra"]:

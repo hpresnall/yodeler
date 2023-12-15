@@ -71,8 +71,7 @@ class FakeISP(Role):
             fisp_vlan["ipv6_subnet"] = first_64
             fisp_vlan["ipv6_delegation_subnet"] = subnet
 
-            _logger.debug(
-                f"splitting {subnet}; will use {first_64} for server & DHCP addresses")
+            _logger.debug(f"splitting {subnet}; will use {first_64} for server & DHCP addresses")
 
             fakeisp.setdefault("ipv6_address",  str(first_64.network_address + 1))
             # accept router advertisements, but do not use the local DHCP server
@@ -91,11 +90,13 @@ class FakeISP(Role):
         if ("vmhost") in self._cfg["roles_to_hostnames"] and (self._cfg["hostname"] not in self._cfg["roles_to_hostnames"]["vmhost"]):
             if (fisp_vlan["id"] is not None):
                 parent = fakeisp.get("name", "eth1")
-                self._cfg["interfaces"].insert(1, config.interface.for_port(parent, "vlans on 'fakeisp' vswitch", "vswitch"))
+                self._cfg["interfaces"].insert(1, config.interface.for_port(
+                    parent, "vlans on 'fakeisp' vswitch", "vswitch"))
 
             if (finet_vlan["id"] is not None):
                 parent = fakeinternet.get("name", "eth0")
-                self._cfg["interfaces"].insert(0, config.interface.for_port(parent, "vlans on 'fakeiternet' vswitch", "vswitch"))
+                self._cfg["interfaces"].insert(0, config.interface.for_port(
+                    parent, "vlans on 'fakeiternet' vswitch", "vswitch"))
 
     def additional_configuration(self):
         # configure iptables manually; no need for awall
@@ -206,9 +207,12 @@ class FakeISP(Role):
             setup.service("radvd", "boot")
             setup.blank()
 
-        for file in ["add_boot_iso.py", "add_boot_iso.sh", "rm_boot_iso.py", "rm_boot_iso.sh"]:
+        for file in ["add_boot_iso.sh", "rm_boot_iso.sh"]:
             shutil.copyfile(f"templates/fakeisp/{file}", os.path.join(output_dir, file))
-            setup.append(f"install -o nobody -g libvirt -m 770 $DIR/{file} {self._cfg['vm_images_path']}")
+            setup.append(f"install -o nobody -g libvirt -m 750 $DIR/{file} {self._cfg['vm_images_path']}")
+        for file in ["add_boot_iso.py", "rm_boot_iso.py"]:
+            shutil.copyfile(f"templates/fakeisp/{file}", os.path.join(output_dir, file))
+            setup.append(f"install -o nobody -g libvirt -m 640 $DIR/{file} {self._cfg['vm_images_path']}")
         setup.blank()
 
         util.sysctl.enable_ipv6_forwarding(setup, output_dir)

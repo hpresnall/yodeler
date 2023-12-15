@@ -294,12 +294,12 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
                 try:
                     address = ipaddress.ip_address(loc["ipv6_address"])
                 except ValueError as ve:
-                    raise KeyError(f"invalid ipv6 address '{loc['ipv6_address']}' for {loc_name}") from ve
+                    raise KeyError(f"invalid IPv6 address '{loc['ipv6_address']}' for {loc_name}") from ve
                 if not isinstance(address, ipaddress.IPv6Address):
-                    raise ValueError(f"invalid ipv6 address '{loc['ipv6_address']}' for {loc_name}")
+                    raise ValueError(f"invalid IPv6 address '{loc['ipv6_address']}' for {loc_name}")
                 if vlan_obj and vlan_obj["ipv6_subnet"] and (address not in vlan_obj["ipv6_subnet"]):
                     raise ValueError(
-                        f"invalid ipv6 address '{loc['ipv6_address']}' for {loc_name}; it is not in vlan '{vlan}'")
+                        f"invalid IPv6 address '{loc['ipv6_address']}' for {loc_name}; it is not in vlan '{vlan}'")
                 parsed_location6["ipaddress"] = str(address)
 
                 if "ipaddress" not in parsed_location4:
@@ -402,6 +402,10 @@ def validate_rule_hostnames(cfg: dict):
 def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str, src_or_dest: str):
     locations_to_remove = []
 
+    # rule deleted by previous call
+    if ip_version not in rule:
+        return
+
     for i, location in enumerate(rule[ip_version][src_or_dest], start=1):
         if not "hostname" in location:
             continue
@@ -468,9 +472,13 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
             raise ValueError(f"invalid hostname '{hostname}' in {loc_name}")
     # for locations
 
-    for location in locations_to_remove:
-        del rule[ip_version][src_or_dest][location]
+    deleted_locations = []
 
-    if not rule[ip_version]:
+    for location in locations_to_remove:
+        deleted_locations.append(rule[ip_version][src_or_dest].pop(location))
+
+    # if there is no src_or_dest, the whole rule is unnecessary
+    if not rule[ip_version][src_or_dest]:
         del rule[ip_version]
-        _logger.debug(f"removing firewall.rule[{idx}].{src_or_dest} with no valid locations")
+        _logger.debug(
+            f"removing firewall.rule[{idx}] for with no valid {src_or_dest} for {ip_version} in {deleted_locations}")

@@ -546,6 +546,10 @@ def _add_shorewall_action(cfg: dict, rule: dict, rule_idx: int,  ip_version: int
     key = "ipv4" if ip_version == 4 else "ipv6"
     actions = []
 
+    # rule may be for only one ip version
+    if key not in rule:
+        return
+
     # for every source/destination combo
     for source in rule[key]["sources"]:
         for destination in rule[key]["destinations"]:
