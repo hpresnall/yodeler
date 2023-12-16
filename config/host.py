@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import sys
+import re
 
 import util.file as file
 import util.shell as shell
@@ -17,6 +18,7 @@ import ipaddress
 
 _logger = logging.getLogger(__name__)
 
+_valid_hostname = "^[A-Za-z0–9][A-Za-z0–9\\-]{1,63}[A-Za-z0–9]$"
 
 def load(site_cfg: dict, host_path: str | None) -> dict:
     """Load the given host YAML file from given path, using the existing site config.
@@ -53,6 +55,8 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
 
     hostname = parse.non_empty_string("hostname", host_yaml, "host_yaml").lower()  # lowercase for consistency
 
+    if not re.match(_valid_hostname, hostname):
+        raise ValueError(f"invalid hostname '{hostname}'")
     if hostname in site_cfg["hosts"]:
         raise ValueError(f"duplicate hostname '{hostname}'")
     if hostname in site_cfg["firewall"]["static_hosts"]:
@@ -81,7 +85,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
         role.configure_interfaces()
     interface.validate(host_cfg)
 
-    # aliases are validated against interface vlan DHCP reservations
+    # aliases are validated against other hosts, interface vlan DHCP reservations and firewall static hosts
     _configure_aliases(host_cfg)
 
     # add any additional configuration; this may include aliases
@@ -250,6 +254,8 @@ def _configure_aliases(cfg: dict):
     cfg["aliases"] = set()
 
     for alias in aliases:
+        if not re.match(_valid_hostname, alias):
+            raise ValueError(f"invalid alias '{alias}' for host '{hostname}'")
         cfg["aliases"].add(alias.lower())
 
     for role in cfg["roles"]:
@@ -262,6 +268,13 @@ def _configure_aliases(cfg: dict):
     for alias in cfg["aliases"]:
         if alias in cfg["firewall"]["static_hosts"]:
             raise ValueError(f"alias '{alias}' for host '{hostname}' is already used in firewall.static_hosts")
+
+        # ensure no clashes with other hosts; site.py already checked for duplicate hostnames
+        for other_hostname, other_host in cfg["hosts"].items():
+            if other_hostname == hostname:
+                continue
+            if alias in other_host["aliases"]:
+                raise ValueError(f"alias '{alias}' for host '{hostname}' is already used as an alias for '{other_hostname}'")
 
     # ensure no clashes with DHCP reservations
     aliases = set(cfg["aliases"])

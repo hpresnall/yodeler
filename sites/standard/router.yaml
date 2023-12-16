@@ -2,7 +2,7 @@
 # instead it defines an uplink that connects to the WAN/ISP
 # router configuration will automatically create and configure interfaces for all routable vlans
 motd: "Alpine router VM built by Yodeler"
-roles: [router]
+role: router
 primary_domain: server.yodeler.internal
 memory_mb: 256
 uplink:

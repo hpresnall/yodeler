@@ -1,6 +1,6 @@
 # the single physical server for this site
 # setting up this system will also set up all the VMs
-roles: [vmhost]
+role: vmhost
 motd: "KVM host built by Yodeler"
 primary_domain: server.yodeler.internal # needed when host has multiple interfaces
 is_vm: false # physical server
