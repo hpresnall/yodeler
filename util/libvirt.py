@@ -5,7 +5,7 @@ import os.path
 
 def write_vm_xml(cfg: dict, output_dir: str) -> None:
     """Create the libvirt XML for the given virtual machine."""
-    template = xml.parse("templates/vm/server.xml")
+    template = xml.parse("templates/vm/vm.xml")
     domain = template.getroot()
 
     _find_and_set_text(domain, "name", cfg["hostname"])
@@ -40,6 +40,11 @@ def write_vm_xml(cfg: dict, output_dir: str) -> None:
             continue
         devices.append(interface_from_config(cfg["hostname"], iface))
 
+    if cfg["host_share"]:
+        devices.append(_create_host_share(cfg["vm_images_path"] + "/shared", "shared"))
+    if cfg["host_backup"]:
+        devices.append(_create_host_share(cfg["vm_images_path"] + "/backup/" + cfg["hostname"], "backup"))
+
     xml.indent(template, space="  ")
 
     template.write(os.path.join(output_dir, cfg["hostname"] + ".xml"))
@@ -72,8 +77,7 @@ def interface_from_config(hostname: str, iface: dict) -> xml.Element:
     </interface>
     """
     vlan_name = iface["vlan"]["name"]
-    interface = xml.Element("interface")
-    interface.attrib["type"] = "network"
+    interface = xml.Element("interface", {"type": "network"})
     device = f"{hostname}-{vlan_name}"[:15]  # Linux device names much be < 16 characters
     xml.SubElement(interface, "source", {"network": iface["vswitch"]["name"], "portgroup": vlan_name})
     xml.SubElement(interface, "target", {"dev": device})
@@ -95,8 +99,7 @@ def macvtap_interface(cfg: dict, iface_name: str) -> xml.Element:
         if "uplink" in vswitch and vswitch["uplink"] == iface_name:
             raise KeyError((f"invalid router uplink; cannot reuse uplink {iface_name} from vswitch {vswitch['name']}"))
 
-    interface = xml.Element("interface")
-    interface.attrib["type"] = "direct"
+    interface = xml.Element("interface", {"type": "direct"})
     xml.SubElement(interface, "source", {"dev": iface_name, "mode": "private"})
     xml.SubElement(interface, "model", {"type": "virtio"})
 
@@ -112,8 +115,7 @@ def router_interface(hostname: str, vswitch: dict) -> xml.Element:
       <model type="virtio" />
     </interface>
     """
-    interface = xml.Element("interface")
-    interface.attrib["type"] = "network"
+    interface = xml.Element("interface", {"type": "network"})
     xml.SubElement(interface, "source",  {"network": vswitch["name"], "portgroup": "router"})
     xml.SubElement(interface, "target", {"dev": f"{hostname}-{vswitch['name']}"})
     xml.SubElement(interface, "model", {"type": "virtio"})
@@ -161,8 +163,7 @@ def create_network(vswitch: dict, output_dir: str) -> None:
 
     # create a portgroup for the router that trunks all the routable vlans
     router_portgroup = xml.SubElement(net, "portgroup", {"name": "router"})
-    router = xml.SubElement(router_portgroup, "vlan")
-    router.attrib["trunk"] = "yes"
+    router = xml.SubElement(router_portgroup, "vlan", {"trunk": "yes"})
     routable = False
 
     # create a portgroup for each vlan
@@ -175,8 +176,7 @@ def create_network(vswitch: dict, output_dir: str) -> None:
 
         if vlan_id is not None:
             vlan_xml = xml.SubElement(portgroup, "vlan")
-            tag = xml.SubElement(vlan_xml, "tag")
-            tag.attrib["id"] = str(vlan_id)
+            tag = xml.SubElement(vlan_xml, "tag", {"id": str(vlan_id)})
 
         # add to router portgroup
         if vlan["routable"]:
@@ -197,6 +197,25 @@ def create_network(vswitch: dict, output_dir: str) -> None:
     network_xml = vswitch_name + ".xml"
     xml.indent(net, space="  ")
     xml.ElementTree(net).write(os.path.join(output_dir, network_xml))
+
+
+def _create_host_share(vmhost_path: str, share_name: str) -> xml.Element:
+    """Create an <filesystem> XML element for a directory shared with the KVM host.
+
+    <filesystem type='mount' accessmode='passthrough'>                           
+      <driver type='virtiofs'/>                         
+      <binary path="/usr/lib/qemu/virtiofsd"/>
+      <source dir='<path>'/>                  
+      <target dir='<name>'/>                                                  
+    </filesystem>
+    """
+    filesystem = xml.Element("filesystem", {"type": "mount", "accessmode": "passthrough"})
+    xml.SubElement(filesystem, "driver", {"type": "virtiofs"})
+    xml.SubElement(filesystem, "binary",  {"path": "/usr/lib/qemu/virtiofsd"})
+    xml.SubElement(filesystem, "source", {"dir": vmhost_path})
+    xml.SubElement(filesystem, "target", {"dir": share_name})
+
+    return filesystem
 
 
 def _find_and_set_text(root: xml.Element, element_name: str, text: str) -> None:

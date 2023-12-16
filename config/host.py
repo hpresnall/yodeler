@@ -430,6 +430,9 @@ _DEFAULT_SITE_CONFIG_TYPES = {
 # accessible for testing
 DEFAULT_CONFIG = {
     "is_vm": True,
+    "autostart": True,
+    "host_share": True,
+    "host_backup": True,
     "vcpus": 1,
     "memory_mb": 128,
     "disk_size_mb": 256,
@@ -446,6 +449,9 @@ DEFAULT_CONFIG = {
 
 _DEFAULT_CONFIG_TYPES = {
     "is_vm": bool,
+    "autostart": bool,
+    "host_share": bool,
+    "host_backup": bool,
     "vcpus": int,
     "memory_mb": int,
     "disk_size_mb": int,

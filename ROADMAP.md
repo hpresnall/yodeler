@@ -55,7 +55,8 @@
 - [ ] Add separate storage volume, outside of the VM
 - [ ] Configure ZFS
 - [ ] Add PCI passthrough support for storage volumes
-- [ ] Add backup and / or shared mount support for durable VM configuration data
+- [x] Add backup and / or shared mount support for durable VM configuration data
+- [] Add backup scripts for each server role & configure nightly backups
 
 ## Build Server
 - [x] Configure basic build tools

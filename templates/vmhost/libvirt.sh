@@ -49,20 +49,16 @@ while [ "$$?" -ne 0 ]; do
 done
 
 log "Configuring libvirt storage"
-mkdir -p $VM_IMAGES_PATH
-chown nobody:libvirt $VM_IMAGES_PATH
-chmod 755 $VM_IMAGES_PATH
+mkdir -p $VM_IMAGES_PATH/backup
+mkdir -p $VM_IMAGES_PATH/shared
+chown -R nobody:libvirt $VM_IMAGES_PATH
+chmod 755 -R $VM_IMAGES_PATH
 virsh pool-define-as --name vmstorage --type dir --target $VM_IMAGES_PATH
 virsh pool-autostart vmstorage
 virsh pool-start vmstorage
 
-log "Configuring libvirt networks"
-# remove default DHCP network
-virsh net-destroy default
-virsh net-undefine default
-
-# add alpine-make-vm-images for creating new VMs
 log "Installing alpine-make-vm-image"
+# add alpine-make-vm-images for creating new VMs
 cd $VM_IMAGES_PATH
 git clone --depth=1 --single-branch --branch=master https://github.com/alpinelinux/alpine-make-vm-image.git
 chown -R nobody:libvirt alpine-make-vm-image
@@ -70,3 +66,16 @@ cd alpine-make-vm-image
 if [ -f $$DIR/patch ]; then
     git apply $$DIR/patch
 fi
+
+log "Adding libvirt hook scripts"
+# add hook scripts for disabling ipv6 on vswitch and vm interfaces
+mkdir -p /etc/libvirt/hooks
+chmod 750 /etc/libvirt/hooks
+chown root:libvirt /etc/libvirt/hooks
+install -o root -g libvirt -m 750 $$DIR/network_hook /etc/libvirt/hooks/network
+install -o root -g libvirt -m 750 $$DIR/qemu_hook /etc/libvirt/hooks/qemu
+
+log "Configuring libvirt networks"
+# remove default DHCP network
+virsh net-destroy default
+virsh net-undefine default

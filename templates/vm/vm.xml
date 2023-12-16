@@ -10,6 +10,10 @@
     <apic />
   </features>
   <cpu mode="host-passthrough" check="none" />
+  <memoryBacking>
+    <source type='memfd'/>
+    <access mode='shared'/>
+  </memoryBacking>
   <devices>
     <console type="pty">
       <target type="serial" port="0" />

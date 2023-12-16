@@ -29,20 +29,26 @@ if [ "$$?" = "0" ]; then
   log "Creating VM definition for '$HOSTNAME'"
   virsh define $$DIR/$HOSTNAME.xml
 
-  # if successful, set the image perms & autostart the VM
+  # if successful, set the image perms & create the share & backup directories
+  # (auto)start the VM if configured
   if [ "$$?" = "0" ]; then
+    chown qemu:kvm $VM_IMAGES_PATH/$HOSTNAME.img
     chmod 660 $VM_IMAGES_PATH/$HOSTNAME.img
-    chown root:libvirt $VM_IMAGES_PATH/$HOSTNAME.img
 
-    virsh autostart $HOSTNAME
+    if [ "$HOST_BACKUP" = "True" ]; then
+      log "Creating backup directory"
+      mkdir -p $VM_IMAGES_PATH/backup/$HOSTNAME
+      chown nobody:libvirt $VM_IMAGES_PATH/backup/$HOSTNAME
+      chmod 750 $VM_IMAGES_PATH/backup/$HOSTNAME
+    fi
+
+    if [ "$AUTOSTART" = "True" ]; then
+      virsh autostart $HOSTNAME
+    fi
 
     if [ "$$1" = "start" ]; then
       log "Starting VM '$HOSTNAME'"
       virsh start $HOSTNAME
     fi
-  else
-    log "Installation did not complete successfully; please see $$LOG for more info"
   fi
-else
-  log "Installation did not complete successfully; please see $$LOG for more info"
 fi

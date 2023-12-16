@@ -69,7 +69,7 @@ chown -R $USER:$USER /home/$USER/.ssh
 echo "PermitRootLogin no" >> /etc/ssh/sshd_config
 echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
 
-# network confing
+# network config
 echo "$HOSTNAME" > /etc/hostname
 rootinstall $$DIR/hosts /etc
 rootinstall $$DIR/interfaces /etc/network

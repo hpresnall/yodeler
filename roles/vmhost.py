@@ -105,15 +105,9 @@ class VmHost(Role):
         if os.path.isfile("templates/vmhost/patch"):
             shutil.copyfile("templates/vmhost/patch", os.path.join(output_dir, "patch"))
 
+        # directly copy hook scripts
         shutil.copyfile("templates/vmhost/network_hook", os.path.join(output_dir, "network_hook"))
         shutil.copyfile("templates/vmhost/qemu_hook", os.path.join(output_dir, "qemu_hook"))
-        setup.comment("add hook scripts for disabling ipv6 on vswitch and vm interfaces")
-        setup.append("mkdir -p /etc/libvirt/hooks")
-        setup.append("chmod 750 /etc/libvirt/hooks")
-        setup.append("chown root:libvirt /etc/libvirt/hooks")
-        setup.append("install -o root -g libvirt -m 750 $DIR/network_hook /etc/libvirt/hooks/network")
-        setup.append("install -o root -g libvirt -m 750 $DIR/qemu_hook /etc/libvirt/hooks/qemu")
-        setup.blank()
 
         setup.comment("add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity")
         for vswitch in self._cfg["vswitches"].values():

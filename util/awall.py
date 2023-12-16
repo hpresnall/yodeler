@@ -75,6 +75,7 @@ def configure(interfaces: list[dict], roles: list[Role], setup: util.shell.Shell
 
     setup.service("iptables", "boot")
     setup.service("ip6tables", "boot")
+    setup.blank()
 
 
 def _load_templates(services: dict, template_dir: str):
