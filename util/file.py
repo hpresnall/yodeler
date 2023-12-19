@@ -4,6 +4,7 @@ import os
 import string
 import yaml
 import json
+import shutil
 
 try:
     loader, dumper = yaml.CLoader, yaml.CDumper
@@ -67,3 +68,7 @@ def load_json_string(json_str: str):
 def output_json(data: object):
     """Output the object tree to a JSON string."""
     return json.dumps(data, indent=2)
+
+
+def copy_template(role_name: str, file_name: str,  output_dir: str):
+    shutil.copy(os.path.join("templates", role_name, file_name), output_dir)

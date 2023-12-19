@@ -1,7 +1,6 @@
 """Configuration & setup for the main KVM & Openvswitch Alpine host."""
 
 import os
-import shutil
 
 from roles.role import Role
 
@@ -101,13 +100,16 @@ class VmHost(Role):
             setup.append("log \"\"")
             setup.blank()
 
-        # directly copy patch for alpine-make-vm-image if it exists
+        # patch for alpine-make-vm-image if it exists
         if os.path.isfile("templates/vmhost/patch"):
-            shutil.copyfile("templates/vmhost/patch", os.path.join(output_dir, "patch"))
+            file.copy_template(self.name, "patch", output_dir)
 
-        # directly copy hook scripts
-        shutil.copyfile("templates/vmhost/network_hook", os.path.join(output_dir, "network_hook"))
-        shutil.copyfile("templates/vmhost/qemu_hook", os.path.join(output_dir, "qemu_hook"))
+        # network hook scripts
+        file.copy_template(self.name, "network_hook", output_dir)
+        file.copy_template(self.name, "qemu_hook", output_dir)
+
+        file.copy_template(self.name, "logrotate-openvswitch", output_dir)
+        setup.append("rootinstall $DIR/logrotate-openvswitch /etc/logrotate.d/openvswitch")
 
         setup.comment("add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity")
         for vswitch in self._cfg["vswitches"].values():

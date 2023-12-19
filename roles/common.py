@@ -1,7 +1,5 @@
 """Common configuration & setup for all Alpine hosts."""
 import sys
-import os.path
-import shutil
 
 import util.shell as shell
 import util.file as file
@@ -22,7 +20,8 @@ class Common(Role):
     def additional_packages(self):
         # use dhcpcd for dhcp since it can also handle prefix delegation for routers
         # use better ifupdown-ng  and the Linux ip command, instead of Busybox's built-ins
-        packages = {"e2fsprogs", "acpi", "doas", "openssh", "chrony", "awall", "dhcpcd", "ifupdown-ng", "iproute2"}
+        packages = {"e2fsprogs", "acpi", "doas", "openssh", "chrony",
+                    "logrotate", "awall", "dhcpcd", "ifupdown-ng", "iproute2"}
 
         for iface in self._cfg["interfaces"]:
             if iface["name"].startswith("wlan"):
@@ -33,7 +32,7 @@ class Common(Role):
 
     def additional_configuration(self):
         self._cfg["fqdn"] = ""
-        if ("primary_domain" in self._cfg) and self._cfg["primary_domain"]:
+        if self._cfg["primary_domain"]:
             self._cfg["fqdn"] = self._cfg["hostname"] + '.' + self._cfg["primary_domain"]
 
         if self._cfg["is_vm"]:
@@ -105,7 +104,7 @@ class Common(Role):
         setup.substitute("templates/common/common.sh", self._cfg)
 
         # directly copy /etc/hosts
-        shutil.copyfile("templates/common/hosts", os.path.join(output_dir, "hosts"))
+        file.copy_template(self.name, "hosts", output_dir)
 
         if self._cfg["metrics"]:
             setup.append(_SETUP_METRICS)

@@ -1,7 +1,6 @@
 """Configuration & setup for a Shorewall based router."""
 import os.path
 import os
-import shutil
 
 import util.file as file
 import util.interfaces
@@ -209,6 +208,9 @@ class Router(Role):
 
         if dhrelay6_ifaces:  # at least one interface needs ipv6
             util.sysctl.enable_ipv6_forwarding(setup, output_dir)
+
+        file.copy_template("router", "ulogd.conf", output_dir)
+        file.copy_template("router", "logrotate-firewall", output_dir)
 
 
 def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
@@ -667,9 +669,6 @@ all all REJECT  NFLOG({0})
 
     file.write("rules", "\n".join(shorewall["rules"]), shorewall4)
     file.write("rules", "\n".join(shorewall["rules6"]), shorewall6)
-
-    shutil.copy("templates/router/ulogd.conf", output_dir)
-    shutil.copy("templates/router/ulogd", output_dir)
 
     setup.comment("# shorewall config")
     setup.substitute("templates/router/shorewall.sh", cfg)

@@ -1,5 +1,3 @@
-import shutil
-import os
 import logging
 import ipaddress
 
@@ -192,7 +190,7 @@ class FakeISP(Role):
             setup.blank()
 
             # directly copy the kea hook script
-            shutil.copyfile("templates/fakeisp/pdroute.sh", os.path.join(output_dir, "pdroute.sh"))
+            util.file.copy_template(self.name, "pdroute.sh", output_dir )
             setup.comment("allow kea to modify routes for prefix delegation")
             setup.append("echo \"permit nopass kea cmd /sbin/ip\" >> /etc/doas.d/doas.conf")
             setup.append("install -o kea -g kea -m 750 $DIR/pdroute.sh /usr/lib/kea/hooks/")
@@ -208,10 +206,10 @@ class FakeISP(Role):
             setup.blank()
 
         for file in ["add_boot_iso.sh", "rm_boot_iso.sh"]:
-            shutil.copyfile(f"templates/fakeisp/{file}", os.path.join(output_dir, file))
+            util.file.copy_template(self.name, file, output_dir)
             setup.append(f"install -o nobody -g libvirt -m 750 $DIR/{file} {self._cfg['vm_images_path']}")
         for file in ["add_boot_iso.py", "rm_boot_iso.py"]:
-            shutil.copyfile(f"templates/fakeisp/{file}", os.path.join(output_dir, file))
+            util.file.copy_template(self.name, file, output_dir)
             setup.append(f"install -o nobody -g libvirt -m 640 $DIR/{file} {self._cfg['vm_images_path']}")
         setup.blank()
 

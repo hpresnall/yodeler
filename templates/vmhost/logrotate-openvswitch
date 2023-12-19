@@ -1,0 +1,14 @@
+/var/log/openvswitch {
+  compress
+  weekly
+  rotate 4
+  missingok
+  postrotate
+  # tell Open vSwitch daemons to reopen the log files
+  if [ -d /var/run/openvswitch ]; then
+    for ctl in /var/run/openvswitch/ovs-vswitchd.*.ctl; do
+      ovs-appctl -t "$ctl" vlog/reopen 2>/dev/null || :
+    done
+  fi
+  endscript
+}

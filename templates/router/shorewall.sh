@@ -23,7 +23,7 @@ sed -i -E 's/(USE_NFLOG_SIZE=)No/\1Yes/' /etc/shorewall6/shorewall6.conf
 
 # setup ulogd
 install -o root -g root -m 600 $$DIR/ulogd.conf /etc/
-install -o root -g root -m 600 $$DIR/ulogd /etc/logrotate.d/
+install -o root -g root -m 644 $$DIR/logrotate-firewall /etc/logrotate.d/firewall
 mkdir -p /var/log/firewall
 chown root:wheel /var/log/firewall
 chmod 640 /var/log/firewall
