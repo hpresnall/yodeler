@@ -234,9 +234,11 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
 
         if "all" == vlan:
             # no need for further processing
-            return [{"vlan": "all"}], [{"vlan": "all"}]
+            location_obj = [{"vlan": {"name": "all", "dhcp_reservations": []}}]
+            return location_obj, location_obj
         elif "internet" == vlan:
             # not a valid vlan with a hostname, but continue processing for ipsets which can be external
+            vlan_obj = {"name": "internet", "dhcp_reservations": []}
             vlan = "internet"
         else:
             vswitch = parse.non_empty_string("vswitch", loc, loc_name)
@@ -247,8 +249,8 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
             vlan_obj = vlans.lookup(vlan, cfg["vswitches"][vswitch])
             vlan = vlan_obj["name"]
 
-        parsed_location4 = {"vlan": vlan}
-        parsed_location6 = {"vlan": vlan}
+        parsed_location4 = {"vlan": vlan_obj}
+        parsed_location6 = {"vlan": vlan_obj}
 
         # optional hostname, ipset, or ipaddress
         # if none of these, add a rule for the entire vlan
@@ -412,9 +414,12 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
 
         loc_name = f"firewall.rule[{idx}].{src_or_dest}[{i}]"
         hostname = location["hostname"]
+        vlan = location["vlan"]  # already validated in _parse_locations()
+
         host = hostname in cfg["hosts"]
 
         if host:
+            _validate_host_vlan(cfg, hostname, vlan, loc_name)
             _logger.debug("%s found '%' as a top-level host", loc_name, hostname)
             continue
         # else hostname is not a host, check aliases
@@ -422,16 +427,21 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
         for h in cfg["hosts"].values():
             if hostname in h["aliases"]:
                 host = True
-                location["hostname"] = h["hostname"]
+                hostname = location["hostname"] = h["hostname"]
                 _logger.debug("%s found '%s' as a top-level host alias for '%s'", loc_name, hostname, h["hostname"])
                 break
 
         if host:
+            _validate_host_vlan(cfg, hostname, vlan, loc_name)
             continue
         # else not an aliases, check static_hosts
 
         if hostname in cfg["firewall"]["static_hosts"]:
-            if cfg["firewall"]["static_hosts"][ip_version + "_address"]:
+            address = cfg["firewall"]["static_hosts"][hostname][ip_version + "_address"]
+            if address:
+                if address not in vlan[ip_version + "_subnet"]:
+                    raise ValueError(
+                        f"{loc_name} invalid static host {hostname}; it does not have an address in vlan '{vlan['name']}'")
                 _logger.debug("%s found '%s' as a firewall static_host", loc_name, hostname)
             else:
                 locations_to_remove.append(i-1)
@@ -439,15 +449,6 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
                               loc_name, hostname, ip_version)
             continue
         # else not a static host, check dhcp rerservations
-
-        # find vlan; vlan names are unique across vswitches
-        vlan = None
-        for vswitch in cfg["vswitches"].values():
-            vlan = vlans.lookup(location["vlan"], vswitch)
-            if vlan:
-                break
-        if not vlan:
-            raise KeyError(f"invalid vlan '{location['vlan']}' for {loc_name}")
 
         for reservation in vlan["dhcp_reservations"]:
             if (hostname == reservation["hostname"]):
@@ -458,6 +459,7 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
 
             if host:
                 if reservation[ip_version + "_address"]:
+                    # reservation address must be in vlan; no need to recheck here
                     _logger.debug("%s found '%s' as a dhcp reservation", loc_name, hostname)
                 else:
                     locations_to_remove.append(i-1)
@@ -469,7 +471,8 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
             _logger.debug("%s found '%s' as a DHCP reservation in vlan '%s'", loc_name, hostname, vlan["name"])
             continue
         else:
-            raise ValueError(f"invalid hostname '{hostname}' in {loc_name}")
+            raise ValueError(
+                f"invalid hostname '{hostname}' in {loc_name}; could not find a DHCP reservation in vlan '{vlan['name']}'")
     # for locations
 
     deleted_locations = []
@@ -482,3 +485,12 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
         del rule[ip_version]
         _logger.debug(
             f"removing firewall.rule[{idx}] for with no valid {src_or_dest} for {ip_version} in {deleted_locations}")
+
+
+def _validate_host_vlan(cfg: dict, hostname: str, vlan: dict, loc_name: str):
+    valid_vlan = False
+    for iface in cfg["hosts"][hostname]["interfaces"]:
+        if iface["vlan"]["name"] == vlan["name"]:
+            valid_vlan = True
+    if not valid_vlan:
+        raise ValueError(f"{loc_name} invalid host {hostname}; it has no interface defined in vlan '{vlan['name']}'")
