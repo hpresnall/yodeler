@@ -322,7 +322,7 @@ def _match_iface(iface: dict, to_match: list[dict], prefer_routable=True, first_
 
 def check_accessiblity(to_check: list[dict], vswitches: list[dict], ignore_vlan: Callable = lambda *_: False) -> set[str]:
     """Check if the the given list of interfaces can reach all the vlans on the given vswitches.
-    Returns an empty set if all vlans or accessible. Otherwise returns a set of vlan names, as strings.
+    Returns an empty set if all vlans are accessible. Otherwise returns a set of vlan names, as strings.
 
     Optionally accepts an additional check function that can remove a vlan from consideration. This function will be
     passed a single vlan. If the vlan should be removed, even if it is not accessible by the given interfaces, the

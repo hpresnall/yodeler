@@ -61,7 +61,7 @@ def enable_ipv6_accept_ra_2(cfg: dict, setup: shell.ShellScript, output_dir: str
     for iface in cfg["interfaces"]:
         if iface["type"] == "uplink" and not iface["ipv6_disabled"]:
             enabled = True
-            sysctl_conf.append(f"net.ipv6.conf.{iface['name']}.accept_ra = 2")
+            sysctl_conf.append(f"net.ipv6.conf.{iface['name']}.accept_ra = 2\n")
 
             _logger.debug("setting accept_ra=2 for %s %s",  cfg["hostname"], iface["name"])
 

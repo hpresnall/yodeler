@@ -162,11 +162,26 @@ class Router(Role):
                     dhrelay4_ifaces.append(vlan["router_iface"])
 
                 if not vlan["ipv6_disabled"]:
-                    # dhcp6_managed== True => AdvManagedFlag on
+                    # find all accessible DNS addresses for this vlan and add them to the RDNSS entry for radvd
+                    dns_addresses = []
+                    for dns_hostname in self._cfg["roles_to_hostnames"]["dns"]:
+                        for match in interface.find_ips_from_vlan(vswitch, vlan, self._cfg["hosts"][dns_hostname]["interfaces"]):
+                            if match["ipv6_address"]:
+                                dns_addresses.append(str(match["ipv6_address"]))
+                    rdnss = "RDNSS " + " ".join(dns_addresses) + \
+                        " {};" if dns_addresses else "# no DNS servers => no RDNSS entries"
+
+                    # add the vland and top level site domain to the DNSSL entry for radvd
+                    domain = vlan["domain"] if vlan["domain"] else ""
+                    domain += " " + self._cfg["domain"] if self._cfg["domain"] else ""
+                    dnssl = "DNSSL " + domain + " {}" if domain else "# no domains set => no DNSSL entries"
+
                     radvd_config.append(radvd_template.format(
-                        vlan["router_iface"], "on" if vlan["dhcp6_managed"] else "off",
-                        "unknown",
-                        (vlan["domain"] if vlan["domain"] else "")) + (self._cfg["domain"] if self._cfg["domain"] else ""))
+                        vlan["router_iface"],
+                        "on" if vlan["dhcp6_managed"] else "off",  # dhcp6_managed == True => AdvManagedFlag on
+                        rdnss,
+                        dnssl
+                    ))
 
                     dhrelay6_ifaces.append(vlan["router_iface"])
 

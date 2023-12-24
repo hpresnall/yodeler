@@ -198,7 +198,7 @@ class FakeISP(Role):
 
             # setup radvd on the fakeisp interface
             radvd_template = util.file.read("templates/router/radvd.conf")
-            radvd_template = radvd_template.format(fakeisp["name"], "on")  # AdvManagedFlag on => use DHCP6
+            radvd_template = radvd_template.format(fakeisp["name"], "on", "", "")  # AdvManagedFlag on => use DHCP6
             util.file.write("radvd.conf", radvd_template, output_dir)
 
             setup.append("rootinstall radvd.conf /etc")
