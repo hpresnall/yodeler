@@ -49,6 +49,7 @@ class FakeISP(Role):
                 "vswitch": "fakeinternet"
             }
         fakeinternet["forward"] = True  # required to forward from fakeisp network
+        fakeinternet["type"] = "uplink"
         fakeinternet.setdefault("ipv4_address", "dhcp")
 
         if not fakeisp:
@@ -72,8 +73,9 @@ class FakeISP(Role):
             _logger.debug(f"splitting {subnet}; will use {first_64} for server & DHCP addresses")
 
             fakeisp.setdefault("ipv6_address",  str(first_64.network_address + 1))
-            # accept router advertisements, but do not use the local DHCP server
-            fakeisp["accept_ra"] = True
+
+            # configure ipv6 manually; do not enable dhcpcd for this interface
+            fakeisp["accept_ra"] = False
             fakeisp["ipv6_dhcp"] = False
         else:
             fisp_vlan["ipv6_subnet"] = None
@@ -109,8 +111,6 @@ class FakeISP(Role):
         fakeinternet = fakeisp = vlan = {}
 
         for iface in self._cfg["interfaces"]:
-            if iface["type"] != "std":
-                continue
             if iface["vlan"]["name"] == "fakeinet":
                 fakeinternet = iface
             if iface["vlan"]["name"] == "fakeisp":
@@ -190,7 +190,7 @@ class FakeISP(Role):
             setup.blank()
 
             # directly copy the kea hook script
-            util.file.copy_template(self.name, "pdroute.sh", output_dir )
+            util.file.copy_template(self.name, "pdroute.sh", output_dir)
             setup.comment("allow kea to modify routes for prefix delegation")
             setup.append("echo \"permit nopass kea cmd /sbin/ip\" >> /etc/doas.d/doas.conf")
             setup.append("install -o kea -g kea -m 750 $DIR/pdroute.sh /usr/lib/kea/hooks/")
@@ -214,6 +214,11 @@ class FakeISP(Role):
         setup.blank()
 
         util.sysctl.enable_ipv6_forwarding(setup, output_dir)
+
+        util.file.write("ipv6_accept_ra.start", f"net.ipv6.conf.{fakeinternet['name']}.accept_ra = 2\n", output_dir)
+        setup.service("local")
+        setup.append("install -o root -g root -m 750 $DIR/ipv6_accept_ra.start /etc/local.d")
+        setup.blank()
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

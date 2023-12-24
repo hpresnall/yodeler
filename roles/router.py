@@ -69,7 +69,6 @@ class Router(Role):
 
                 vlan_iface = interface.for_vlan(iface_name, vswitch, vlan)
                 vlan["router_iface"] = vlan_iface["name"]
-                vlan_iface["forward"] = True
                 vlan_interfaces.append(vlan_iface)
 
                 # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
@@ -208,6 +207,8 @@ class Router(Role):
 
         if dhrelay6_ifaces:  # at least one interface needs ipv6
             util.sysctl.enable_ipv6_forwarding(setup, output_dir)
+
+        util.sysctl.enable_ipv6_accept_ra_2(self._cfg, setup, output_dir)
 
         file.copy_template("router", "ulogd.conf", output_dir)
         file.copy_template("router", "logrotate-firewall", output_dir)

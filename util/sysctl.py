@@ -12,13 +12,16 @@ def disable_ipv6(cfg: dict, setup: shell.ShellScript, output_dir: str):
     disabled = False
     sysctl_conf = []
     sysctl_conf.append("# disable ipv6 on ipv4 only networks")
-    sysctl_conf.append("# also disable vlan parents and openvswitch interfaces & uplinks\n")
+    sysctl_conf.append("# also disable vlan parents, openvswitch uplinks & ports for vms\n")
 
     for iface in cfg["interfaces"]:
         if iface["ipv6_disabled"]:
             if iface["type"] == "port" and iface["subtype"] == "vswitch":
-                # vswitch interfaces (and vmhost ports for vms) are not defined at boot
+                # vswitch interfaces (and vswitch ports for vms) are not defined at boot
                 # they will be handled via libvirt hook scripts
+                continue
+            if iface.get("subtype") == "vmhost":
+                # vmhost interface switch ports are disabled using the local service
                 continue
 
             disabled = True
@@ -48,6 +51,22 @@ def enable_ipv6_forwarding(setup: shell.ShellScript, output_dir: str):
     _create_file("ipv6_forwarding", sysctl_conf, setup, output_dir)
 
     _logger.debug("enabled ipv6 forwarding")
+
+
+def enable_ipv6_accept_ra_2(cfg: dict, setup: shell.ShellScript, output_dir: str):
+    enabled = False
+    sysctl_conf = []
+    sysctl_conf.append("# allow the router uplink to forward _and_ accept router advertisements\n")
+
+    for iface in cfg["interfaces"]:
+        if iface["type"] == "uplink" and not iface["ipv6_disabled"]:
+            enabled = True
+            sysctl_conf.append(f"net.ipv6.conf.{iface['name']}.accept_ra = 2")
+
+            _logger.debug("setting accept_ra=2 for %s %s",  cfg["hostname"], iface["name"])
+
+    if enabled:
+        _create_file("ipv6_accept_ra", sysctl_conf, setup, output_dir)
 
 
 def _create_file(name: str, sysctl_conf: list[str], setup: shell.ShellScript, output_dir: str):

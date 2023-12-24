@@ -62,6 +62,7 @@ class VmHost(Role):
 
             iface["name"] = f"{self._cfg['hostname']}-{iface_vlan}"
             iface["comment"] = "host interface"
+            iface["subtype"] = "vmhost"
 
         self._cfg["interfaces"] = vswitch_interfaces + self._cfg["interfaces"]
 
@@ -98,6 +99,24 @@ class VmHost(Role):
             setup.append("log \"Creating VM for '" + hostname + "'\"")
             setup.append(hostname + "/yodel.sh")
             setup.append("log \"\"")
+            setup.blank()
+
+        local = False
+        local_conf = ["# disable ipv6 on ipv4 only networks for vmhost interfaces\n"]
+        # run using the local service which runs _after_ the interface has been created by openvswitch
+        # sysctl would run before the openvswitch port is created
+        for iface in self._cfg["interfaces"]:
+            if iface["ipv6_disabled"] and iface.get("subtype") == "vmhost":
+                local = True
+                name = iface["name"]
+                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.disable_ipv6=1")
+                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.accept_ra=0")
+                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.autoconf=0\n")
+
+        if local:
+            file.write("ipv6_disable.start", "\n".join(local_conf), output_dir)
+            setup.service("local")
+            setup.append("install -o root -g root -m 750 $DIR/ipv6_disable.start /etc/local.d")
             setup.blank()
 
         # patch for alpine-make-vm-image if it exists

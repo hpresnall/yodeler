@@ -364,7 +364,8 @@ def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:
         "vswitch": vswitch,
         "vlan": vlan,
         "accept_ra": False,  # assume prefix delgation assigns addresses and router configures next hop
-        "ipv6_dhcp": False
+        "ipv6_dhcp": False,
+        "forward": True
     }
 
     iface["ipv4_address"] = str(vlan["ipv4_subnet"].network_address + 1)
