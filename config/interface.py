@@ -145,7 +145,7 @@ def _validate_iface(iface: dict):
         # no DHCP
         if iface["ipv6_dhcp"]:
             _logger.warning(
-                f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'dhcp6_disabled'; no DHCP request will be made")
+                f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'ipv6_disabled'; no DHCP request will be made")
         iface["ipv6_dhcp"] = False
         iface["additional_ipv6_addresses"] = []
         return

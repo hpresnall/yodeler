@@ -171,7 +171,7 @@ class Router(Role):
                     rdnss = "RDNSS " + " ".join(dns_addresses) + \
                         " {};" if dns_addresses else "# no DNS servers => no RDNSS entries"
 
-                    # add the vland and top level site domain to the DNSSL entry for radvd
+                    # add the vlan and top level site domain to the DNSSL entry for radvd
                     domain = vlan["domain"] if vlan["domain"] else ""
                     domain += " " + self._cfg["domain"] if self._cfg["domain"] else ""
                     dnssl = "DNSSL " + domain + " {}" if domain else "# no domains set => no DNSSL entries"
@@ -306,6 +306,7 @@ def _init_shorewall(cfg: dict):
     shorewall["zones"] = ["fw\tfirewall\ninet\tipv4"]
     shorewall["zones6"] = ["fw\tfirewall\ninet\tipv6"]
     shorewall["interfaces"] = ["inet\t$INTERNET\ttcpflags,dhcp,nosmurfs,routefilter,logmartians"]
+    # accept_ra=2 => assume upstream is autoconfiguring ipv6 from the isp
     shorewall["interfaces6"] = ["inet\t$INTERNET\ttcpflags,dhcp,rpfilter,accept_ra=2"]
     shorewall["policy"] = []
     shorewall["snat"] = []
@@ -329,7 +330,9 @@ def _configure_shorewall_vlan(shorewall, vswitch_name, vlan):
     shorewall["zones6"].append(f"{vlan_name}\tipv6")
 
     shorewall["interfaces"].append((f"{vlan_name}\t{shorewall_name}\ttcpflags,dhcp,nosmurfs,routefilter,logmartians"))
-    shorewall["interfaces6"].append((f"{vlan_name}\t{shorewall_name}\ttcpflags,dhcp,rpfilter,accept_ra=2"))
+    # disable router advertisements on downstream interfaces
+    # dhcpcd will assign addresses, no need for SLAAC
+    shorewall["interfaces6"].append((f"{vlan_name}\t{shorewall_name}\ttcpflags,dhcp,rpfilter,accept_ra=0"))
 
     all_access = False
 

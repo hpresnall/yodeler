@@ -4,11 +4,12 @@
 
 if [ "$2" = "started" ]; then
   # disable ipv6 when vswitch ports are created (i.e. vms are started)
-  # domain xml is passed via stdin; parse for
+  # domain xml is passed via stdin; parse for:
   #  1) bridge interface target devices; this is the vm's switch port
-  #  2) direct source devices; this is the router's uplink for both the device and the macvtap iface
+  #  2) direct source devices; this is the pysical interface component of a router's macvtap uplink
+  # note the macvtapX interface _is not_ disabled since this also disables router advertisments reaching the router
   # assume libvirt device == Linux interface name
-  for iface in $(xmlstarlet sel -T -t -m "/domain/devices/interface[@type='bridge']/target" -v "@dev" -n -t -m "/domain/devices/interface[@type='direct']" -v "source/@dev" -n -v "target/@dev" -n); do
+  for iface in $(xmlstarlet sel -T -t -m "/domain/devices/interface[@type='bridge']/target" -v "@dev" -n -t -m "/domain/devices/interface[@type='direct']/source" -v "@dev" -n); do
     sysctl -w net.ipv6.conf.$iface.disable_ipv6=1
     sysctl -w net.ipv6.conf.$iface.accept_ra=0
     sysctl -w net.ipv6.conf.$iface.autoconf=0

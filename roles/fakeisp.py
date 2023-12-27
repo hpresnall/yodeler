@@ -273,4 +273,7 @@ def _create_pd_pools(subnet: ipaddress.IPv6Network) -> list[dict]:
     _logger.debug(f"divided {delegation_subnet} into {len(pools)} pools "
                   f"with {2**(delegation_size-delegation_subnet.prefixlen)-1} total ::/{delegation_size} networks")
 
+    # reverse so the smallest pool, closest to the host's subnet is first
+    pools.reverse()
+
     return pools

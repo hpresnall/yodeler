@@ -6,7 +6,7 @@ the Debian's version from the ifupdown package."""
 import config.interface
 
 
-def from_config(cfg: dict):
+def from_config(cfg: dict) -> str:
     """Convert the interfaces to a form for use in /etc/network/interfaces.
 
     The interfaces must be from a validated host configuration."""

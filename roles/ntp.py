@@ -86,6 +86,7 @@ def create_chrony_conf(cfg: dict, output_dir: str):
     buffer.append("driftfile /var/lib/chrony/chrony.drift")
     buffer.append("rtcsync")
     buffer.append("makestep 0.1 3")
+    buffer.append("")
 
     for role in cfg["roles"]:
         if role.name == "ntp":

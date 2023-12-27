@@ -35,7 +35,7 @@ class Dhcp(Role):
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         return 0 if 'fakeisp' in site_cfg["roles_to_hostnames"] else 1
-    
+
     def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
         ifaces4 = []
@@ -176,9 +176,11 @@ class Dhcp(Role):
                     subnet6["subnet"] = str(ip6_subnet)
                     subnet6["rapid-commit"] = True
                     subnet6["pools"] = []
-                    if vlan["dhcp6_managed"]:  # no pool if DHCP is only informational
+                    if vlan["dhcp6_managed"]:
                         subnet6["pools"] = [{"pool": str(ip6_subnet.network_address + vlan["dhcp_min_address_ipv6"]) +
                                             " - " + str(ip6_subnet.network_address + vlan["dhcp_max_address_ipv6"])}]
+                    # else no pool if DHCP is only informational
+
                     if vlan["domain"]:
                         subnet6["ddns-qualifying-suffix"] = vlan["domain"]
 
