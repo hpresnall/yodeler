@@ -42,7 +42,7 @@ else
   rc-update del acpid default
 fi
 
-# remove root password; only allow access via doas su
+# remove root password; only allow access via doas su -
 passwd -l root
 echo "doas su -" > /home/$USER/.ash_history
 chown "$USER:$USER" /home/$USER/.ash_history
@@ -73,7 +73,9 @@ echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
 echo "$HOSTNAME" > /etc/hostname
 rootinstall $$DIR/hosts /etc
 rootinstall $$DIR/interfaces /etc/network
-rootinstall $$DIR/dhcpcd.conf /etc
+if [ -f $$DIR/dhcpcd.conf ]; then
+  rootinstall $$DIR/dhcpcd.conf /etc
+fi
 if [ -f $$DIR/resolv.conf ]; then
   rootinstall $$DIR/resolv.conf /etc
 fi
@@ -82,10 +84,10 @@ if [ -f $$DIR/resolv.conf.head ]; then
   # remove resolv.conf from setup
   rm /etc/resolv.conf
 fi
-# prevent dhcpcd starting as a service; let ifupdown-ng start it, if needed
-sed -i -e "s/provide net/# provide net/g" /etc/init.d/dhcpcd
-# remove dhcpcd messages to stdout
-sed -i -e "s#/sbin/dhcpcd \$$optargs#/sbin/dhcpcd -q \$$optargs#g" /usr/libexec/ifupdown-ng/dhcp
+# start dhcpcd service before networking; it will wait for interfaces to come up
+sed -i -e "s/provide net/# provide net/g" -e "/s/before dns/before networking dns/g" /etc/init.d/dhcpcd
+# remove dhcpcd messages to stdout on startup; rebind instead of starting dhcpcd just for this interface
+sed -i -e "s#/sbin/dhcpcd \$$optargs#/sbin/dhcpcd -q -n \$$optargs#g" /usr/libexec/ifupdown-ng/dhcp
 
 # reduce crond logging level so info messages are not printed to syslog on every execution
 echo "CRON_OPTS=\"$$CRON_OPTS -l 5\"" >> /etc/conf.d/crond

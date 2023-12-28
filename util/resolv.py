@@ -1,34 +1,17 @@
-"""Utility for /etc/resolv.confg configuration."""
+"""Utility for /etc/resolv.conf configuration."""
 import util.file as file
 
 import config.interface as interface
 
 
-def create_conf(cfg: dict, output_dir: str):
-    """Create resolv.conf and save it to the given directory.
-
-    If DHCP or DHCP6 is used on any interfaces, no file is created.
-    """
-    resolv_conf = "resolv.conf"
-    head = False  # for uplinks using dhcp, write to resolv.conf.head
-
+def create_conf(cfg: dict) -> str:
+    """Create resolv.conf file as a string."""
     search_domains = []
 
     for iface in cfg["interfaces"]:
-        if iface["ipv4_address"] == "dhcp" or iface["ipv6_dhcp"]:
-            if iface["type"] == "std":
-                return  # dhcp will handle
-            if iface["type"] == "uplink":
-                head = True  # let uplink dhcp create resolv.conf but add site content
-
-        if iface["type"] in {"std", "vlan"}:
-            # possibly search vlan domains
-            if iface["vlan"]["domain"]:
-                search_domains.append(iface["vlan"]["domain"])
-
-    if head:
-        # write to head so this config is combined with what dhcp returns
-        resolv_conf = "resolv.conf.head"
+        # possibly search vlan domains
+        if iface["type"] in {"std", "vlan"} and iface["vlan"]["domain"]:
+            search_domains.append(iface["vlan"]["domain"])
 
     buffer = []
 
@@ -36,13 +19,14 @@ def create_conf(cfg: dict, output_dir: str):
     if cfg["primary_domain"] != "":
         buffer.append(f"domain {cfg['primary_domain']}")
 
-    dns_addresses = None
-    if "dns" in cfg["roles_to_hostnames"] and cfg["roles_to_hostnames"]["dns"] :
-        dns_server = cfg["hosts"][cfg["roles_to_hostnames"]["dns"][0]]
-        dns_addresses = interface.find_ips_to_interfaces(cfg, dns_server["interfaces"])
+    dns_addresses = []
+    if "dns" in cfg["roles_to_hostnames"] and cfg["roles_to_hostnames"]["dns"]:
+        for hostname in cfg["roles_to_hostnames"]["dns"]:
+            dns_server = cfg["hosts"][hostname]
+            dns_addresses.extend(interface.find_ips_to_interfaces(cfg, dns_server["interfaces"]))
 
     if dns_addresses:
-        # can search local domains if there is local DNS
+        # search local domains if there is local DNS
         search_domains.append(cfg["domain"])
 
         buffer.append("search {}".format(" ".join(search_domains)))
@@ -56,4 +40,4 @@ def create_conf(cfg: dict, output_dir: str):
         buffer.append("nameserver " + server)
     buffer.append("")
 
-    file.write(resolv_conf, "\n".join(buffer), output_dir)
+    return "\n".join(buffer)

@@ -50,7 +50,7 @@ class Common(Role):
 
     def validate(self):
         # ensure each vlan is only used once
-        # do not allow multiple routable vlans on the same switch
+        # do not allow multiple interfaces with routable vlans on the same switch
         vswitches_used = set()
         vlans_used = set()
 
@@ -116,8 +116,34 @@ class Common(Role):
 
         util.sysctl.disable_ipv6(self._cfg, setup, output_dir)
 
-        util.resolv.create_conf(self._cfg, output_dir)
-        util.dhcpcd.create_conf(self._cfg, output_dir)
+        # create resolve.conf as needed, based on dhcp and ipv6 configuration
+        # this also determines the need for dhcpcd
+        need_ipv6 = False
+        need_dhcp4 = False
+
+        for iface in self._cfg["interfaces"]:
+            # ignore dhcp on the router so it has external and internal resolve.conf info
+            if (iface["ipv4_address"] == "dhcp") and (iface["type"] != "uplink"):
+                need_dhcp4 = True
+            if not iface["ipv6_disabled"]:
+                need_ipv6 = True
+
+        if need_ipv6:
+            # dhcp6 or router advertisements will provide ipv6 dns config
+            if not need_dhcp4:
+                # do not let ipv6 overwrite static ipv4 dns config
+                file.write("resolve.conf.head", util.resolv.create_conf(self._cfg), output_dir)
+            # else dhcp4 and dhcp6 will provide all needed resolve.conf info
+            util.dhcpcd.create_conf(self._cfg, output_dir)
+            setup.service("dhcpcd", "boot")
+        elif need_dhcp4:
+            # no ipv6; dhcp4 will provide all needed resolve.conf info
+            util.dhcpcd.create_conf(self._cfg, output_dir)
+            setup.service("dhcpcd", "boot")
+        else:
+            # static ipv4 and no ipv6 => static resolve.conf
+            file.write("resolve.conf", util.resolv.create_conf(self._cfg), output_dir)
+
         roles.ntp.create_chrony_conf(self._cfg, output_dir)
 
         if self._cfg["is_vm"]:
