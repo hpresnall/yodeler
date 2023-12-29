@@ -68,7 +68,7 @@ class Router(Role):
                     untagged = True
 
                 vlan_iface = interface.for_vlan(iface_name, vswitch, vlan)
-                vlan["router_iface"] = vlan_iface["name"]
+                vlan["router_iface"] = vlan_iface
                 vlan_interfaces.append(vlan_iface)
 
                 # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
@@ -159,7 +159,7 @@ class Router(Role):
                 _configure_shorewall_vlan(shorewall, vswitch["name"], vlan)
 
                 if vlan["dhcp4_enabled"]:
-                    dhrelay4_ifaces.append(vlan["router_iface"])
+                    dhrelay4_ifaces.append(vlan["router_iface"]["name"])
 
                 if not vlan["ipv6_disabled"]:
                     # find all accessible DNS addresses for this vlan and add them to the RDNSS entry for radvd
@@ -177,7 +177,7 @@ class Router(Role):
                     dnssl = "DNSSL " + domain + " {}" if domain else "# no domains set => no DNSSL entries"
 
                     radvd_config.append(radvd_template.format(
-                        vlan["router_iface"],
+                        vlan["router_iface"]["name"],
                         "on" if vlan["dhcp6_managed"] else "off",  # dhcp6_managed == True => AdvManagedFlag on
                         rdnss,
                         dnssl
@@ -284,16 +284,18 @@ def _write_dhcrelay_config(cfg: dict, setup: util.shell.ShellScript, dhrelay4_if
         setup.blank()
 
     if dhrelay6_ifaces:
-        # remove upper iface from list; no need to relay traffic already being broadcast
-        # dhrelay6 does require it to be explicitly set with the ip address
-        upper_iface6 = dhcp_addresses["src_iface"]["name"] if dhcp_addresses["ipv6_address"] else ""
-        dhrelay6_ifaces = [iface for iface in dhrelay6_ifaces if iface != upper_iface6]
-        upper_iface6 = "%" + upper_iface6 if upper_iface6 else upper_iface6
+        # set explicit address on the upper iface to avoid another multicast request
+        upper_iface6_name = dhcp_addresses["src_iface"]["name"]
+        upper_iface6 = str(dhcp_addresses["ipv6_address"]) + "%" + upper_iface6_name
+
+        # set explicit addreses on the lower interfaces so the dhcp server is receving a relay from a known, static network
+        # also remove upper iface from list; no need to relay traffic in the same subnet
+        dhrelay6_ifaces = [str(iface["ipv6_address"]) + "%" + iface["name"]
+                           for iface in dhrelay6_ifaces if iface["name"] != upper_iface6_name]
 
         setup.comment("setup dhcrelay6.conf")
         setup.append("echo 'IFACE=\"" + " ".join(dhrelay6_ifaces) + "\"' >> /etc/conf.d/dhcrelay6")
-        setup.append("echo 'DHCRELAY_SERVERS=\"-u " +
-                     str(dhcp_addresses["ipv6_address"]) + upper_iface6 + "\"' >> /etc/conf.d/dhcrelay6")
+        setup.append(f"echo 'DHCRELAY_SERVERS=\"-u {upper_iface6}\"' >> /etc/conf.d/dhcrelay6")
         setup.service("dhcrelay6")
         setup.blank()
 
