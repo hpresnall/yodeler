@@ -673,6 +673,16 @@ def _write_shorewall_config(cfg: dict, shorewall: dict, setup: util.shell.ShellS
     file.write("interfaces", "\n".join(shorewall["interfaces"]), shorewall4)
     file.write("interfaces", "\n".join(shorewall["interfaces6"]), shorewall6)
 
+    # virtio devices do not calculate the correct udp checksums; add rules compute them manually
+    if cfg["is_vm"]:
+        # POSTROUTING on source port 53 for dns responses
+        dns = "CHECKSUM:T\t-\t-\tudp\t-\t53\n"
+        # POSTROUTING on destination port 546 for dhcrelay6 responses to clients
+        dhcrelay6 = "CHECKSUM:T\t-\t-\tudp\t546\n"
+
+        file.write("mangle", dns, shorewall4)
+        file.write("mangle", dns + dhcrelay6, shorewall6)
+
     template = """# drop everything coming in from the internet
 inet all DROP    NFLOG({0})
 
