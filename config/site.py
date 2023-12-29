@@ -121,10 +121,9 @@ def _validate_full_site(site_cfg: dict):
     # confirm site contains all necessary roles
     for role_name in roles.role.names():
         if role_name == "common":
-            hostnames = site_cfg["hosts"].keys()
-        else:
-            hostnames = site_cfg["roles_to_hostnames"][role_name] if role_name in site_cfg["roles_to_hostnames"] else []
+            continue
 
+        hostnames = site_cfg["roles_to_hostnames"][role_name] if role_name in site_cfg["roles_to_hostnames"] else []
         count = len(hostnames)
 
         clazz = roles.role.class_for_name(role_name)
@@ -135,7 +134,7 @@ def _validate_full_site(site_cfg: dict):
             raise ValueError((f"site '{site_cfg['site_name']}' requires at least {min} hosts with '{role_name}' role;"
                               f" {count} hosts defined: {hostnames}"))
         if count > max:
-            raise ValueError((f"site '{site_cfg['site_name']}' requires at least {max} hosts with '{role_name}' role;"
+            raise ValueError((f"site '{site_cfg['site_name']}' requires no more than {max} hosts with '{role_name}' role;"
                               f" {count} hosts defined: {hostnames}"))
 
     # hostname uniqueness already determined as hosts were loaded but _not_ against all aliases; see host.validate()

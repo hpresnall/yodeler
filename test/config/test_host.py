@@ -84,10 +84,10 @@ class TestHost(base.TestCfgBase):
         # has all default packages
         packages = cfg["packages"]
         self.assertIsNotNone(packages)
-        self.assertEqual(10, len(packages))
+        self.assertEqual(11, len(packages))
         # common packages + metrics enabled by default
         self.assertEqual(0, len({"e2fsprogs", "acpi", "doas", "openssh", "chrony",
-                         "awall", "dhcpcd", "ifupdown-ng", "iproute2", "prometheus-node-exporter"} - packages))
+                         "logrotate", "awall", "dhcpcd", "ifupdown-ng", "iproute2", "prometheus-node-exporter"} - packages))
 
         vswitch = cfg["vswitches"]["public"]
 
@@ -164,7 +164,7 @@ class TestHost(base.TestCfgBase):
         self.build_error()
 
     def test_invalid_role_list(self):
-        self._host_yaml["role"] = [ False ]
+        self._host_yaml["role"] = [False]
         self.build_error()
 
     def test_invalid_alias_type(self):
@@ -172,7 +172,7 @@ class TestHost(base.TestCfgBase):
         self.build_error()
 
     def test_invalid_alias_list(self):
-        self._host_yaml["aliases"] = [ False ]
+        self._host_yaml["aliases"] = [False]
         self.build_error()
 
     def test_invalid_type_default(self):

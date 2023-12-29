@@ -54,10 +54,6 @@ class Build(Role):
     def minimum_instances(site_cfg: dict) -> int:
         return 0
 
-    @staticmethod
-    def maximum_instances(site_cfg: dict) -> int:
-        return sys.maxsize
-
     def validate(self):
         if self._cfg["is_vm"] and (self._cfg["disk_size_mb"] < 1024):
             raise ValueError("build server must set 'disk_size_mb' to at least 1,024")

@@ -26,6 +26,10 @@ class NTP(Role):
     def minimum_instances(site_cfg: dict) -> int:
         return 0
 
+    @staticmethod
+    def maximum_instances(site_cfg: dict) -> int:
+        return 2 # no need for additional redundancy
+
     def validate(self):
         for iface in self._cfg["interfaces"]:
             if (iface["type"] == "std") and (iface["ipv4_address"] == "dhcp"):

@@ -43,7 +43,11 @@ class Dns(Role):
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         return 0 if 'fakeisp' in site_cfg["roles_to_hostnames"] else 1
-    
+
+    @staticmethod
+    def maximum_instances(site_cfg: dict) -> int:
+        return 2 # no need for additional redundancy
+
     def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
 

@@ -82,24 +82,23 @@ class TestSite(unittest.TestCase):
                 self.assertTrue(os.path.isdir(host_dir))
 
                 required_files = ["yodel.sh", "setup.sh", "hosts", "interfaces",
-                                  "resolv.conf", "chrony.conf", "packages"]
+                                  "resolv.conf.head", "chrony.conf", "packages"]
                 required_dirs = []
 
                 if hostname == "router":
                     required_files.append("dhcpcd.conf")
-                    required_files.remove("resolv.conf")
-                    required_files.append("resolv.conf.head")
                     self.assertIn("firewall", host_cfg["aliases"])
                     self.assertNotIn("test", host_cfg["aliases"])
                     self.assertIn("test2", host_cfg["aliases"])
 
                 if hostname == "server":
+                    required_files.remove("resolv.conf.head") # completely dynamic config => no resolv.conf
                     self.assertNotIn("test", host_cfg["aliases"])
                     self.assertIn("test1", host_cfg["aliases"])
 
                 if hostname == "client":
                     self.assertIn("laptop", host_cfg["aliases"])
-                    required_files.remove("resolv.conf")
+                    required_files.remove("resolv.conf.head")
 
                 if host_cfg["local_firewall"]:
                     required_dirs.append("awall")
@@ -112,7 +111,7 @@ class TestSite(unittest.TestCase):
                 for path in required_files:
                     self.assertTrue(
                         os.path.isfile(os.path.join(host_dir, path)),
-                        f"{path} not created for {hostname}")
+                        f"{host_dir}/{path} not created for {hostname}")
 
                 for path in required_dirs:
                     self.assertTrue(

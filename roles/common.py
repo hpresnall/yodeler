@@ -40,14 +40,6 @@ class Common(Role):
             # note that this image file is created and formatted in yodel.sh by alpine-make-vm-image
             self._cfg["vm_disk_paths"] = [f"{self._cfg['vm_images_path']}/{self._cfg['hostname']}.img"]
 
-    @staticmethod
-    def minimum_instances(site_cfg: dict) -> int:
-        return 0
-
-    @staticmethod
-    def maximum_instances(site_cfg: dict) -> int:
-        return sys.maxsize
-
     def validate(self):
         # ensure each vlan is only used once
         # do not allow multiple interfaces with routable vlans on the same switch
@@ -132,7 +124,7 @@ class Common(Role):
             # dhcp6 or router advertisements will provide ipv6 dns config
             if not need_dhcp4:
                 # do not let ipv6 overwrite static ipv4 dns config
-                file.write("resolve.conf.head", util.resolv.create_conf(self._cfg), output_dir)
+                file.write("resolv.conf.head", util.resolv.create_conf(self._cfg), output_dir)
             # else dhcp4 and dhcp6 will provide all needed resolve.conf info
             util.dhcpcd.create_conf(self._cfg, output_dir)
             setup.service("dhcpcd", "boot")
@@ -142,7 +134,7 @@ class Common(Role):
             setup.service("dhcpcd", "boot")
         else:
             # static ipv4 and no ipv6 => static resolve.conf
-            file.write("resolve.conf", util.resolv.create_conf(self._cfg), output_dir)
+            file.write("resolv.conf", util.resolv.create_conf(self._cfg), output_dir)
 
         roles.ntp.create_chrony_conf(self._cfg, output_dir)
 

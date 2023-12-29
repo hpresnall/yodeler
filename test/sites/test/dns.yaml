@@ -6,3 +6,4 @@ interfaces:
     vswitch: public
   - ipv4_address: 192.168.2.2
     vswitch: private
+    ipv6_address: 2001:db8:0:2::2
