@@ -46,23 +46,14 @@ def _standard(iface: dict):
         buffer.append("")
 
     dhcp4 = iface["ipv4_address"] == "dhcp"
-    space = dhcp = dhcp4 or iface["ipv6_dhcp"]
+    dhcp = dhcp4 or iface["ipv6_dhcp"]
 
     if dhcp:
         buffer.append("  use dhcp")
-
-    if iface["accept_ra"]:
-        buffer.append("  use ipv6-ra")
-        space |= True
-
-    # TODO research RFCs 7217 and 8981 along with dhcpcd's slaac private temporary setting
-    # TODO uncomment when /usr/libexex/ifupdown-nd/ipv6-tempaddr is provided by Alpine
-    # if iface["ipv6_tempaddr"]:
-    #    buffer.append("  use ipv6-tempaddr")
-
-    if space:
         buffer.append("")
-        space = False
+
+    # never set 'use ipv6-ra'
+    # dhcpcd runs in all cases and will handle router advertisements
 
     _output_forward(iface, buffer)
 
@@ -70,11 +61,9 @@ def _standard(iface: dict):
         buffer.append("  address {ipv4_address}/{ipv4_prefixlen}")
         if iface["ipv4_gateway"] and (iface["ipv4_gateway"] != iface["ipv4_address"]):
             buffer.append("  gateway {ipv4_gateway}")
-        space = True
-
-    if space:
         buffer.append("")
-        space = False
+
+    space = False
 
     # assume interface validation removes the ipv6_address if disabled by vlan
     if iface["ipv6_address"] is not None:

@@ -28,6 +28,4 @@ mkdir -p /var/log/firewall
 chown root:wheel /var/log/firewall
 chmod 640 /var/log/firewall
 
-rc-update add shorewall boot
-rc-update add shorewall6 boot
 rc-update add ulogd boot

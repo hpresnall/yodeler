@@ -102,19 +102,29 @@ class VmHost(Role):
             setup.blank()
 
         local = False
-        local_conf = ["# disable ipv6 on ipv4 only networks for vmhost interfaces\n"]
-        # run using the local service which runs _after_ the interface has been created by openvswitch
+        local_conf = ["# for vmhost interfaces, disable ipv6 on ipv4 only networks and enable ipv6 temporary addresses\n"]
+        # run using the local service which runs _after_ the interfaces have been created by openvswitch
         # sysctl would run before the openvswitch port is created
         for iface in self._cfg["interfaces"]:
-            if iface["ipv6_disabled"] and iface.get("subtype") == "vmhost":
+            if iface.get("subtype") != "vmhost":
+                continue
+
+            name = iface["name"]
+
+            if iface["ipv6_disabled"]:
                 local = True
-                name = iface["name"]
                 local_conf.append(f"sysctl -w net.ipv6.conf.{name}.disable_ipv6=1")
                 local_conf.append(f"sysctl -w net.ipv6.conf.{name}.accept_ra=0")
                 local_conf.append(f"sysctl -w net.ipv6.conf.{name}.autoconf=0\n")
 
+            if iface["ipv6_tempaddr"]:
+                local = True
+                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.use_tempaddr=2")
+                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.temp_prefered_lft=86400")
+                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.temp_valid_lft=172800\n")
+
         if local:
-            file.write("ipv6_disable.start", "\n".join(local_conf), output_dir)
+            file.write("ipv6.start", "\n".join(local_conf), output_dir)
             setup.service("local")
             setup.append("install -o root -g root -m 750 $DIR/ipv6_disable.start /etc/local.d")
             setup.blank()

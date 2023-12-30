@@ -120,7 +120,7 @@ class TestHost(base.TestCfgBase):
         self.assertEqual("24", str(iface["ipv4_prefixlen"]))
 
         self.assertTrue(iface["accept_ra"])
-        self.assertFalse(iface["ipv6_tempaddr"])
+        self.assertTrue(iface["ipv6_tempaddr"])
 
     def test_site_and_host(self):
         site_cfg = site.load(os.path.join(self._base_path, "sites", "test"))

@@ -85,7 +85,7 @@ if [ -f $$DIR/resolv.conf.head ]; then
   rm /etc/resolv.conf
 fi
 # start dhcpcd service before networking; it will wait for interfaces to come up
-sed -i -e "s/provide net/# provide net/g" -e "/s/before dns/before networking dns/g" /etc/init.d/dhcpcd
+sed -i -e "s/provide net/# provide net/g" -e "s/before dns/before networking dns/g" /etc/init.d/dhcpcd
 # remove dhcpcd messages to stdout on startup; rebind instead of starting dhcpcd just for this interface
 sed -i -e "s#/sbin/dhcpcd \$$optargs#/sbin/dhcpcd -q -n \$$optargs#g" /usr/libexec/ifupdown-ng/dhcp
 

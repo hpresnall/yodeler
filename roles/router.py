@@ -199,9 +199,24 @@ class Router(Role):
                     # new libvirt interface to trunk the vlans
                     libvirt_interfaces.append(util.libvirt.router_interface(self._cfg['hostname'], vswitch))
 
-        # blank line after vlan to firewall ping rules
+        # blank line after ping rules from vlan to firewall
         shorewall["rules"].append("")
         shorewall["rules6"].append("")
+
+        _add_shorewall_host_config(self._cfg, shorewall, routable_vlans)
+        _add_shorewall_rules(self._cfg, shorewall)
+        _write_shorewall_config(self._cfg, shorewall, setup, output_dir)
+
+        setup.service("shorewall", "boot")
+        if radvd_config:  # ipv6 enabled on at least one vlan
+            setup.service("shorewall6", "boot")
+        setup.blank()
+
+        _write_ipsets(self._cfg, setup)
+        _write_dhcrelay_config(self._cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces, shorewall)
+
+        file.copy_template("router", "ulogd.conf", output_dir)
+        file.copy_template("router", "logrotate-firewall", output_dir)
 
         if self._cfg["is_vm"]:
             util.libvirt.update_interfaces(self._cfg['hostname'], libvirt_interfaces, output_dir)
@@ -212,21 +227,8 @@ class Router(Role):
             setup.append("rootinstall radvd.conf /etc")
             setup.service("radvd", "boot")
 
-        _add_shorewall_host_config(self._cfg, shorewall, routable_vlans)
-
-        _add_shorewall_rules(self._cfg, shorewall)
-
-        _write_shorewall_config(self._cfg, shorewall, setup, output_dir)
-        _write_ipsets(self._cfg, setup)
-        _write_dhcrelay_config(self._cfg, setup, dhrelay4_ifaces, dhrelay6_ifaces, shorewall)
-
-        if dhrelay6_ifaces:  # at least one interface needs ipv6
+        if dhrelay6_ifaces:  # at least one interface needs dhcp6
             util.sysctl.enable_ipv6_forwarding(setup, output_dir)
-
-        util.sysctl.enable_ipv6_accept_ra_2(self._cfg, setup, output_dir)
-
-        file.copy_template("router", "ulogd.conf", output_dir)
-        file.copy_template("router", "logrotate-firewall", output_dir)
 
 
 def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
@@ -308,8 +310,8 @@ def _init_shorewall(cfg: dict):
     shorewall["zones"] = ["fw\tfirewall\ninet\tipv4"]
     shorewall["zones6"] = ["fw\tfirewall\ninet\tipv6"]
     shorewall["interfaces"] = ["inet\t$INTERNET\ttcpflags,dhcp,nosmurfs,routefilter,logmartians"]
-    # accept_ra=2 => assume upstream is autoconfiguring ipv6 from the isp
-    shorewall["interfaces6"] = ["inet\t$INTERNET\ttcpflags,dhcp,rpfilter,accept_ra=2"]
+    # accept_ra=0 => let dhcpcd manage router advertizements
+    shorewall["interfaces6"] = ["inet\t$INTERNET\ttcpflags,dhcp,rpfilter,accept_ra=0"]
     shorewall["policy"] = []
     shorewall["snat"] = []
     shorewall["rules"] = [file.read("templates/router/shorewall/rules")]
@@ -709,21 +711,22 @@ def _write_ipsets(cfg: dict, setup: util.shell.ShellScript):
     setup.append(file.read("templates/router/ipsets.sh"))
 
     for name, ipset in cfg["firewall"]["ipsets4"].items():
-        setup.blank()
         setup.append(
             f"echo \"create {name} hash:{ipset['type']} family {ipset['family']} hashsize {ipset['hashsize']} maxelem {len(ipset['addresses'])}\"  >> $IPSETS_4")
 
         for address in ipset["addresses"]:
             setup.append(f"echo \"add {name} {address}\" >> $IPSETS_4")
 
-    for name, ipset in cfg["firewall"]["ipsets6"].items():
         setup.blank()
+
+    for name, ipset in cfg["firewall"]["ipsets6"].items():
         setup.append(
             f"echo \"create {name} hash:{ipset['type']} family {ipset['family']} hashsize {ipset['hashsize']} maxelem {len(ipset['addresses'])}\"  >> $IPSETS_6")
 
         for address in ipset["addresses"]:
             setup.append(f"echo \"add {name} {address}\" >> $IPSETS_6")
 
-    setup.blank()
+        setup.blank()
+
     setup.append("ipset restore < $IPSETS_4")
     setup.append("ipset restore < $IPSETS_6")

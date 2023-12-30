@@ -131,10 +131,7 @@ def _validate_iface(iface: dict):
     else:
         iface["ipv4_gateway"] = None
 
-    # default to False, SLAAC only; will not preclude using DHCP6 for options
-    iface["ipv6_dhcp"] = bool(iface.get("ipv6_dhcp"))
-
-    # ipv6 disabled at vlan level of interface level => ignore address
+    # ipv6 disabled at vlan level of interface level => ignore ipv6 config
     iface["ipv6_disabled"] = vlan["ipv6_disabled"] or bool(iface.get("ipv6_disabled"))
 
     if iface["ipv6_disabled"]:
@@ -143,12 +140,12 @@ def _validate_iface(iface: dict):
         iface["ipv6_tempaddr"] = False
         iface["accept_ra"] = False
         # no DHCP
-        if iface["ipv6_dhcp"]:
-            _logger.warning(
-                f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'ipv6_disabled'; no DHCP request will be made")
         iface["ipv6_dhcp"] = False
         iface["additional_ipv6_addresses"] = []
         return
+
+    # default to False, SLAAC only; will not preclude using DHCP6 for options
+    iface["ipv6_dhcp"] = bool(iface.get("ipv6_dhcp"))
 
     address = iface.get("ipv6_address")
     if address is not None:
@@ -180,11 +177,11 @@ def _validate_iface(iface: dict):
         _logger.warning(
             f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'dhcp6_managed' set to false; no DHCP request will be made")
 
-    # default to False; dhcpcd will use another temporary address method
-    iface["ipv6_tempaddr"] = bool(iface.get("ipv6_tempaddr"))
+    # default to True; dhcpcd will also create RFC 7217 addresses
+    iface["ipv6_tempaddr"] = True if "ipv6_tempaddr" not in iface else bool(iface["ipv6_tempaddr"])
 
     # default to True
-    iface["accept_ra"] = True if "accept_ra" not in iface else bool(iface.get("accept_ra"))
+    iface["accept_ra"] = True if "accept_ra" not in iface else bool(iface["accept_ra"])
 
     if iface["name"].startswith("wl"):  # wlxx or wlanx
         if not ("wifi_ssid" in iface) and not ("wifi_psk" in iface):
@@ -363,7 +360,7 @@ def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:
         "type": "vlan",
         "vswitch": vswitch,
         "vlan": vlan,
-        "accept_ra": False,  # assume prefix delgation assigns addresses and router configures next hop
+        "accept_ra": False,  # assume prefix delgation assigns addresses and router configures a static ipv6 address
         "ipv6_dhcp": False,
         "forward": True
     }

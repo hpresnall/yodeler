@@ -21,7 +21,7 @@ def disable_ipv6(cfg: dict, setup: shell.ShellScript, output_dir: str):
                 # they will be handled via libvirt hook scripts
                 continue
             if iface.get("subtype") == "vmhost":
-                # vmhost interface switch ports are disabled using the local service
+                # vmhost interface switch ports are disabled using the local service since they do not exist until ifup
                 continue
 
             disabled = True
@@ -38,6 +38,37 @@ def disable_ipv6(cfg: dict, setup: shell.ShellScript, output_dir: str):
         _create_file("ipv6_disable", sysctl_conf, setup, output_dir)
 
 
+def enable_temp_addresses(cfg: dict, setup: shell.ShellScript, output_dir: str):
+    addresses = False
+    sysctl_conf = []
+    sysctl_conf.append("# enable ipv6 temporary addresses")
+
+    for iface in cfg["interfaces"]:
+        if iface["ipv6_tempaddr"]:
+            if iface["type"] not in {"std", "uplink"}:
+                # do not enable for ports or vlan parents since they should have ipv6 disabled
+                # do not enable for vlan interfaces because no traffic should originate from those ips
+                continue
+            if iface.get("subtype") == "vmhost":
+                # vmhost interface switch ports are configured using the local service since they do not exist until ifup
+                continue
+
+            addresses = True
+            name = iface["name"]
+
+            sysctl_conf.append(f"net.ipv6.conf.{name}.use_tempaddr = 2")  # 2 =>use and prefer
+            # use for 1 day, remove after 2
+            # incorrect spelling is the valid value
+            sysctl_conf.append(f"net.ipv6.conf.{name}.temp_prefered_lft = 86400")
+            sysctl_conf.append(f"net.ipv6.conf.{name}.temp_valid_lft = 172800")
+            sysctl_conf.append("")
+
+            _logger.debug("enabling ipv6 temp addresses for %s %s",  cfg["hostname"], iface["name"])
+
+    if addresses:
+        _create_file("ipv6_temp_addr", sysctl_conf, setup, output_dir)
+
+
 def enable_ipv6_forwarding(setup: shell.ShellScript, output_dir: str):
     """Globally enable ipb6 forwarding by creating a sysctl.d conf file.
     This is required; ifupdown-ng currently only sets the value on each interface.
@@ -51,22 +82,6 @@ def enable_ipv6_forwarding(setup: shell.ShellScript, output_dir: str):
     _create_file("ipv6_forwarding", sysctl_conf, setup, output_dir)
 
     _logger.debug("enabled ipv6 forwarding")
-
-
-def enable_ipv6_accept_ra_2(cfg: dict, setup: shell.ShellScript, output_dir: str):
-    enabled = False
-    sysctl_conf = []
-    sysctl_conf.append("# allow the router uplink to forward _and_ accept router advertisements\n")
-
-    for iface in cfg["interfaces"]:
-        if iface["type"] == "uplink" and not iface["ipv6_disabled"]:
-            enabled = True
-            sysctl_conf.append(f"net.ipv6.conf.{iface['name']}.accept_ra = 2\n")
-
-            _logger.debug("setting accept_ra=2 for %s %s",  cfg["hostname"], iface["name"])
-
-    if enabled:
-        _create_file("ipv6_accept_ra", sysctl_conf, setup, output_dir)
 
 
 def _create_file(name: str, sysctl_conf: list[str], setup: shell.ShellScript, output_dir: str):

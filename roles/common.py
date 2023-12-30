@@ -9,6 +9,7 @@ import util.sysctl
 import util.awall
 import util.resolv
 import util.dhcpcd
+import util.sysctl
 
 from roles.role import Role
 import roles.ntp
@@ -128,12 +129,13 @@ class Common(Role):
             # else dhcp4 and dhcp6 will provide all needed resolve.conf info
             util.dhcpcd.create_conf(self._cfg, output_dir)
             setup.service("dhcpcd", "boot")
+            util.sysctl.enable_temp_addresses(self._cfg, setup, output_dir)
         elif need_dhcp4:
             # no ipv6; dhcp4 will provide all needed resolve.conf info
             util.dhcpcd.create_conf(self._cfg, output_dir)
             setup.service("dhcpcd", "boot")
         else:
-            # static ipv4 and no ipv6 => static resolve.conf
+            # static ipv4 and no ipv6 => static resolve.conf and no dhcpcd needed
             file.write("resolv.conf", util.resolv.create_conf(self._cfg), output_dir)
 
         roles.ntp.create_chrony_conf(self._cfg, output_dir)
