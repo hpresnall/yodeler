@@ -20,6 +20,7 @@ _logger = logging.getLogger(__name__)
 
 _valid_hostname = "^[A-Za-z0–9][A-Za-z0–9\\-]{1,63}[A-Za-z0–9]$"
 
+
 def load(site_cfg: dict, host_path: str | None) -> dict:
     """Load the given host YAML file from given path, using the existing site config.
 
@@ -123,7 +124,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.add_log_function()
     setup.append_rootinstall()
 
-    # load any envvars passed in from bootstrap scripts
+    setup.comment("load any envvars passed in from yodeler.sh")
     setup.append("source /tmp/envvars")
     setup.blank()
 
@@ -274,7 +275,8 @@ def _configure_aliases(cfg: dict):
             if other_hostname == hostname:
                 continue
             if alias in other_host["aliases"]:
-                raise ValueError(f"alias '{alias}' for host '{hostname}' is already used as an alias for '{other_hostname}'")
+                raise ValueError(
+                    f"alias '{alias}' for host '{hostname}' is already used as an alias for '{other_hostname}'")
 
     # ensure no clashes with DHCP reservations
     aliases = set(cfg["aliases"])

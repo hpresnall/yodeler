@@ -82,25 +82,6 @@ class VmHost(Role):
         _setup_open_vswitch(self._cfg, setup,)
         _setup_libvirt(self._cfg, setup, output_dir)
 
-        # call yodel.sh for each VM
-        setup.comment("run yodel.sh for each VM for this site")
-        setup.append("cd $SITE_DIR")
-        setup.blank()
-
-        setup.append("log -e \"\\nCreating VMs\\n\"")
-        setup.blank()
-
-        for _, host in self._cfg["hosts"].items():
-            hostname = host["hostname"]
-
-            if not host["is_vm"] or hostname == self._cfg["hostname"]:
-                continue
-
-            setup.append("log \"Creating VM for '" + hostname + "'\"")
-            setup.append(hostname + "/yodel.sh")
-            setup.append("log \"\"")
-            setup.blank()
-
         local = False
         local_conf = ["# for vmhost interfaces, disable ipv6 on ipv4 only networks and enable ipv6 temporary addresses\n"]
         # run using the local service which runs _after_ the interfaces have been created by openvswitch
@@ -126,7 +107,7 @@ class VmHost(Role):
         if local:
             file.write("ipv6.start", "\n".join(local_conf), output_dir)
             setup.service("local")
-            setup.append("install -o root -g root -m 750 $DIR/ipv6_disable.start /etc/local.d")
+            setup.append("install -o root -g root -m 750 $DIR/ipv6.start /etc/local.d")
             setup.blank()
 
         # patch for alpine-make-vm-image if it exists
@@ -139,7 +120,23 @@ class VmHost(Role):
 
         file.copy_template(self.name, "logrotate-openvswitch", output_dir)
         setup.append("rootinstall $DIR/logrotate-openvswitch /etc/logrotate.d/openvswitch")
+        setup.blank()
 
+        # call yodel.sh for each VM
+        setup.comment("run yodel.sh for each VM for this site")
+        setup.append("cd $SITE_DIR")
+        setup.append("log -e \"\\nCreating VMs\\n\"")
+
+        for _, host in self._cfg["hosts"].items():
+            hostname = host["hostname"]
+
+            if not host["is_vm"] or hostname == self._cfg["hostname"]:
+                continue
+
+            setup.append(hostname + "/yodel.sh")
+            setup.append("log \"\"")
+
+        setup.blank()
         setup.comment("add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity")
         for vswitch in self._cfg["vswitches"].values():
             _create_vswitch_uplink(vswitch, setup)
@@ -216,8 +213,6 @@ def _create_vswitch_uplink(vswitch, setup):
         setup.comment(f"uplink for vswitch '{vswitch_name}'")
         setup.append(f"ovs-vsctl add-port {vswitch_name} {uplink_name}")
 
-    setup.blank()
-
     # tag the uplink port
     vlans_by_id = vswitch["vlans_by_id"].keys()
     if len(vlans_by_id) == 1:
@@ -225,7 +220,6 @@ def _create_vswitch_uplink(vswitch, setup):
         if None not in vlans_by_id:
             tag = list(vlans_by_id)[0]
             setup.append(f"ovs-vsctl set port {uplink_name} tag={tag} vlan_mode=access")
-            setup.blank()
         # else no tagging needed
     elif len(vlans_by_id) > 1:  # multiple vlans => trunk port
         trunks = [str(vlan_id) for vlan_id in vlans_by_id if vlan_id != None]
@@ -235,7 +229,8 @@ def _create_vswitch_uplink(vswitch, setup):
         # see http://www.openvswitch.org/support/dist-docs/ovs-vswitchd.conf.db.5.txt
         vlan_mode = "native_untagged" if None in vlans_by_id else "trunk"
         setup.append(f"ovs-vsctl set port {uplink_name} trunks={trunks} vlan_mode={vlan_mode}")
-        setup.blank()
+
+    setup.blank()
 
 
 def _setup_libvirt(cfg, setup, output_dir):

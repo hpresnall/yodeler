@@ -215,11 +215,6 @@ class FakeISP(Role):
 
         util.sysctl.enable_ipv6_forwarding(setup, output_dir)
 
-        util.file.write("ipv6_accept_ra.start", f"net.ipv6.conf.{fakeinternet['name']}.accept_ra = 2\n", output_dir)
-        setup.service("local")
-        setup.append("install -o root -g root -m 750 $DIR/ipv6_accept_ra.start /etc/local.d")
-        setup.blank()
-
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         return 0

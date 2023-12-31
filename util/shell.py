@@ -65,13 +65,16 @@ class ShellScript():
         All scripts should use the log() function rather than echo."""
         self.append(util.file.substitute("templates/common/logging.sh", {"hostname": hostname}))
         self.add_log_function()
+        self.append(f"""error () {{
+  log "Unexpected error during setup of '{hostname}'; see $LOG for details"
+}}
+trap error ERR
+""")
 
     def add_log_function(self):
         self.append("""log () {
   echo $* >&3
 }
-
-trap 'echo \"Installation did not complete successfully; please see logs for details\" >&3' ERR
 """)
 
     def write_file(self, output_dir) -> None:

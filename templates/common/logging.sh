@@ -18,7 +18,7 @@ fi
 exec 3> >(tee -a $$LOG >&4)
 
 echo "Writing logs to $$LOG"
-# stdout to log, stderr to log & console
+# stdout & stderr to log
 exec 1>> $$LOG
 exec 2>&1
 

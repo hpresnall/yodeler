@@ -1,6 +1,4 @@
 """Configuration for an XFCE host."""
-import sys
-
 import util.shell as shell
 import util.disk as disk
 

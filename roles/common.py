@@ -146,7 +146,6 @@ class Common(Role):
             if self._cfg["host_backup"]:
                 setup.comment("mount backup on boot")
                 setup.append("echo \"backup /backup virtiofs relatime 0 0\" >> /etc/fstab")
-                setup.blank()
 
 
 def _setup_repos(cfg: dict, setup: shell.ShellScript):

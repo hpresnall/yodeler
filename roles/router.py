@@ -12,12 +12,7 @@ import util.dhcpcd
 from roles.role import Role
 
 import config.interface as interface
-import config.vlan as vlans
-import config.firewall as firewall
-
 import util.parse as parse
-import util.address as address
-
 
 class Router(Role):
     """Router defines the configuration needed to setup a system that can route from the configured
@@ -174,7 +169,7 @@ class Router(Role):
                     # add the vlan and top level site domain to the DNSSL entry for radvd
                     domain = vlan["domain"] if vlan["domain"] else ""
                     domain += " " + self._cfg["domain"] if self._cfg["domain"] else ""
-                    dnssl = "DNSSL " + domain + " {}" if domain else "# no domains set => no DNSSL entries"
+                    dnssl = "DNSSL " + domain + " {};" if domain else "# no domains set => no DNSSL entries"
 
                     radvd_config.append(radvd_template.format(
                         vlan["router_iface"]["name"],

@@ -1,3 +1,6 @@
+IS_VM=$IS_VM
+INSTALL_PRIVATE_SSH_KEY=$INSTALL_PRIVATE_SSH_KEY
+
 # basic config
 echo "$MOTD" > /etc/motd
 setup-timezone -z $TIMEZONE
@@ -15,7 +18,7 @@ echo 'alias ls="ls --color"' >> /etc/profile.d/aliases.sh
 echo 'alias ip="ip -c"' >> /etc/profile.d/aliases.sh
 chmod +x /etc/profile.d/aliases.sh
 
-if [ "$IS_VM" = "True" ]; then
+if [ "$$IS_VM" = "True" ]; then
   # no TTYs on VMs; all access via virsh console
   sed -i -E "s/^tty([1-6])/\#tty\1/g" /etc/inittab
 
@@ -53,7 +56,7 @@ mkdir -p /home/$USER/.ssh
 echo "$PUBLIC_SSH_KEY" > /home/$USER/.ssh/authorized_keys
 rc-update add sshd default
 
-if [ "$INSTALL_PRIVATE_SSH_KEY" = "True" ]; then
+if [ "$$INSTALL_PRIVATE_SSH_KEY" = "True" ]; then
     echo "Host=*
 User=$USER
 IdentityFile=~/.ssh/$SITE_NAME" > /home/$USER/.ssh/config
@@ -81,8 +84,6 @@ if [ -f $$DIR/resolv.conf ]; then
 fi
 if [ -f $$DIR/resolv.conf.head ]; then
   rootinstall $$DIR/resolv.conf.head /etc
-  # remove resolv.conf from setup
-  rm /etc/resolv.conf
 fi
 # start dhcpcd service before networking; it will wait for interfaces to come up
 sed -i -e "s/provide net/# provide net/g" -e "s/before dns/before networking dns/g" /etc/init.d/dhcpcd

@@ -1,9 +1,4 @@
 """Configuration & setup for a Kea DHCP server."""
-import os
-import os.path
-
-import ipaddress
-
 import util.shell
 import util.file
 import util.address

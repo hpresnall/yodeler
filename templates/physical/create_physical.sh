@@ -6,7 +6,7 @@ mkdir -p $$SITE_DIR/apk_cache
 ln -s $$(realpath $$SITE_DIR/apk_cache) /etc/apk/cache
 
 # alpine install uses /etc/apk/world to configure the base system
-# ensure iptables does end up on the installed system unless required
+# ensure apks needed for setup do no end up on the installed system unless required
 cp /etc/apk/world /tmp
 
 # alpine install will setup the network
@@ -22,14 +22,13 @@ ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 cp /tmp/world /etc/apk
 
 # install Alpine with answerfile
-log -e "Installing Alpine to $ROOT_DEV\n"
-# redirecting to allow confirmation of deleting existing partitions
-setup-alpine -e -f $$DIR/answerfile >&3 2>&1
-log -e "\nAlpine install complete"
+log -e "\nInstalling Alpine for '$HOSTNAME' to $ROOT_DEV"
+setup-alpine -e -f $$DIR/answerfile > $$LOG 2>&1
+log -e "Alpine install complete; starting yodeler configuration\n"
 
 # mount the installed system and run setup inside of chroot
-log "Mounting installed system"
 INSTALLED=/media/installed
+log "Mounting installed system at $$INSTALLED"
 mkdir -p "$$INSTALLED"
 mount ${ROOT_DEV}${ROOT_PARTITION} "$$INSTALLED"
 
@@ -39,11 +38,18 @@ apk -q add rsync
 rsync -r --exclude logs "$$SITE_DIR" "$$INSTALLED/root"
 
 # still using Alpine installer's network configuration in chroot
-# backup the installed resolv.conf and use the current installation's instead
-if [ -f "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.conf" ]; then
-  cp "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.conf" "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.orig"
+# backup the installed resolv.conf, if any, and use the current installation's instead
+RESOLV_CONF_PATH="$$INSTALLED/root/$SITE_NAME/$HOSTNAME"
+RESOLV_CONF=""
+if [ -f "$$RESOLV_CONF_PATH/resolv.conf" ]; then
+  RESOLV_CONF=resolv.conf
+elif [ -f "$$RESOLV_CONF_PATH/resolv.conf.head" ]; then
+  RESOLV_CONF=resolv.conf.head
 fi
-cp /etc/resolv.conf "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.conf" # will be moved to /etc by setup.sh
+if [ -z "$$RESOLV_CONF" ]; then
+  cp "$$RESOLV_CONF_PATH/$$RESOLV_CONF" "$$RESOLV_CONF_PATH/resolv.orig"
+fi
+cp /etc/resolv.conf "$$RESOLV_CONF_PATH/resolv.conf" # will be moved to /etc by setup.sh
 
 # cache APKs on installed system in /root/$SITE_NAME
 # note symlinks are relative to installed root fs
@@ -68,11 +74,14 @@ mount --bind /sys "$$INSTALLED"/sys
 mount --make-private "$$INSTALLED"/sys
 
 log -e "\nRunning setup for '$HOSTNAME' in chroot"
-# continue running the rest of the script even if setup.sh fails
+# run the rest of the script even if setup.sh fails
+trap - ERR
 set +o errexit
 # export START_TIME in chroot to use the same LOG_DIR this script is already using
 chroot "$$INSTALLED" /bin/sh -c "export START_TIME=$$START_TIME; cd /root/$SITE_NAME/$HOSTNAME; ./setup.sh"
 RESULT=$$?
+trap exception ERR
+set -o errexit
 
 # mount status gets reset sometimes; ensure still writable
 mount -o remount,rw $$YODELER_DEV
@@ -87,14 +96,15 @@ if [ -d "$$INSTALLED/root/$SITE_NAME/logs" ]; then
 fi
 
 # copy back final resolv.conf
-if [ -f "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.orig" ]; then
-  mv "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.orig" "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.conf"
-  install -o root -g root -m 644 "$$INSTALLED/root/$SITE_NAME/$HOSTNAME/resolv.conf" "$$INSTALLED/etc"
+if [ -f "$$RESOLV_CONF_PATH/resolv.orig" ]; then
+  mv "$$RESOLV_CONF_PATH/resolv.orig" "$$RESOLV_CONF_PATH/$$RESOLV_CONF"
+  rm "$$INSTALLED/etc.resolv.conf"
+  install -o root -g root -m 644 "$$RESOLV_CONF_PATH/$$RESOLV_CONF" "$$INSTALLED/etc"
 fi
 
 if [ "$$RESULT" == 0 ]; then
-  log -e "\nSuccessful Yodel!\nThe system will now reboot\n"
+  log -e "\nSuccessful Yodel for '$HOSTNAME'!\nThe system will now reboot\n"
   # reboot
 else
-  log "Installation did not complete successfully; please see $$LOG for more info"
+  log -e "\nUnsuccessful Yodel for '$HOSTNAME'; see $$LOG for details"
 fi
