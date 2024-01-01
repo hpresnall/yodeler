@@ -35,7 +35,7 @@ class VmHost(Role):
         for vswitch in self._cfg["vswitches"].values():
             vswitch_name = vswitch["name"]
 
-            # iface for switch itself
+            # iface for vswitch itself
             vswitch_interfaces.append(interface.for_port(vswitch_name, "vswitch", "vswitch"))
 
             vswitch_interfaces.extend(_create_uplink_ports(vswitch))
@@ -150,28 +150,28 @@ def _create_uplink_ports(vswitch: dict) -> list[dict]:
         return []
     elif len(uplinks) == 1:
         uplink = uplinks[0]
-        return [interface.for_port(uplink, f"uplink for vswitch {vswitch_name}", vswitch_name, uplink)]
+        return [interface.for_port(uplink, f"uplink for vswitch {vswitch_name}", "uplink", vswitch_name, uplink)]
     else:
         ports = []
         for n, iface in enumerate(uplinks, start=1):
             ports.append(interface.for_port(
-                iface, f"uplink {n} of {len(uplinks)} for vswitch {vswitch_name}", vswitch_name, iface))
+                iface, f"uplink {n} of {len(uplinks)} for vswitch {vswitch_name}", "uplink", vswitch_name, iface))
         return ports
 
 
 def _setup_open_vswitch(cfg, setup):
     setup.substitute("templates/vmhost/openvswitch.sh", cfg)
 
-    # create Open vswitches for each definiation
+    # create vswitches for each definition
     # add uplink ports with correct tagging where specified
     for vswitch in cfg["vswitches"].values():
         vswitch_name = vswitch["name"]
 
-        setup.comment(f"setup vswitch '{vswitch_name}'")
+        setup.comment(f"vswitch '{vswitch_name}'")
         setup.append(f"ovs-vsctl add-br {vswitch_name}")
         setup.blank()
 
-    # each host interface needs a port on the vswitch
+    # each interface on this host needs a port on the vswitch
     for iface in cfg["interfaces"]:
         if iface["type"] != "std":
             continue
@@ -179,7 +179,7 @@ def _setup_open_vswitch(cfg, setup):
         port = f"{cfg['hostname']}-{iface['vlan']['name']}"
         port = port[:15]  # Linux device names much be < 16 characters
 
-        setup.comment(f"setup switch port for host interface on vswitch '{iface['vswitch']['name']}'")
+        setup.comment(f"switch port for host interface on vswitch '{iface['vswitch']['name']}'")
         setup.append(
             f"ovs-vsctl add-port {iface['vswitch']['name']} {port} -- set interface {port} type=internal")
 
@@ -203,7 +203,7 @@ def _create_vswitch_uplink(vswitch, setup):
         bond_ifaces = " ".join(uplinks)
         bond_name = f"{vswitch_name}-uplink"
 
-        setup.comment("bonded uplink")
+        setup.comment(f"bonded uplink for vswitch '{vswitch_name}'")
         setup.append(f"ovs-vsctl add-bond {vswitch_name} {bond_name} {bond_ifaces} lacp=active")
 
         uplink_name = bond_name  # use new uplink name for tagging, if needed
