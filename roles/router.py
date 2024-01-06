@@ -14,6 +14,7 @@ from roles.role import Role
 import config.interface as interface
 import util.parse as parse
 
+
 class Router(Role):
     """Router defines the configuration needed to setup a system that can route from the configured
      vlans to the internet"""
@@ -94,6 +95,9 @@ class Router(Role):
         self._cfg["local_firewall"] = False
 
         self.add_alias("gateway")
+
+        if self._cfg["metrics"]:
+            self._cfg["prometheus_collectors"].extend(["conntrack", "network_route"])
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

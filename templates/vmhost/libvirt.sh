@@ -57,6 +57,9 @@ virsh pool-define-as --name vmstorage --type dir --target $VM_IMAGES_PATH
 virsh pool-autostart vmstorage
 virsh pool-start vmstorage
 
+# needed for pci passthrough
+echo vfio_iommu_type1 > /etc/modules-load.d/iommu
+
 log "Installing alpine-make-vm-image"
 # add alpine-make-vm-images for creating new VMs
 cd $VM_IMAGES_PATH

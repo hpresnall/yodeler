@@ -28,7 +28,7 @@ if [ "$$IS_VM" = "True" ]; then
   # create non-root user and allow doas
   adduser -D -g $USER $USER
   addgroup $USER wheel
-  echo "permit persist :wheel" >> /etc/doas.d/doas.conf
+  echo "permit persist :wheel" >> /etc/doas.conf
 else
   # keep 2 TTYs on physical
   sed -i -E "s/^tty([3-6])/\#tty\1/g" /etc/inittab
@@ -39,10 +39,14 @@ else
   # non-root user will be configured by Alpine setup
 
   # enable services on physical systems
-  rc-update add cpufreqd boot
+  rc-update add cpufrequtils
   rc-update add cgroups sysinit
   # acpid should only be run at boot runlevel
   rc-update del acpid default
+
+  # default to 'powersave' CPU frequency govenor
+  # this should be ideal for newer Intel CPUs
+  echo "START_OPTS=\"--governor powersave\"" >> /etc/conf.d/cpufrequtils
 fi
 
 # remove root password; only allow access via doas su -

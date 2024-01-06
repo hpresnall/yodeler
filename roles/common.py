@@ -40,6 +40,9 @@ class Common(Role):
             # define the base disk for the VM image
             # note that this image file is created and formatted in yodel.sh by alpine-make-vm-image
             self._cfg["vm_disk_paths"] = [f"{self._cfg['vm_images_path']}/{self._cfg['hostname']}.img"]
+        elif self._cfg["metrics"]:
+            # metrics for physical hosts
+            self._cfg["prometheus_collectors"].extend(["edac", "hwmon", "nvme", "thermal_zone", "cpufreq"])
 
     def validate(self):
         # ensure each vlan is only used once
@@ -100,7 +103,14 @@ class Common(Role):
         file.copy_template(self.name, "hosts", output_dir)
 
         if self._cfg["metrics"]:
-            setup.append(_SETUP_METRICS)
+            setup.append("log \"Configuring Prometheus\"")
+            setup.service("node-exporter")
+            # awful formatting; put each prometheus arg on a separate line ending with '\'
+            # then, the whole command needs to be echoed to a file as a quoted param
+            node_exporter_cmd = " \\\n".join(_PROMETHEUS_ARGS) + " "  \
+                + " \\\n".join("--collector.%s" % c for c in self._cfg["prometheus_collectors"])
+            setup.append("echo \"ARGS=\\\"" + node_exporter_cmd + "\\\"\" > /etc/conf.d/node-exporter")
+            setup.blank()
 
         if self._cfg["local_firewall"]:
             util.awall.configure(self._cfg["interfaces"], self._cfg["roles"], setup, output_dir)
@@ -165,25 +175,11 @@ def _setup_repos(cfg: dict, setup: shell.ShellScript):
 
 # ignore all ram, loop, floppy disks and all _partitions_
 # ignore all non-file systems
-_SETUP_METRICS = """echo "Configuring Prometheus"
-rc-update add node-exporter default
+_PROMETHEUS_ARGS = [
+    "--log.level=warn",
+    "--collector.diskstats.device-exclude='^(ram|loop|fd[a-z]|((h|s|v|xv)d[a-z]|nbd|sr|nvme\\\\d+n\\\\d+p))\\\\d+$'",
+    "--collector.filesystem.fs-types-exclude='^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs)$'",
+    "--collector.disable-defaults"
+]
 
-echo "ARGS=\\\"--log.level=warn \\
---no-collector.bonding \\
---no-collector.btrfs \\
---no-collector.cpufreq \\
---no-collector.entropy \\
---no-collector.hwmon \\
---no-collector.ipvs \\
---no-collector.infiniband \\
---no-collector.nfs \\
---no-collector.nfsd \\
---no-collector.textfile \\
---no-collector.timex \\
---no-collector.xfs \\
---no-collector.zfs \\
---web.disable-exporter-metrics \\
---collector.diskstats.device-exclude='^(ram|loop|fd[a-z]|((h|s|v|xv)d[a-z]|nbd|sr|nvme\\\\d+n\\\\d+p))\\\\d+$' \\
---collector.filesystem.fs-types-exclude='^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs)$'\\"" \\
-> /etc/conf.d/node-exporter
-"""
+# for storage zfs

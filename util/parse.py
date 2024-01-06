@@ -144,10 +144,22 @@ def configure_defaults(config_name: str, default_config: dict, default_types: di
         if key not in default_types:
             raise KeyError(f"{key} in {config_name} does not define a type")
 
-        value = cfg.setdefault(key, default_config[key])
+        use_default = False
+
+        if key in cfg:
+            value = cfg[key]
+        else:
+            value = default_config[key]
+            use_default = True
 
         kind = default_types[key]
 
         if not isinstance(value, kind):
             raise KeyError(f"{key} value '{value}' in {config_name} is {type(value)} not {kind}")
         # some default values can be empty; so do not check here
+
+        if use_default:
+            if isinstance(value, list):
+                cfg[key] = list(value)  # copy the list
+            else:
+                cfg[key] = value

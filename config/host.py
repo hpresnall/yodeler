@@ -324,8 +324,8 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
         host_cfg["packages"].discard("awall")
 
     if not host_cfg["is_vm"]:
-        # add cpufreq and other utils to real hosts
-        host_cfg["packages"] |= {"util-linux", "cpufreqd", "cpufrequtils"}
+        # add utils to real hosts
+        host_cfg["packages"] |= {"util-linux", "pciutils", "dmidecode", "cpufrequtils"}
 
     # resolve conflicts in favor of adding the package
     host_cfg["remove_packages"] -= host_cfg["packages"]
@@ -459,7 +459,9 @@ DEFAULT_CONFIG = {
     # do not install private ssh key on every host
     "install_private_ssh_key": False,
     # domain for the host when it has multiple interfaces; used for DNS search
-    "primary_domain": ""
+    "primary_domain": "",
+    "prometheus_collectors": ["cpu", "diskstats", "filefd", "filesystem", "meminfo", "netdev", "netstat",
+                              "schedstat", "sockstat", "stat", "udp_queues", "uname", "vmstat"]
 }
 
 _DEFAULT_CONFIG_TYPES = {
@@ -478,5 +480,6 @@ _DEFAULT_CONFIG_TYPES = {
     "motd": str,
     "install_private_ssh_key": bool,
     "primary_domain": str,
-    "install_interfaces": str
+    "install_interfaces": str,
+    "prometheus_collectors": list
 }

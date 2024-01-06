@@ -72,6 +72,9 @@ class VmHost(Role):
 
         self.add_alias("kvm")
 
+        if self._cfg["metrics"]:
+            self._cfg["prometheus_collectors"].extend(["cgroups"])
+
         # additional physical server config before running chroot during setup
         self._cfg["before_chroot"] = file.substitute("templates/vmhost/before_chroot.sh", self._cfg)
 
@@ -106,9 +109,20 @@ class VmHost(Role):
 
         if local:
             file.write("ipv6.start", "\n".join(local_conf), output_dir)
+            setup.comment("configure ipv6 on this host's network interfaces")
             setup.service("local")
             setup.append("install -o root -g root -m 750 $DIR/ipv6.start /etc/local.d")
             setup.blank()
+
+        if not self._cfg["is_vm"]:
+            setup.append("""# enable VT-d / IOMMU
+if $(grep vendor_id /proc/cpuinfo | head -n 1 | grep AMD > /dev/null); then
+  iommu="amd_iommu=pgtbl_v1"
+else
+  iommu="intel_iommu=on"
+fi
+sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
+""")
 
         # patch for alpine-make-vm-image if it exists
         if os.path.isfile("templates/vmhost/patch"):
@@ -204,7 +218,8 @@ def _create_vswitch_uplink(vswitch, setup):
         bond_name = f"{vswitch_name}-uplink"
 
         setup.comment(f"bonded uplink for vswitch '{vswitch_name}'")
-        setup.append(f"ovs-vsctl add-bond {vswitch_name} {bond_name} {bond_ifaces} lacp=active")
+        setup.append(
+            f"ovs-vsctl add-bond {vswitch_name} {bond_name} {bond_ifaces} lacp=active bond_mode=balance-slb other-config:lacp-fallback-ab=true")
 
         uplink_name = bond_name  # use new uplink name for tagging, if needed
     else:
