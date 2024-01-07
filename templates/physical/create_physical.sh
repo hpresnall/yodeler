@@ -18,9 +18,6 @@ iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 ip6tables -P INPUT DROP
 ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
-# copy back original
-cp /tmp/world /etc/apk
-
 # install Alpine with answerfile
 log -e "\nInstalling Alpine for '$HOSTNAME' to $ROOT_DEV"
 setup-alpine -e -f $$DIR/answerfile > $$LOG 2>&1
@@ -37,8 +34,11 @@ apk -q add rsync
 # do not include logs dir as that will stop output for this script
 rsync -r --exclude logs "$$SITE_DIR" "$$INSTALLED/root"
 
+# copy back original world
+cp /tmp/world /etc/apk
+
 # still using Alpine installer's network configuration in chroot
-# backup the installed resolv.conf, if any, and use the current installation's instead
+# backup the installed resolv.conf, if any, and use the installer's instead
 RESOLV_CONF_PATH="$$INSTALLED/root/$SITE_NAME/$HOSTNAME"
 RESOLV_CONF=""
 if [ -f "$$RESOLV_CONF_PATH/resolv.conf" ]; then
@@ -60,6 +60,8 @@ ln -s /root/$SITE_NAME/apk_cache "$$INSTALLED/etc/apk/cache"
 mkdir -p /tmp/$HOSTNAME/tmp
 rm -f /tmp/$HOSTNAME/tmp/envvars
 touch /tmp/$HOSTNAME/tmp/envvars
+# export START_TIME in chroot to use the same LOG_DIR this script is already using
+echo "START_TIME=$$START_TIME" >> /tmp/$HOSTNAME/tmp/envvars
 
 $BEFORE_CHROOT
 
@@ -77,8 +79,8 @@ log -e "\nRunning setup for '$HOSTNAME' in chroot"
 # run the rest of the script even if setup.sh fails
 trap - ERR
 set +o errexit
-# export START_TIME in chroot to use the same LOG_DIR this script is already using
-chroot "$$INSTALLED" /bin/sh -c "export START_TIME=$$START_TIME; cd /root/$SITE_NAME/$HOSTNAME; ./setup.sh"
+# note running scripts _copied_ into the installed system
+chroot "$$INSTALLED" /bin/sh -c "cd /root/$SITE_NAME/$HOSTNAME; ./setup.sh"
 RESULT=$$?
 trap exception ERR
 set -o errexit
@@ -98,7 +100,7 @@ fi
 # copy back final resolv.conf
 if [ -f "$$RESOLV_CONF_PATH/resolv.orig" ]; then
   mv "$$RESOLV_CONF_PATH/resolv.orig" "$$RESOLV_CONF_PATH/$$RESOLV_CONF"
-  rm "$$INSTALLED/etc.resolv.conf"
+  rm "$$INSTALLED/etc/resolv.conf"
   install -o root -g root -m 644 "$$RESOLV_CONF_PATH/$$RESOLV_CONF" "$$INSTALLED/etc"
 fi
 
