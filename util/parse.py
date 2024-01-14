@@ -62,6 +62,8 @@ def set_default_string(key: str, cfg: dict, default: str):
 
     if not value:
         value = default
+    elif type(value) != str:
+        raise ValueError(f"{key} must be a string")
 
     cfg[key] = value
 

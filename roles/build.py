@@ -13,14 +13,14 @@ class Build(Role):
     def additional_packages(self) -> set[str]:
         packages = {"build-base", "automake", "autoconf", "make", "pkgconf", "git", "gcc", "python3", "py3-pip", "perl"}
 
-        if self._cfg.setdefault("java", False) == True:
+        if self._cfg.setdefault("java", False):
             packages.add("openjdk19-jdk")
-        if self._cfg.setdefault("java17", False) == True:
+        if self._cfg.setdefault("java17", False):
             packages.add("openjdk17-jdk")
-        if self._cfg.setdefault("java11", False) == True:
+        if self._cfg.setdefault("java11", False):
             packages.add("openjdk11-jdk")
 
-        if self._cfg.setdefault("go", False) == True:
+        if self._cfg.setdefault("go", False):
             packages.add("go")
 
         return packages
@@ -30,7 +30,7 @@ class Build(Role):
             # add an additional disk for builds so it can be persistent across VM instances
             # create & format the image before running setup.sh in chroot
             disk_path = self._cfg["vm_images_path"] + "/" + self._cfg["hostname"] + "_build.img"
-            size = self._cfg.setdefault("build_disk_size_mb", 128)
+            size = int(self._cfg.setdefault("build_disk_size_mb", 128))
 
             self._cfg["vm_disk_paths"].append(disk_path)
 

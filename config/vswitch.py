@@ -1,6 +1,4 @@
 """Handles parsing and validating vswitch configuration from site YAML files."""
-import logging
-
 import config.vlan as vlan
 
 import util.parse as parse

@@ -37,7 +37,7 @@ def validate(cfg: dict):
         names.add(iface["name"])
 
         try:
-            iface.setdefault("type", "std")
+            parse.set_default_string("type", iface, "std")
             types = {"std", "vlan", "port", "uplink"}
             if iface["type"] not in types:
                 raise KeyError(f"only {type} interface types are supported")

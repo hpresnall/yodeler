@@ -88,7 +88,12 @@ class Router(Role):
                 vswitch_interfaces.extend(vlan_interfaces)
 
         # set uplink after vswitch interfaces in /etc/interfaces so all the vlans are up before prefix delgation
-        self._cfg["interfaces"] = vswitch_interfaces + [uplink] + self._cfg.setdefault("interfaces", [])
+        interfaces = self._cfg.setdefault("interfaces", [])
+
+        if not isinstance(interfaces, list):
+            raise KeyError(f"cfg['interfaces'] must be a list")
+
+        self._cfg["interfaces"] = vswitch_interfaces + [uplink] + interfaces
 
     def additional_configuration(self):
         # router will use Shorewall instead
