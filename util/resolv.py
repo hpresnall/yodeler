@@ -1,7 +1,7 @@
 """Utility for /etc/resolv.conf configuration."""
 import util.file as file
 
-import config.interface as interface
+import config.interfaces as interfaces
 
 
 def create_conf(cfg: dict) -> str:
@@ -23,7 +23,7 @@ def create_conf(cfg: dict) -> str:
     if "dns" in cfg["roles_to_hostnames"] and cfg["roles_to_hostnames"]["dns"]:
         for hostname in cfg["roles_to_hostnames"]["dns"]:
             dns_server = cfg["hosts"][hostname]
-            dns_addresses.extend(interface.find_ips_to_interfaces(cfg, dns_server["interfaces"]))
+            dns_addresses.extend(interfaces.find_ips_to_interfaces(cfg, dns_server["interfaces"]))
 
     if dns_addresses:
         # search local domains if there is local DNS

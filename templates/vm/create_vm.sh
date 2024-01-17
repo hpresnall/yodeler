@@ -7,6 +7,8 @@ log "Creating VM for '$HOSTNAME'"
 mkdir -p /tmp/$HOSTNAME/tmp
 rm -f /tmp/$HOSTNAME/tmp/envvars
 touch /tmp/$HOSTNAME/tmp/envvars
+# export START_TIME in chroot to use the same LOG_DIR this script is already using
+echo "export START_TIME=$$START_TIME" >> /tmp/$HOSTNAME/tmp/envvars
 
 $BEFORE_CHROOT
 

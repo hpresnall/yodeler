@@ -105,7 +105,7 @@ def _validate_vlan_subnet(vswitch_name: str, vlan: dict, ip_version: str):
     except ValueError as ve:
         raise ValueError(f"invalid {ip_version}_subnet for {cfg_name}") from ve
 
-    if (ip_version == "ipv6") and (subnet.prefixlen> 64):
+    if (ip_version == "ipv6") and (subnet.prefixlen > 64):
         raise ValueError(f"invalid {ip_version}_subnet for {cfg_name}; the prefix length cannot be greater than 64")
 
     # default to DHCP range over all addresses except the router
@@ -159,12 +159,12 @@ def _validate_vlan_dhcp_reservations(vswitch_name: str, vlan: dict):
         if "mac_address" in res:
             mac = res["mac_address"]
             if not isinstance(mac, str):
-                raise KeyError(f"invalid mac_address for {location}")
-            if _VALID_MAC.match(mac.upper()) is None:
-                raise KeyError(f"invalid mac_address for {location}")
+                raise ValueError(f"invalid mac_address '{mac}' for {location}")
+            if not _VALID_MAC.match(mac.upper()):
+                # mac address case is up to the users of the reservations, but upper() for regex here
+                raise ValueError(f"invalid mac_address '{mac}' for {location}")
         else:
-            raise KeyError(f"no mac_address for {location}")
-        # mac address case is up to the users of the reservations
+            raise ValueError(f"no 'mac_address' defined for {location}")
 
         aliases = parse.read_string_list_plurals({"alias", "aliases"}, res, location)
         res.pop("alias", None)

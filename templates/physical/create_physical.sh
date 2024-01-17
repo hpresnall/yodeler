@@ -5,37 +5,37 @@ rm -f /etc/apk/cache
 mkdir -p $$SITE_DIR/apk_cache
 ln -s $$(realpath $$SITE_DIR/apk_cache) /etc/apk/cache
 
-# alpine install uses /etc/apk/world to configure the base system
-# ensure apks needed for setup do no end up on the installed system unless required
-cp /etc/apk/world /tmp
-
 # alpine install will setup the network
 # block all incoming traffic until awall is configured
+# install rsync too for later use; avoid issues with moving world file later
 log "Blocking incoming network traffic"
-apk -q add iptables ip6tables
+apk -q add iptables ip6tables rsync
 iptables -P INPUT DROP
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 ip6tables -P INPUT DROP
 ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
+# alpine install uses /etc/apk/world to configure the base system
+# ensure apks needed for setup do not end up on the installed system unless required
+cp /etc/apk/world /tmp
+
 # install Alpine with answerfile
-log -e "\nInstalling Alpine for '$HOSTNAME' to $ROOT_DEV"
+log -e "\nInstalling Alpine for '$HOSTNAME' to $SYSTEM_DEV"
 setup-alpine -e -f $$DIR/answerfile > $$LOG 2>&1
 log -e "Alpine install complete; starting yodeler configuration\n"
+
+# copy back original world
+cp /tmp/world /etc/apk
 
 # mount the installed system and run setup inside of chroot
 INSTALLED=/media/installed
 log "Mounting installed system at $$INSTALLED"
 mkdir -p "$$INSTALLED"
-mount ${ROOT_DEV}${ROOT_PARTITION} "$$INSTALLED"
+mount ${SYSTEM_DEV}${SYSTEM_PARTITION} "$$INSTALLED"
 
 log "Copying yodeler scripts & apk_cache for site '$SITE_NAME' to $$INSTALLED/root/" 
-apk -q add rsync
 # do not include logs dir as that will stop output for this script
 rsync -r --exclude logs "$$SITE_DIR" "$$INSTALLED/root"
-
-# copy back original world
-cp /tmp/world /etc/apk
 
 # still using Alpine installer's network configuration in chroot
 # backup the installed resolv.conf, if any, and use the installer's instead
@@ -61,7 +61,7 @@ mkdir -p /tmp/$HOSTNAME/tmp
 rm -f /tmp/$HOSTNAME/tmp/envvars
 touch /tmp/$HOSTNAME/tmp/envvars
 # export START_TIME in chroot to use the same LOG_DIR this script is already using
-echo "START_TIME=$$START_TIME" >> /tmp/$HOSTNAME/tmp/envvars
+echo "export START_TIME=$$START_TIME" >> /tmp/$HOSTNAME/tmp/envvars
 
 $BEFORE_CHROOT
 

@@ -43,14 +43,14 @@ def non_empty_string(key: str, cfg: None | dict, dict_name: str) -> str:
 
     value = cfg[key]
     if not isinstance(value, str):
-        raise KeyError(f"{dict_name}['{key}'] must be a string")
+        raise KeyError(f"{dict_name}['{key}'] must be a string, not a {type(value)}")
     if not value:
         raise KeyError(f"{dict_name}['{key}'] cannot be an empty string")
 
     return value
 
 
-def set_default_string(key: str, cfg: dict, default: str):
+def set_default_string(key: str, cfg: dict, default: str) -> str:
     if not key:
         raise ValueError("key cannot be empty")
     if cfg is None:
@@ -62,10 +62,11 @@ def set_default_string(key: str, cfg: dict, default: str):
 
     if not value:
         value = default
-    elif type(value) != str:
+    elif not isinstance(value, str):
         raise ValueError(f"{key} must be a string")
 
     cfg[key] = value
+    return value
 
 
 def read_string_list(key: str, cfg: dict, value_name: str) -> list[str]:
