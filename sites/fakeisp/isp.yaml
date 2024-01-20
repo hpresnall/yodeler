@@ -1,5 +1,4 @@
 is_vm: false
-root_dev: "/dev/vda"
 motd: "Alpine physical fake ISP for testing nested Yodeler installs"
 roles: [vmhost, fakeisp]
 # /etc/network/interfaces used during initial Alpine Linux install
@@ -17,3 +16,10 @@ install_private_ssh_key: true
 #    fakeinternet with dhcp
 #    fakeisp with valid addresses
 # defaults to eth0 for fakeinternet and eth1 for fakeisp
+disk: # optional; defaults to /dev/sda & partition 3
+  # can also be an array
+  # first and only disk => system disk for the OS
+  # THIS MUST BE CORRECT
+  # installation will reformat this drive during the install
+  path: /dev/nvme0n1
+  partition: p3

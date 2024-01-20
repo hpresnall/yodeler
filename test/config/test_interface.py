@@ -5,7 +5,7 @@ import copy
 
 import test.config.base as base
 
-import config.interface as interface
+import config.interfaces as interfaces
 
 
 class TestInterface(base.TestCfgBase):
@@ -155,12 +155,12 @@ class TestInterface(base.TestCfgBase):
         cfg = self.build_cfg()
 
         with self.assertRaises(KeyError):
-            interface.find_by_name(cfg, "invalid")
+            interfaces.find_by_name(cfg, "invalid")
 
     def test_find_ips_self(self):
         cfg = self.build_cfg()
 
-        matches = interface.find_ips_to_interfaces(cfg, cfg["interfaces"])
+        matches = interfaces.find_ips_to_interfaces(cfg, cfg["interfaces"])
 
         self.assertIsNotNone(matches)
         self.assertEqual(1, len(matches))
@@ -175,7 +175,7 @@ class TestInterface(base.TestCfgBase):
         self._host_yaml["interfaces"][0]["ipv4_address"] = "dhcp"
         del self._host_yaml["interfaces"][0]["ipv6_address"]
 
-        matches = interface.find_ips_to_interfaces(cfg, matching)
+        matches = interfaces.find_ips_to_interfaces(cfg, matching)
 
         self.assertIsNotNone(matches)
         self.assertEqual(1, len(matches))

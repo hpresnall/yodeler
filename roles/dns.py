@@ -6,7 +6,7 @@ import util.shell
 import util.file
 import util.address
 
-import config.interface as interface
+import config.interfaces as interfaces
 
 from roles.role import Role
 
@@ -34,7 +34,7 @@ class Dns(Role):
                 raise KeyError(
                     f"host '{self._cfg['hostname']}' cannot configure a DNS server with a DHCP address on interface '{iface['name']}'")
 
-        accessible_vlans = interface.check_accessiblity(self._cfg["interfaces"],
+        accessible_vlans = interfaces.check_accessiblity(self._cfg["interfaces"],
                                                         self._cfg["vswitches"].values())
 
         if accessible_vlans:

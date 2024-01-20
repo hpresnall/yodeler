@@ -3,7 +3,6 @@ import os.path
 import os
 
 import util.file as file
-import util.interfaces
 import util.libvirt
 import util.shell
 import util.sysctl
@@ -11,7 +10,7 @@ import util.dhcpcd
 
 from roles.role import Role
 
-import config.interface as interface
+import config.interfaces
 import util.parse as parse
 
 
@@ -23,7 +22,7 @@ class Router(Role):
         return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "ndisc6", "tcpdump"}
 
     def configure_interfaces(self):
-        uplink = interface.configure_uplink(self._cfg)
+        uplink = config.interfaces.configure_uplink(self._cfg)
 
         # add an interface for each vswitch that has routable vlans
         iface_counter = 1  # start at eth1
@@ -44,7 +43,6 @@ class Router(Role):
                 # TODO handle multiple uplinks; maybe just error instead of creating physical bond ifaces
                 # TODO if site also has a separate, physical vmhost, then need a way to
                 # differentiate uplinks for vmhost vs router; maybe router_iface in vswitch config?
-                # next(iter(vswitch["uplinks"]))
                 iface_name = vswitch["uplinks"][0]
                 # vswitch validation already confirmed uplink uniqueness
             else:
@@ -63,7 +61,7 @@ class Router(Role):
                 if vlan["id"] is None:
                     untagged = True
 
-                vlan_iface = interface.for_vlan(iface_name, vswitch, vlan)
+                vlan_iface = config.interfaces.for_vlan(iface_name, vswitch, vlan)
                 vlan["router_iface"] = vlan_iface
                 vlan_interfaces.append(vlan_iface)
 
@@ -83,7 +81,7 @@ class Router(Role):
                     vlan_interfaces[0]["comment"] = comment
                 else:  # add the base interface as a port
                     # append to vswitch_interfaces to ensure it is the first definition
-                    vswitch_interfaces.append(interface.for_port(iface_name, comment, "vlan"))
+                    vswitch_interfaces.append(config.interfaces.for_port(iface_name, comment, "vlan"))
 
                 vswitch_interfaces.extend(vlan_interfaces)
 
@@ -169,7 +167,7 @@ class Router(Role):
                     # find all accessible DNS addresses for this vlan and add them to the RDNSS entry for radvd
                     dns_addresses = []
                     for dns_hostname in self._cfg["roles_to_hostnames"]["dns"]:
-                        for match in interface.find_ips_from_vlan(vswitch, vlan, self._cfg["hosts"][dns_hostname]["interfaces"]):
+                        for match in config.interfaces.find_ips_from_vlan(vswitch, vlan, self._cfg["hosts"][dns_hostname]["interfaces"]):
                             if match["ipv6_address"]:
                                 dns_addresses.append(str(match["ipv6_address"]))
                     rdnss = "RDNSS " + " ".join(dns_addresses) + \
@@ -191,8 +189,8 @@ class Router(Role):
 
             if has_routable_vlans:
                 if not comment:
-                    shorewall["params"].append("\n# parent interface for vswitch " + vswitch["router_iface"])
-                    shorewall["params6"].append("\n# parent interface for vswitch " + vswitch["router_iface"])
+                    shorewall["params"].append("\n# parent interface for vswitch " + vswitch["name"])
+                    shorewall["params6"].append("\n# parent interface for vswitch " + vswitch["name"])
                     comment = True
                 # shorewall param to associate vswitch with interface
                 param = vswitch["name"].upper() + "=" + vswitch["router_iface"]
@@ -245,7 +243,7 @@ def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
 
 def _write_dhcrelay_config(cfg: dict, setup: util.shell.ShellScript, dhrelay4_ifaces: list, dhrelay6_ifaces: list, shorewall: dict):
     dhcp_server = cfg["hosts"][cfg["roles_to_hostnames"]["dhcp"][0]]
-    dhcp_addresses = interface.find_ips_to_interfaces(cfg, dhcp_server["interfaces"], first_match_only=False)
+    dhcp_addresses = config.interfaces.find_ips_to_interfaces(cfg, dhcp_server["interfaces"], first_match_only=False)
 
     if not dhcp_addresses:
         raise ValueError("router needs to relay DHCP but cannot find any reachable DHCP servers")

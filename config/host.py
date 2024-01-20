@@ -9,7 +9,8 @@ import util.file as file
 import util.shell as shell
 import util.parse as parse
 
-import config.interface as interface
+import config.interfaces
+import config.disks
 
 import roles.role
 import roles.common
@@ -84,7 +85,8 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     # add all interfaces, then validate
     for role in host_cfg["roles"]:
         role.configure_interfaces()
-    interface.validate(host_cfg)
+    config.interfaces.validate(host_cfg)
+    config.disks.validate(host_cfg)
 
     # aliases are validated against other hosts, interface vlan DHCP reservations and firewall static hosts
     _configure_aliases(host_cfg)
@@ -143,6 +145,12 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
     setup.write_file(host_dir)
 
+    # convert array into string for substitution in bootstrap script
+    if not host_cfg["before_chroot"]:
+        host_cfg["before_chroot"] = "# no configuration needed before chroot"
+    else:
+        host_cfg["before_chroot"] = "\n".join(host_cfg["before_chroot"])
+
     if host_cfg["is_vm"]:
         _bootstrap_vm(host_cfg, host_dir)
     else:
@@ -188,12 +196,8 @@ def _set_defaults(cfg: dict):
 iface lo inet loopback
 auto eth0
 iface eth0 inet dhcp""")
-        cfg.setdefault("root_dev", "/dev/sda")
-        cfg.setdefault("root_partition", "3")
 
         parse.non_empty_string("install_interfaces", cfg, cfg["hostname"] + " cfg")
-        parse.non_empty_string("root_dev", cfg, cfg["hostname"] + " cfg")
-        parse.non_empty_string("root_partition", cfg, cfg["hostname"] + " cfg")
 
     # also called in site.py; this call ensures overridden values from the host are also valid
     validate_site_defaults(cfg)
@@ -208,7 +212,6 @@ def _load_roles(cfg: dict):
 
     # Common _must_ be the first so it is configured and setup first
     common = roles.role.load("common", cfg)
-    common.configure_interfaces()
     cfg["roles"] = [common]
     role_names.discard("common")
 
@@ -336,6 +339,13 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
 
 
 def _bootstrap_physical(cfg: dict, output_dir: str):
+    for disk in cfg["disks"]:
+        if disk["name"] == "system":
+            # system disk type must be 'device' per config allowed in disks.py
+            cfg["system_dev"] = disk["path"]
+            cfg["system_partition"] = disk["partition"]
+            break
+
     # boot with install media; run /media/<install_dev>/<site>/<host>/yodel.sh
     # setup.sh will run in the installed host via chroot
     yodel = shell.ShellScript("yodel.sh")
@@ -351,6 +361,7 @@ def _bootstrap_physical(cfg: dict, output_dir: str):
     # create Alpine setup answerfile
     # use external DNS for initial Alpine setup
     cfg["external_dns_str"] = " ".join(cfg["external_dns"])
+
     file.write("answerfile", file.substitute("templates/physical/answerfile", cfg), output_dir)
 
 
@@ -425,8 +436,7 @@ DEFAULT_SITE_CONFIG = {
     "domain": "",
     # if not specified, no SSH access will be possible!
     "user": "nonroot",
-    "password": "apassword",
-    "before_chroot": "# no configuration needed before chroot"
+    "password": "apassword"
 }
 
 _DEFAULT_SITE_CONFIG_TYPES = {
@@ -438,8 +448,7 @@ _DEFAULT_SITE_CONFIG_TYPES = {
     "metrics": bool,
     "domain": str,
     "user": str,
-    "password": str,
-    "before_chroot": str
+    "password": str
 }
 
 # accessible for testing
@@ -460,6 +469,7 @@ DEFAULT_CONFIG = {
     "install_private_ssh_key": False,
     # domain for the host when it has multiple interfaces; used for DNS search
     "primary_domain": "",
+    "before_chroot": [],
     "prometheus_collectors": ["cpu", "diskstats", "filefd", "filesystem", "meminfo", "netdev", "netstat",
                               "schedstat", "sockstat", "stat", "udp_queues", "uname", "vmstat"]
 }
@@ -474,12 +484,11 @@ _DEFAULT_CONFIG_TYPES = {
     "disk_size_mb": int,
     "image_format": str,
     "vm_images_path": str,
-    "root_dev": str,
-    "root_partition": str,  # default disk layout puts /root on /dev/sda3
     "local_firewall": bool,
     "motd": str,
     "install_private_ssh_key": bool,
     "primary_domain": str,
     "install_interfaces": str,
+    "before_chroot": list,
     "prometheus_collectors": list
 }

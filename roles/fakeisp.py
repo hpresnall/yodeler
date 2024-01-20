@@ -4,7 +4,7 @@ import ipaddress
 from roles.role import Role
 
 import config.vlan
-import config.interface
+import config.interfaces
 
 import util.shell
 import util.sysctl
@@ -49,7 +49,6 @@ class FakeISP(Role):
                 "vswitch": "fakeinternet"
             }
         fakeinternet["forward"] = True  # required to forward from fakeisp network
-        fakeinternet["type"] = "uplink"
         fakeinternet.setdefault("ipv4_address", "dhcp")
 
         if not fakeisp:
@@ -86,16 +85,18 @@ class FakeISP(Role):
         self._cfg["interfaces"] = [fakeinternet, fakeisp]
 
         # create the parent interface for tagged vlans
-        # vmhosts will configure the vswitches to vlan tag, so parents are not necessary
+        # vmhost will configure the vswitches to vlan tag, so parents are not necessary
         if ("vmhost") in self._cfg["roles_to_hostnames"] and (self._cfg["hostname"] not in self._cfg["roles_to_hostnames"]["vmhost"]):
             if (fisp_vlan["id"] is not None):
                 parent = fakeisp.get("name", "eth1")
-                self._cfg["interfaces"].insert(1, config.interface.for_port(
+                # insert before fakeisp
+                self._cfg["interfaces"].insert(1, config.interfaces.for_port(
                     parent, "vlans on 'fakeisp' vswitch", "vswitch"))
 
             if (finet_vlan["id"] is not None):
                 parent = fakeinternet.get("name", "eth0")
-                self._cfg["interfaces"].insert(0, config.interface.for_port(
+                # insert before fakeinternet
+                self._cfg["interfaces"].insert(0, config.interfaces.for_port(
                     parent, "vlans on 'fakeiternet' vswitch", "vswitch"))
 
     def additional_configuration(self):
@@ -204,6 +205,9 @@ class FakeISP(Role):
             setup.append("rootinstall radvd.conf /etc")
             setup.service("radvd", "boot")
             setup.blank()
+
+        # fakeisp runs before vmhost, create the directory here; let vmhost role chmod & chown
+        setup.append("mkdir -p " + self._cfg["vm_images_path"])
 
         for file in ["add_boot_iso.sh", "rm_boot_iso.sh"]:
             util.file.copy_template(self.name, file, output_dir)

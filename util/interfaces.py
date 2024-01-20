@@ -3,7 +3,7 @@
 Files created by this module are usable by the ifupdown-ng package.
 It _will not_ be usable by the Alpine's default BusyBox ifupdown command or by
 the Debian's version from the ifupdown package."""
-import config.interface
+import config.interfaces
 
 
 def from_config(cfg: dict) -> str:
@@ -110,7 +110,7 @@ def _port(cfg: dict, iface: dict):
 
     # move wifi config from uplink to this interface
     if iface["uplink"]:
-        uplink = config.interface.find_by_name(cfg, iface["uplink"])
+        uplink = config.interfaces.find_by_name(cfg, iface["uplink"])
         _output_wifi(uplink, buffer)
         port = "\n".join(buffer).format_map(uplink)
 

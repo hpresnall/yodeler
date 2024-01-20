@@ -4,7 +4,7 @@ import os
 
 from roles.role import Role
 
-import config.interface as interface
+import config.interfaces as interfaces
 import config.vlan as vlan
 
 import util.file as file
@@ -36,7 +36,7 @@ class VmHost(Role):
             vswitch_name = vswitch["name"]
 
             # iface for vswitch itself
-            vswitch_interfaces.append(interface.for_port(vswitch_name, "vswitch", "vswitch"))
+            vswitch_interfaces.append(interfaces.for_port(vswitch_name, "vswitch", "vswitch"))
 
             vswitch_interfaces.extend(_create_uplink_ports(vswitch))
 
@@ -76,7 +76,7 @@ class VmHost(Role):
             self._cfg["prometheus_collectors"].extend(["cgroups"])
 
         # additional physical server config before running chroot during setup
-        self._cfg["before_chroot"] = file.substitute("templates/vmhost/before_chroot.sh", self._cfg)
+        self._cfg["before_chroot"].append(file.substitute("templates/vmhost/before_chroot.sh", self._cfg))
 
     def validate(self):
         pass
@@ -164,11 +164,11 @@ def _create_uplink_ports(vswitch: dict) -> list[dict]:
         return []
     elif len(uplinks) == 1:
         uplink = uplinks[0]
-        return [interface.for_port(uplink, f"uplink for vswitch {vswitch_name}", "uplink", vswitch_name, uplink)]
+        return [interfaces.for_port(uplink, f"uplink for vswitch {vswitch_name}", "uplink", vswitch_name, uplink)]
     else:
         ports = []
         for n, iface in enumerate(uplinks, start=1):
-            ports.append(interface.for_port(
+            ports.append(interfaces.for_port(
                 iface, f"uplink {n} of {len(uplinks)} for vswitch {vswitch_name}", "uplink", vswitch_name, iface))
         return ports
 
@@ -223,7 +223,7 @@ def _create_vswitch_uplink(vswitch, setup):
 
         uplink_name = bond_name  # use new uplink name for tagging, if needed
     else:
-        uplink_name = next(iter(uplinks))
+        uplink_name = uplinks[0]
 
         setup.comment(f"uplink for vswitch '{vswitch_name}'")
         setup.append(f"ovs-vsctl add-port {vswitch_name} {uplink_name}")

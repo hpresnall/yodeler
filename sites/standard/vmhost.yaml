@@ -24,7 +24,10 @@ install_interfaces: |
 # private key will be put on this server and it can be used as a jump box
 install_private_ssh_key: true
 packages: [ndisc6 tcpdump]
-# INSTALL DISK MUST BE CORRECT
-# installation will reformat this drive during the install
-root_dev: /dev/nvme0n1
-root_partition: p3
+disk: # optional; defaults to /dev/sda & partition 3
+  # can also be an array
+  # first and only disk => system disk for the OS
+  # THIS MUST BE CORRECT
+  # installation will reformat this drive during the install
+  path: /dev/nvme0n1
+  partition: p3

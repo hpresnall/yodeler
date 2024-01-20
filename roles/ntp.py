@@ -5,7 +5,7 @@ import util.shell
 import util.file
 import util.address
 
-import config.interface as interface
+import config.interfaces as interfaces
 
 from roles.role import Role
 
@@ -36,7 +36,7 @@ class NTP(Role):
                 raise KeyError(
                     f"host '{self._cfg['hostname']}' cannot configure aN NTP server with a DHCP address on interface '{iface['name']}'")
 
-        missing_vlans = interface.check_accessiblity(self._cfg["interfaces"],
+        missing_vlans = interfaces.check_accessiblity(self._cfg["interfaces"],
                                                      self._cfg["vswitches"].values())
 
         if missing_vlans:
@@ -55,7 +55,7 @@ def create_chrony_conf(cfg: dict, output_dir: str):
     if "ntp" in cfg["roles_to_hostnames"]:
         for ntp_server in cfg["roles_to_hostnames"]["ntp"]:
             ntp_server_interfaces = cfg["hosts"][ntp_server]["interfaces"]
-            ntp_addresses.extend(interface.find_ips_to_interfaces(cfg, ntp_server_interfaces))
+            ntp_addresses.extend(interfaces.find_ips_to_interfaces(cfg, ntp_server_interfaces))
     # else external_ntp will always be defined so chrony.conf will always be valid
 
     # do not run initstepslew at boot

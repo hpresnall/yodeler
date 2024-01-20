@@ -16,7 +16,10 @@ uplink:
   # note that eth0 _cannot_ also be an uplink for a vswitch
   # this is the WAN port on the router
   name: eth0
-# THIS MUST BE CORRECT
-# installation will reformat this drive during the install
-root_dev: /dev/nvme0n1
-root_partition: p3
+disk: # optional; defaults to /dev/sda & partition 3
+  # can also be an array
+  # first and only disk => system disk for the OS
+  # THIS MUST BE CORRECT
+  # installation will reformat this drive during the install
+  path: /dev/nvme0n1
+  partition: p3

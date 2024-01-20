@@ -87,16 +87,20 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
             continue
 
         host_cfg = host.load(site_cfg, os.path.join(site_dir, host_path))
-        
+
         if host_cfg["is_vm"]:
             total_vcpus += host_cfg["vcpus"]
             total_mem += host_cfg["memory_mb"]
-            total_disk += host_cfg["disk_size_mb"]
+
+            for disk in host_cfg["disks"]:
+                if disk["type"] == "img":
+                    total_disk += disk["size_mb"]
 
     _validate_full_site(site_cfg)
 
     _logger.info("loaded %d hosts for site '%s'", len(site_cfg["hosts"]), site_cfg["site_name"])
-    _logger.info("total VM resources used: %d vcpus, %d GB memory & %d GB disk", total_vcpus, round(total_mem / 1024), round(total_disk / 1024))
+    _logger.info("total VM resources used: %d vcpus, %d GB memory & %d GB disk",
+                 total_vcpus, round(total_mem / 1024), round(total_disk / 1024))
 
 
 def write_host_scripts(site_cfg: dict, output_dir: str):

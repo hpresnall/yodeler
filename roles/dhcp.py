@@ -3,7 +3,7 @@ import util.shell
 import util.file
 import util.address
 
-import config.interface as interface
+import config.interfaces as interfaces
 
 from roles.role import Role
 
@@ -20,7 +20,7 @@ class Dhcp(Role):
                 raise KeyError(
                     f"host '{self._cfg['hostname']}' cannot configure a DHCP server with a DHCP address on interface '{iface['name']}'")
 
-        accessible_vlans = interface.check_accessiblity(self._cfg["interfaces"],
+        accessible_vlans = interfaces.check_accessiblity(self._cfg["interfaces"],
                                                         self._cfg["vswitches"].values(),
                                                         lambda vlan: not vlan["dhcp4_enabled"] and not vlan["ipv6_subnet"])
 
@@ -100,7 +100,7 @@ class Dhcp(Role):
             # top-level domain will never have any DHCP hosts, so no need to configure DDNS forward / reverse zones
 
             # DNS servers for DDNS config; prefer IPv4 for updates
-            dns_addresses = interface.find_ips_to_interfaces(self._cfg, dns_server_interfaces)
+            dns_addresses = interfaces.find_ips_to_interfaces(self._cfg, dns_server_interfaces)
             ddns_dns_addresses = []
             for match in dns_addresses:
                 if "ipv4_address" in match:
@@ -114,7 +114,7 @@ class Dhcp(Role):
         for vswitch in self._cfg["vswitches"].values():
             for vlan in vswitch["vlans"]:
                 # dns server addresses for this vlan
-                dns_addresses = interface.find_ips_from_vlan(vswitch, vlan, dns_server_interfaces)
+                dns_addresses = interfaces.find_ips_from_vlan(vswitch, vlan, dns_server_interfaces)
                 dns4 = [str(match["ipv4_address"]) for match in dns_addresses if match["ipv4_address"]]
                 dns6 = [str(match["ipv6_address"]) for match in dns_addresses if match["ipv6_address"]]
                 ntp4 = []
@@ -122,7 +122,7 @@ class Dhcp(Role):
 
                 if ntp_servers:
                     for server in ntp_servers:
-                        ntp_addresses = interface.find_ips_from_vlan(vswitch, vlan, server["interfaces"])
+                        ntp_addresses = interfaces.find_ips_from_vlan(vswitch, vlan, server["interfaces"])
 
                         for ntp in ntp_addresses:
                             if ntp["ipv4_address"]:

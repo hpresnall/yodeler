@@ -1,6 +1,5 @@
-"""Configuration for an XFCE host."""
+"""Configuration for host with standard build & compile tools."""
 import util.shell as shell
-import util.disk as disk
 
 from roles.role import Role
 
@@ -26,27 +25,14 @@ class Build(Role):
         return packages
 
     def additional_configuration(self):
-        if self._cfg["is_vm"]:
-            # add an additional disk for builds so it can be persistent across VM instances
-            # create & format the image before running setup.sh in chroot
-            disk_path = self._cfg["vm_images_path"] + "/" + self._cfg["hostname"] + "_build.img"
-            size = int(self._cfg.setdefault("build_disk_size_mb", 128))
+        self._cfg["build_dir"] = "/build"
 
-            self._cfg["vm_disk_paths"].append(disk_path)
-
-            self._cfg["before_chroot"] = "log \"Setting up build disk image\"\n" + \
-                disk.create_disk_image(self._cfg['hostname'], disk_path, size, "BUILD_UUID")
-        elif "build_dev" in self._cfg:
-            # optionally use another disk on physcial servers
-            # if not set, a plain /build directory will be created instead
-            build_dev = parse.non_empty_string("build_dev", self._cfg, self._cfg["hostname"])
-
-            if build_dev == self._cfg["root_dev"]:
-                raise ValueError(
-                    f"build_dev={build_dev} cannot be the same as the system install location specified by 'root_dev'")
-
-            self._cfg["before_chroot"] = "log \"Setting up build disk image\"\n" + \
-                disk.format_disk(self._cfg["hostname"], build_dev, "BUILD_UUID")
+        # optional disk for builds, if defined
+        # otherwise just use a directory on the system disk
+        for disk in self._cfg["disks"]:
+            if disk["name"] == "build":
+                self._cfg["build_dir"] = parse.set_default_string("mountpoint", disk, "/build")
+                break
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -57,13 +43,9 @@ class Build(Role):
             raise ValueError("build server must set 'disk_size_mb' to at least 1,024")
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):
+        build_dir = self._cfg["build_dir"]
+
         user = self._cfg["user"]
-
-        if self._cfg["is_vm"]:
-            setup.append(disk.create_fstab_entry("BUILD_UUID", "/build"))
-        elif "build_dev" in self._cfg:
-            setup.append(disk.create_fstab_entry("BUILD_UUID", "/build"))
-
-        setup.append("mkdir /build")
-        setup.append(f"chown {user}:{user} /build")
-        setup.append("chmod 750 /build")
+        setup.append(f"mkdir {build_dir}")
+        setup.append(f"chown {user}:{user} {build_dir}")
+        setup.append(f"chmod 750 {build_dir}")

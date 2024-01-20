@@ -1,14 +1,13 @@
 """Common configuration & setup for all Alpine hosts."""
-import sys
-
-import util.shell as shell
-import util.file as file
+import util.awall
+import util.disks
+import util.dhcpcd
+import util.file
 import util.interfaces
 import util.libvirt
-import util.sysctl
-import util.awall
+import util.parse
 import util.resolv
-import util.dhcpcd
+import util.shell
 import util.sysctl
 
 from roles.role import Role
@@ -29,6 +28,11 @@ class Common(Role):
                 packages.add("ifupdown-ng-wifi")
                 break
 
+        # needed for checking existing partitions and getting UUIDs
+        for disk in self._cfg["disks"]:
+            if disk["type"] != "img":
+                packages.add("lsblk")
+
         return packages
 
     def additional_configuration(self):
@@ -36,12 +40,8 @@ class Common(Role):
         if self._cfg["primary_domain"]:
             self._cfg["fqdn"] = self._cfg["hostname"] + '.' + self._cfg["primary_domain"]
 
-        if self._cfg["is_vm"]:
-            # define the base disk for the VM image
-            # note that this image file is created and formatted in yodel.sh by alpine-make-vm-image
-            self._cfg["vm_disk_paths"] = [f"{self._cfg['vm_images_path']}/{self._cfg['hostname']}.img"]
-        elif self._cfg["metrics"]:
-            # metrics for physical hosts
+        if not self._cfg["is_vm"] and self._cfg["metrics"]:
+            # additional metrics for physical hosts
             self._cfg["prometheus_collectors"].extend(["edac", "hwmon", "nvme", "thermal_zone", "cpufreq"])
 
     def validate(self):
@@ -69,9 +69,9 @@ class Common(Role):
 
             vswitches_used.add(vswitch_name)
 
-    def write_config(self, setup: shell.ShellScript, output_dir: str):
+    def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         # write all packages to a file; usage depends on vm or physical server
-        file.write("packages", " ".join(self._cfg["packages"]), output_dir)
+        util.file.write("packages", " ".join(self._cfg["packages"]), output_dir)
 
         if self._cfg["is_vm"]:
             # VMs will use host's configured repositories & APK cache
@@ -100,7 +100,7 @@ class Common(Role):
         setup.substitute("templates/common/common.sh", self._cfg)
 
         # directly copy /etc/hosts
-        file.copy_template(self.name, "hosts", output_dir)
+        util.file.copy_template(self.name, "hosts", output_dir)
 
         if self._cfg["metrics"]:
             setup.append("log \"Configuring Prometheus\"")
@@ -115,7 +115,7 @@ class Common(Role):
         if self._cfg["local_firewall"]:
             util.awall.configure(self._cfg["interfaces"], self._cfg["roles"], setup, output_dir)
 
-        file.write("interfaces", util.interfaces.from_config(self._cfg), output_dir)
+        util.file.write("interfaces", util.interfaces.from_config(self._cfg), output_dir)
 
         util.sysctl.disable_ipv6(self._cfg, setup, output_dir)
 
@@ -135,30 +135,34 @@ class Common(Role):
             # dhcp6 or router advertisements will provide ipv6 dns config
             if not need_dhcp4:
                 # do not let ipv6 overwrite static ipv4 dns config
-                file.write("resolv.conf.head", util.resolv.create_conf(self._cfg), output_dir)
+                util.file.write("resolv.conf.head", util.resolv.create_conf(self._cfg), output_dir)
             # else dhcp4 and dhcp6 will provide all needed resolve.conf info
             util.dhcpcd.create_conf(self._cfg, output_dir)
             setup.service("dhcpcd", "boot")
+            setup.blank()
             util.sysctl.enable_temp_addresses(self._cfg, setup, output_dir)
         elif need_dhcp4:
             # no ipv6; dhcp4 will provide all needed resolve.conf info
             util.dhcpcd.create_conf(self._cfg, output_dir)
             setup.service("dhcpcd", "boot")
+            setup.blank()
         else:
             # static ipv4 and no ipv6 => static resolve.conf and no dhcpcd needed
-            file.write("resolv.conf", util.resolv.create_conf(self._cfg), output_dir)
+            util.file.write("resolv.conf", util.resolv.create_conf(self._cfg), output_dir)
 
         roles.ntp.create_chrony_conf(self._cfg, output_dir)
+
+        util.disks.from_config(self._cfg, setup)
 
         if self._cfg["is_vm"]:
             util.libvirt.write_vm_xml(self._cfg, output_dir)
 
             if self._cfg["host_backup"]:
-                setup.comment("mount backup on boot")
-                setup.append("echo \"backup /backup virtiofs relatime 0 0\" >> /etc/fstab")
+                setup.comment("mount /backup at boot")
+                setup.append("echo -e \"backup\\t/backup\\tvirtiofs\\trw,relatime\\t0\\t0\" >> /etc/fstab")
 
 
-def _setup_repos(cfg: dict, setup: shell.ShellScript):
+def _setup_repos(cfg: dict, setup: util.shell.ShellScript):
     setup.append("log \"Setting up APK repositories\"")
     setup.blank()
 

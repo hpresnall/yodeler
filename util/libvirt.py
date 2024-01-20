@@ -20,20 +20,30 @@ def write_vm_xml(cfg: dict, output_dir: str) -> None:
     disk_devs = set()
     disks = devices.findall("disk")
 
+    # for any existing disks in the template, ensure no duplicate names with disks that are added
     for disk in disks:
         target = disk.find("target")
         if (target is not None) and ("dev" in target.attrib):
             disk_devs.add(target.attrib["dev"])
 
-    for i, disk_path in enumerate(cfg["vm_disk_paths"]):
-        disk_dev = "vd" + chr(ord('a')+i)  # vda, vdb etc
+    idx = 0
+    for disk in cfg["disks"]:
+        if (disk["type"] == "img") or (disk["type"] == "device"):
+            # both need a device id on the vm like vda, vdb etc; make sure it is unique
+            disk_dev = "vd" + chr(ord('a')+idx)
 
-        # ensure unique dev name for each VM
-        while disk_dev in disk_devs:
-            disk_dev = "vd" + chr(ord('a')+i)
-        disk_devs.add(disk_dev)
+            while disk_dev in disk_devs:
+                idx += 1
+                disk_dev = "vd" + chr(ord('a')+idx)
+            disk_devs.add(disk_dev)
+            idx += 1
 
-        devices.append(create_disk(disk_dev, disk_path))
+            if (disk["type"] == "img"):
+                devices.append(_disk_img(disk["path"], disk_dev))
+            else:
+                devices.append(_disk_device(disk["path"], disk_dev))
+        elif disk["type"] == "passthrough":
+            devices.append(_disk_passthrough(disk["bus"], disk["slot"], disk["function"]))
 
     for iface in cfg["interfaces"]:
         if iface["type"] != "std":
@@ -50,19 +60,56 @@ def write_vm_xml(cfg: dict, output_dir: str) -> None:
     template.write(os.path.join(output_dir, cfg["hostname"] + ".xml"))
 
 
-def create_disk(disk_dev: str, disk_path: str) -> xml.Element:
-    """Create a <disk> XML element for the given disk.
+def _disk_img(img_path: str, host_dev: str) -> xml.Element:
+    """Create a <disk> XML element for the given image path.
 
-        <disk type="file" device="disk">
-        <driver name="qemu" type="raw" />
-        <source file="<path_to_img>" />
-        <target dev="<disk_name>" bus="virtio" />
-        </disk>
+    <disk type="file" device="disk">
+      <driver name="qemu" type="raw" />
+      <source file="{img_path}" />
+      <target dev="{host_dev}" bus="virtio" />
+    </disk>
     """
     disk = xml.Element("disk", {"type": "file", "device": "disk"})
     xml.SubElement(disk, "driver", {"name": "qemu", "type": "raw"})
-    xml.SubElement(disk, "source", {"file": disk_path})
-    xml.SubElement(disk, "target", {"dev": disk_dev, "bus": "virtio"})
+    xml.SubElement(disk, "source", {"file": img_path})
+    xml.SubElement(disk, "target", {"dev": host_dev, "bus": "virtio"})
+
+    return disk
+
+
+def _disk_device(dev_path: str, host_dev: str) -> xml.Element:
+    """Create a <disk> XML element for the given host path in /dev.
+
+    <disk type='block' device='disk'>
+      <driver name='qemu' type='raw'/>
+      <source dev='{dev_path}'/>
+      <target dev='{host_dev}' bus='virtio'/>
+    </disk>
+    """
+    disk = xml.Element("disk", {"type": "block", "device": "disk"})
+    xml.SubElement(disk, "driver", {"name": "qemu", "type": "raw"})
+    xml.SubElement(disk, "source", {"dev": dev_path})
+    xml.SubElement(disk, "target", {"dev": host_dev, "bus": "virtio"})
+
+    return disk
+
+
+def _disk_passthrough(bus: int, slot: int, function: int) -> xml.Element:
+    """Create a <disk> XML element for the given host path in /dev.
+    <hostdev mode='subsystem' type='pci' managed='yes'>
+      <source>
+        <address domain='0x0000' bus='0x00' slot='0x00' function='0x0'/>
+      </source>
+    </hostdev>
+    """
+    disk = xml.Element("hostdev", {"mode": "subsystem", "type": "pci", "managed": "yes"})
+    source = xml.SubElement(disk, "source")
+    xml.SubElement(source, "address", {
+        "domain": "0x0000",  # domain is always 0
+        "bus": f"{bus:#0{4}x}",  # padding count includex '0x'
+        "slot": f"{slot:#0{4}x}",
+        "function": f"{function:#0{3}x}"
+    })
 
     return disk
 
