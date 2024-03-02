@@ -1,7 +1,6 @@
 """Handles parsing and validating vlan configuration from site YAML files."""
 import logging
 import ipaddress
-import re
 
 import util.parse as parse
 
@@ -126,9 +125,6 @@ def _validate_vlan_subnet(vswitch_name: str, vlan: dict, ip_version: str):
         raise KeyError(f"{min_key} > {max_key} for vlan '{vlan_name}' for vswitch '{vswitch_name}'")
 
 
-_VALID_MAC = re.compile("^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$")
-
-
 def _validate_vlan_dhcp_reservations(vswitch_name: str, vlan: dict):
     reservations = vlan.setdefault("dhcp_reservations", [])
     cfg_name = f"vswitch['{vswitch_name}'].vlan['{vlan['name']}']"
@@ -157,12 +153,7 @@ def _validate_vlan_dhcp_reservations(vswitch_name: str, vlan: dict):
         _validate_ip_address("ipv6", i-1, vlan, vswitch_name, location)
 
         if "mac_address" in res:
-            mac = res["mac_address"]
-            if not isinstance(mac, str):
-                raise ValueError(f"invalid mac_address '{mac}' for {location}")
-            if not _VALID_MAC.match(mac.upper()):
-                # mac address case is up to the users of the reservations, but upper() for regex here
-                raise ValueError(f"invalid mac_address '{mac}' for {location}")
+            parse.validate_mac_address(res["mac_address"], location)
         else:
             raise ValueError(f"no 'mac_address' defined for {location}")
 

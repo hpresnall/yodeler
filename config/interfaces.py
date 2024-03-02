@@ -463,3 +463,37 @@ def _validate_prefix_len(iface: dict):
         raise ValueError(f"ipv6_pd_prefixlen {prefixlen} must be < 64")
     elif prefixlen < 48:
         raise ValueError(f"ipv6_pd_prefixlen {prefixlen} must be >= 48")
+
+
+def validate_renaming(cfg: dict):
+    """Validate rename_interfaces defined in the host, if any."""
+    if "rename_interface" in cfg:
+        renamings = cfg.pop("rename_interface")
+        cfg["rename_interfaces"] = renamings
+    elif "rename_interfaces" in cfg:
+        renamings = cfg["rename_interfaces"]
+    else:
+        # optional
+        return
+
+    # vm interfaces always seem to come up in order, so this should not be needed
+    # in addition, MAC addresses are currently assigned at first vm boot and are not known at config time
+    if cfg["is_vm"]:
+        raise KeyError("cannot rename interfaces on a virtual machine")
+
+    location = f"{cfg['hostname']}.rename_interfaces"
+
+    if not isinstance(renamings, list):
+        raise ValueError(f"{location} must be a list")
+
+    for i, rename in enumerate(renamings, start=1):
+        m_loc = location + f"[{i}]"
+
+        if not isinstance(rename, dict):
+            raise ValueError(f"{m_loc} must be a dict, not a {type(rename)}")
+
+        # must include name and valid MAC address
+        parse.non_empty_string("name", rename, m_loc)
+
+        mac_address = rename.get("mac_address")
+        parse.validate_mac_address(mac_address, m_loc)

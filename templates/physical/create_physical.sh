@@ -19,6 +19,15 @@ ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 # ensure apks needed for setup do not end up on the installed system unless required
 cp /etc/apk/world /tmp
 
+# rename interfaces to match what the installed system's configuration
+# this means that the 'install_interfaces' config value _must_ use the _renamed_ interface for setup
+if [ -f  $$DIR/rename-eth ]; then
+  log "Renaming interfaces"
+  cp $$DIR/rename-eth /tmp
+  chmod +x /tmp/rename-eth
+  /tmp/rename-eth start
+fi
+
 # install Alpine with answerfile
 log -e "\nInstalling Alpine for '$HOSTNAME' to $SYSTEM_DEV"
 setup-alpine -e -f $$DIR/answerfile > $$LOG 2>&1

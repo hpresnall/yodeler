@@ -119,6 +119,20 @@ class Common(Role):
 
         util.sysctl.disable_ipv6(self._cfg, setup, output_dir)
 
+        if "rename_interfaces" in self._cfg:
+            # create init script & add it to boot
+            rename_cmds = []
+            for rename in self._cfg["rename_interfaces"]:
+                rename_cmds.append(f"  rename_iface {rename['mac_address']} {rename['name']}")
+
+            util.file.write("rename-eth", util.file.substitute(
+                "templates/common/rename-eth", {"rename_cmds": "\n".join(rename_cmds)}), output_dir)
+
+            setup.comment("rename ethernet devices at boot")
+            setup.append("install -m 755 $DIR/rename-eth /etc/init.d")
+            setup.service("rename-eth", "sysinit")
+            setup.blank()
+
         # create resolve.conf as needed, based on dhcp and ipv6 configuration
         # this also determines the need for dhcpcd
         need_ipv6 = False

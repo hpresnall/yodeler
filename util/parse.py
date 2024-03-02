@@ -2,6 +2,8 @@
 
 These functions will raise ValueErrors or KeyErrors for invalid values.
 """
+import re
+
 from typing import cast
 from typing import Hashable
 
@@ -166,3 +168,17 @@ def configure_defaults(config_name: str, default_config: dict, default_types: di
                 cfg[key] = list(value)  # copy the list
             else:
                 cfg[key] = value
+
+
+_VALID_MAC = re.compile("^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$")
+
+
+def validate_mac_address(mac_address, location: str):
+    """Ensure the given MAC address is a string and represents a valid value.
+    Upper and lowercase are accepted as well as ':' or '-' separators."""
+
+    if not isinstance(mac_address, str):
+        raise ValueError(f"invalid mac_address '{mac_address}' for {location}")
+    if not _VALID_MAC.match(mac_address.upper()):
+        # mac address case is up to the client, but upper() for regex here
+        raise ValueError(f"invalid mac_address '{mac_address}' for {location}")

@@ -86,6 +86,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     for role in host_cfg["roles"]:
         role.configure_interfaces()
     config.interfaces.validate(host_cfg)
+    config.interfaces.validate_renaming(host_cfg)
     config.disks.validate(host_cfg)
 
     # aliases are validated against other hosts, interface vlan DHCP reservations and firewall static hosts

@@ -1,0 +1,54 @@
+#!/sbin/openrc-run
+# system service that renames network interfaces based on their MAC address
+# meant for physical systems with multiple network cards that, depending on
+# boot init order, are named differently each time
+
+# this service _must_ run at sysinit so interfaces are changed before anything uses them
+# run after sysfs is created, and all devices are loaded
+depend() {
+  depend hwdrivers devfs
+  need sysfs
+  after mdev udev
+}
+
+# use the list mac_iface pairs to map MAC addresses to the original iface name
+find_iface() {
+  # for splits by spaces
+  for mi in $$mac_iface; do
+    # split by '_'
+    mac=$${mi%_*}
+    iface=$${mi#*_}
+
+    if [ "$$mac" = "$$1" ]; then
+      echo $$iface
+      return
+    fi
+  done
+
+  # any command run with this iface will error
+  echo unknown
+}
+
+rename_iface() {
+  iface=$$(find_iface "$$1")
+  ebegin "  $$iface -> $$2"
+  ip link set dev $$iface name $$2
+}
+
+start() {
+  ebegin "Renaming network interfaces"
+
+  # build space separated list of mac_iface pairs here so the MAC addresses are only read once
+  mac_iface=""
+  for i in $$(ls -1 /sys/class/net/eth*/address); do
+    mac_iface="$$mac_iface $$(cat $$i)_$$(echo $$i | awk -F'/' -e '{print $$5}')"
+  done
+
+$RENAME_CMDS
+
+  eend 0
+}
+
+stop() {
+  return 0
+}
