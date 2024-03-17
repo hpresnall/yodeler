@@ -68,6 +68,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     # silently ignore attempts to overwrite site config
     host_yaml.pop("vswitches", None)
     host_yaml.pop("firewall", None)
+    host_yaml.pop("domain", None)
     host_yaml.pop("external_ntp", None)
     host_yaml.pop("external_dns", None)
 

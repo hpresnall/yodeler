@@ -14,7 +14,7 @@ def rptr_ipv4(subnet: ipaddress.IPv4Network) -> str:
     return rptr[len(prefix):]
 
 
-def hostpart_ipv4(address: ipaddress.IPv4Address):
+def hostpart_ipv4(address: ipaddress.IPv4Address) -> str:
     # last octet
     a = str(address)
     return a[a.rindex(".")+1:]
@@ -31,7 +31,7 @@ def rptr_ipv6(subnet: ipaddress.IPv6Network) -> str:
     return addr[idx:]
 
 
-def ipv6_hostpart(address: ipaddress.IPv6Address, prefixlen: int) -> str:
+def hostpart_ipv6(address: ipaddress.IPv6Address, prefixlen: int) -> str:
     # remove leading 0:'s from reverse, one for each hex digit
     # note this _breaks_ for subnets not divisible by 4
     idx = int(prefixlen / 4) * 2  # 2 for 0.

@@ -1,0 +1,10 @@
+{
+  "description": "allow DDNS / nsupdates directly to the DNS server, bypassing the recursor",
+  "filter": [
+    {
+      "in": [],
+      "service": "ddns",
+      "action": "accept"
+    }
+  ]
+}

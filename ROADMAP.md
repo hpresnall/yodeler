@@ -29,7 +29,7 @@
 ## DNS
 - [x] Basic BIND 9 configuration
 - [x] YAML-based configuration for additional DNS entries
-- [ ] Replace Bind with PowerDNS
+- [x] Replace Bind with PowerDNS
 - [ ] Add / update IPv6 SLAAC addresses
 - [ ] DNSSEC
 

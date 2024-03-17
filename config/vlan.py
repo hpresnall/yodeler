@@ -68,6 +68,10 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
             raise KeyError(
                 f"vlan '{vlan_name}' domain '{vlan['domain']}' is not in top-level domain '{domain}' for vswitch '{vswitch_name}'")
 
+        # single vlan's domain is the site domain
+        if not vlan["domain"] and (len(vlans) == 1):
+            vlan["domain"] = domain
+
         ipv6_pd_network = vlan.setdefault("ipv6_pd_network", None)
         if ipv6_pd_network is not None:
             if not isinstance(ipv6_pd_network, int):

@@ -21,8 +21,8 @@ class Dhcp(Role):
                     f"host '{self._cfg['hostname']}' cannot configure a DHCP server with a DHCP address on interface '{iface['name']}'")
 
         accessible_vlans = interfaces.check_accessiblity(self._cfg["interfaces"],
-                                                        self._cfg["vswitches"].values(),
-                                                        lambda vlan: not vlan["dhcp4_enabled"] and not vlan["ipv6_subnet"])
+                                                         self._cfg["vswitches"].values(),
+                                                         lambda vlan: not vlan["dhcp4_enabled"] and not vlan["ipv6_subnet"])
 
         if accessible_vlans:
             raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {accessible_vlans}")
@@ -104,9 +104,9 @@ class Dhcp(Role):
             ddns_dns_addresses = []
             for match in dns_addresses:
                 if "ipv4_address" in match:
-                    ddns_dns_addresses.append({"ip-address": str(match["ipv4_address"])})
+                    ddns_dns_addresses.append({"ip-address": str(match["ipv4_address"]), "port": 553})
                 else:
-                    ddns_dns_addresses.append({"ip-address": str(match["ipv6_address"])})
+                    ddns_dns_addresses.append({"ip-address": str(match["ipv6_address"]), "port": 553})
 
         ddns = False  # only use ddns if vlans have domain names defined
 
@@ -133,7 +133,7 @@ class Dhcp(Role):
                 domains = []
                 if vlan["domain"]:  # more specific domain first
                     domains.append(vlan["domain"])
-                if self._cfg["domain"]:
+                if self._cfg["domain"] and (self._cfg["domain"] != vlan["domain"]):
                     domains.append(self._cfg["domain"])
 
                 subnet4 = {}

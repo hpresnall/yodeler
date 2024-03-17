@@ -397,7 +397,10 @@ def _add_shorewall_host_config(cfg: dict, shorewall: dict, routable_vlans: list[
                 ipv6 = host_vlan['ipv4']
 
                 if role.name == "dns":
-                    rule = f"DNS(ACCEPT)\t{vlan}\t{name}"
+                    # DNS and nsupdate
+                    rule = f"DNS(ACCEPT)\t{vlan}\t{name}\n"
+                    rule += f"ACCEPT\t{vlan}\t{name}\ttcp\t553\n"
+                    rule += f"ACCEPT\t{vlan}\t{name}\tudp\t553"
                     if idx == 0:
                         rule = f"# {role.name.upper()} role for {host['hostname']}\nDNS(ACCEPT)\t$FW\t{name}\n{rule}"
                     if ipv4:

@@ -27,9 +27,11 @@ def create_conf(cfg: dict) -> str:
 
     if dns_addresses:
         # search local domains if there is local DNS
-        search_domains.append(cfg["domain"])
+        if cfg["domain"]:
+            search_domains.append(cfg["domain"])
 
-        buffer.append("search {}".format(" ".join(search_domains)))
+        if search_domains:
+            buffer.append("search {}".format(" ".join(search_domains)))
 
         nameservers = [str(match["ipv4_address"]) for match in dns_addresses if match["ipv4_address"]]
         nameservers.extend([str(match["ipv6_address"]) for match in dns_addresses if match["ipv6_address"]])

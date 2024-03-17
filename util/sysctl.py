@@ -83,6 +83,13 @@ def enable_ipv6_forwarding(setup: shell.ShellScript, output_dir: str):
 
     _logger.debug("enabled ipv6 forwarding")
 
+def enable_tcp_fastopen(setup: shell.ShellScript, output_dir: str):
+    sysctl_conf = []
+    sysctl_conf.append("# enable TCP fast open")
+
+    sysctl_conf.append("net.ipv4.tcp_fastopen = 3\n")
+
+    _create_file("tcp_fast_open", sysctl_conf, setup, output_dir)
 
 def _create_file(name: str, sysctl_conf: list[str], setup: shell.ShellScript, output_dir: str):
     name += ".conf"
@@ -90,3 +97,4 @@ def _create_file(name: str, sysctl_conf: list[str], setup: shell.ShellScript, ou
 
     setup.append(f"rootinstall $DIR/{name} /etc/sysctl.d")
     setup.blank()
+
