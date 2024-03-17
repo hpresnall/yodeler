@@ -17,12 +17,13 @@ $BEFORE_CHROOT
 # run commands due to library permission / loader issues
 umask 022
 
-# create the virtual machine
-# run setup.sh inside a chroot of the VM's filesystem
-log "Building VM image"
-# log differently if setup fails
+# log failure and exit if alpine-make-vm-image fails
 trap - ERR
 set +o errexit
+
+log "Building VM image"
+# create the virtual machine
+# run setup.sh inside a chroot of the VM's filesystem
 $VM_IMAGES_PATH/alpine-make-vm-image/alpine-make-vm-image \
   --image-format raw \
   --serial-console \
@@ -33,11 +34,14 @@ $VM_IMAGES_PATH/alpine-make-vm-image/alpine-make-vm-image \
   --script-chroot \
   $VM_IMAGES_PATH/$HOSTNAME.img \
   $$DIR/setup.sh
+
 if [ "$$?" != 0 ]; then
   log "Unsuccessful Yodel for vm '$HOSTNAME'; see $$LOG for full details"
   exit 1
 fi
-trap exception ERR
+
+# restore original logging on error
+trap error ERR
 set -o errexit
 
 # define the VM
@@ -61,6 +65,8 @@ if [ "$$AUTOSTART" = "True" ]; then
   virsh autostart $HOSTNAME
 fi
 
+# added for manual rebuilds to immediately start the vm
+# not called during normal setup 
 if [ "$$1" = "start" ]; then
   log "Starting VM '$HOSTNAME'"
   virsh start $HOSTNAME

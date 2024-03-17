@@ -5,7 +5,7 @@ fi
 
 LOG_DIR=$$SITE_DIR/logs/$$START_TIME
 mkdir -p "$$LOG_DIR"
-LOG=$$LOG_DIR/$HOSTNAME
+LOG=$$LOG_DIR/$HOSTNAME.log
 
 if [ -t 4 ]; then
   # for chroot and subshells, continue using parent's stdout at fd 4

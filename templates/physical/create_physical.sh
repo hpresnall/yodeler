@@ -84,14 +84,17 @@ mount --make-private "$$INSTALLED"/dev
 mount --bind /sys "$$INSTALLED"/sys
 mount --make-private "$$INSTALLED"/sys
 
-log -e "\nRunning setup for '$HOSTNAME' in chroot"
 # run the rest of the script even if setup.sh fails
 trap - ERR
 set +o errexit
+
+log -e "\nRunning setup for '$HOSTNAME' in chroot"
 # note running scripts _copied_ into the installed system
 chroot "$$INSTALLED" /bin/sh -c "cd /root/$SITE_NAME/$HOSTNAME; ./setup.sh"
 RESULT=$$?
-trap exception ERR
+
+# restore original logging
+trap error ERR
 set -o errexit
 
 # mount status gets reset sometimes; ensure still writable

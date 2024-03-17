@@ -1,5 +1,5 @@
 diff --git a/alpine-make-vm-image b/alpine-make-vm-image
-index 6c962d5..c91c57b 100755
+index 341a656..d8ad4d0 100755
 --- a/alpine-make-vm-image
 +++ b/alpine-make-vm-image
 @@ -288,6 +288,10 @@ prepare_chroot() {
@@ -37,13 +37,16 @@ index 6c962d5..c91c57b 100755
  #-----------------------------------------------------------------------
  if [ "$FS_SKEL_DIR" ]; then
  	einfo "Copying content of $FS_SKEL_DIR into image"
-@@ -736,7 +737,11 @@ if grep -qw "$RESOLVCONF_MARK" etc/resolv.conf 2>/dev/null; then
+@@ -736,7 +737,14 @@ if grep -qw "$RESOLVCONF_MARK" etc/resolv.conf 2>/dev/null; then
  	EOF
  fi
  
 -rm -Rf var/cache/apk/* ||:
 +if [ -n "$apk_cache_dir" ]; then
-+    rm etc/apk/cache >/dev/null 2>&1
++    # remove symlink and dir created by bind mount
++    rm etc/apk/cache >/dev/null ||:
++    umount $mount_dir/$apk_cache_dir ||:
++    rm $mount_dir/$apk_cache_dir ||:
 +else
 +    rm -Rf var/cache/apk/* ||:
 +fi

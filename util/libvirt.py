@@ -106,7 +106,7 @@ def _disk_passthrough(bus: int, slot: int, function: int) -> xml.Element:
     source = xml.SubElement(disk, "source")
     xml.SubElement(source, "address", {
         "domain": "0x0000",  # domain is always 0
-        "bus": f"{bus:#0{4}x}",  # padding count includex '0x'
+        "bus": f"{bus:#0{4}x}",  # padding count includes '0x'
         "slot": f"{slot:#0{4}x}",
         "function": f"{function:#0{3}x}"
     })

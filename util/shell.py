@@ -65,6 +65,9 @@ class ShellScript():
         All scripts should use the log() function rather than echo."""
         self.append(util.file.substitute("templates/common/logging.sh", {"hostname": hostname}))
         self.add_log_function()
+
+        # add trap to log on errors before exiting
+        # scripts should add 'set -o errexit' beforehand
         self.append(f"""error () {{
   log "Unexpected error during setup of '{hostname}'; see $LOG for details"
 }}

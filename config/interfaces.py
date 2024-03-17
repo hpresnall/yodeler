@@ -24,28 +24,30 @@ def validate(cfg: dict):
     names = set()
 
     for i, iface in enumerate(ifaces, start=1):
-        parse.non_empty_dict("iface " + str(i), iface)
+        location = f"cfg[{cfg['hostname']}].iface[{i}]"
+
+        parse.non_empty_dict(location, iface)
 
         if "name" in iface:
-            iface["name"] = parse.non_empty_string("name", iface, f"iface {i} on host '{cfg['hostname']}'")
+            iface["name"] = parse.non_empty_string("name", iface, location)
         else:
             iface["name"] = f"eth{iface_counter}"
             iface_counter += 1
 
         if iface["name"] in names:
-            raise ValueError(f"duplicate interface name {iface['name']} on host '{cfg['hostname']}")
+            raise ValueError(f"duplicate interface name {iface['name']} for {location}")
         names.add(iface["name"])
 
         try:
             parse.set_default_string("type", iface, "std")
-            types = {"std", "vlan", "port", "uplink"}
-            if iface["type"] not in types:
-                raise KeyError(f"only {type} interface types are supported")
             _validate_network(iface, vswitches)
             _validate_iface(iface)
         except KeyError as err:
             msg = err.args[0]
-            raise KeyError(f"{msg} for interface {i} on host '{cfg['hostname']}': '{iface['name']}'") from err
+            raise KeyError(f"{msg} for {location}") from err
+        except ValueError as err:
+            msg = err.args[0]
+            raise ValueError(f"{msg} for {location}") from err
 
         # host's primary domain, if set, should match one vlan
         vlan = iface["vlan"]
@@ -77,7 +79,7 @@ def _validate_network(iface: dict, vswitches: dict):
             else:
                 vswitch = vswitches.get(vswitch_name)
                 if iface["vswitch"] is None:
-                    raise KeyError(f"invalid vswitch '{vswitch_name}'")
+                    raise ValueError(f"invalid vswitch '{vswitch_name}'")
                 # do not return; continue checking for vlan
         case "vlan":
             # already validated in for_vlan()
@@ -90,7 +92,7 @@ def _validate_network(iface: dict, vswitches: dict):
 
     # for std interfaces and uplinks for vswitches, confirm the vlan
     if vswitch is None:
-        raise KeyError(f"invalid vswitch '{vswitch_name}'")
+        raise ValueError(f"invalid vswitch '{vswitch_name}'")
 
     # check vlan for uplink and standard ifaces
     iface["vswitch"] = vswitch
@@ -112,8 +114,7 @@ def _validate_iface(iface: dict):
 
     if address == "dhcp":
         if not vlan["dhcp4_enabled"]:
-            _logger.warning(
-                f"ipv4 dhcp requested but vlan '{vlan['name']}' has 'dhcp4_enabled' set to false no DHCP request will be made")
+            raise ValueError(f"ipv4 dhcp requested but vlan '{vlan['name']}' has 'dhcp4_enabled' set to false")
     else:
         _validate_ipaddress(iface, "ipv4")
 
