@@ -123,6 +123,14 @@ else
 fi
 sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
 """)
+            if not local:
+                setup.service("local")
+
+            file.write("vfio.start", "\n".join(
+                ["# ensure vfio is writable for PCI passthrough", "chmod 666 /dev/vfio/vfio"]), output_dir)
+            setup.append("install -o root -g root -m 750 $DIR/vfio.start /etc/local.d")
+            setup.append("sed -i -e \"s/after/after local/g\" /etc/init.d/libvirt.d")
+            setup.blank()
 
         # patch for alpine-make-vm-image if it exists
         if os.path.isfile("templates/vmhost/patch"):
