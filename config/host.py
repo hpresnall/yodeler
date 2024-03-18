@@ -346,6 +346,14 @@ def _bootstrap_physical(cfg: dict, output_dir: str):
             # system disk type must be 'device' per config allowed in disks.py
             cfg["system_dev"] = disk["path"]
             cfg["system_partition"] = disk["partition"]
+
+            # for the actual Alpine install, use the real path of the disk
+            # using by-id will cause that path to end up in fstab which will be unable to boot
+            # assume answerfile is sourced by installer and the shell will interperet the value
+            if "/dev/disk/by-id" in disk["path"]:
+                cfg["system_dev_real"] = f"$(cd /dev/disk/by-id/; realpath {disk['path']})"
+            else:
+                cfg["system_dev_real"] = disk["path"]
             break
 
     # boot with install media; run /media/<install_dev>/<site>/<host>/yodel.sh

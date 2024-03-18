@@ -4,7 +4,7 @@ import re
 import util.parse as parse
 
 # like 00:00.0
-_VALID_PCI_ADDRESS = re.compile("^([0-9A-F]{2}):([0-9A-F]{2})\\.([09-A-F])$")
+_VALID_PCI_ADDRESS = re.compile("^([0-9A-F]{2,4}):([0-9A-F]{2})\\.([09-A-F])$")
 
 
 def validate(cfg: dict):
@@ -56,6 +56,8 @@ def validate(cfg: dict):
             path = disk.setdefault("path", f"{cfg['vm_images_path']}/{cfg['hostname']}{postfix}.img")
 
             int(disk.setdefault("size_mb", "1024"))
+
+            disk["partition"] = ""
             parse.set_default_string("fs_type", disk, "ext4")
         elif "device" == type:
             # require /dev/ path; optional partition
@@ -64,8 +66,7 @@ def validate(cfg: dict):
             if not path.startswith("/dev/"):
                 raise ValueError(f"{location}.path '{path}' does not start with /dev/")
 
-            partition = disk["partition"] = str(disk.setdefault("partition", ""))
-            path += partition
+            disk["partition"] = str(disk.setdefault("partition", ""))
             parse.set_default_string("fs_type", disk, "ext4")
         elif "passthrough" == type:
             if not cfg["is_vm"]:
@@ -74,12 +75,13 @@ def validate(cfg: dict):
                 # not difficult, but easier to just force 'device' disks pointing directly to the /dev path
                 raise ValueError(f"{location}: cannot create 'passthrough' disk for physical server")
 
-            # require PCI address & id from /dev/disk/by-id
-            address = parse.non_empty_string("address", disk, location)
-            id = parse.non_empty_string("id", disk, location)
+            # require path & PCI address
+            # path is used during setup to mount the disk inside of chroot
+            path = parse.non_empty_string("path", disk, location)
+            address = parse.non_empty_string("pci_address", disk, location)
 
-            if address == id:
-                raise ValueError(f"{location}.address '{address}' cannot be the same as 'id'")
+            if not path.startswith("/dev/"):
+                raise ValueError(f"{location}.path '{path}' does not start with /dev/")
 
             match = _VALID_PCI_ADDRESS.match(address.upper())
             if not match:
@@ -91,11 +93,13 @@ def validate(cfg: dict):
             disk["slot"] = int(match.group(2), 16)
             disk["function"] = int(match.group(3), 16)
 
-            # use address as path to ensure no duplicates
-            path = address
-            # do not set fs_type; assume role will configure as neede
+            # do not set fs_type; assume role will configure as needed
+            disk["partition"] = ""  # only support complete devices
         else:
             raise ValueError(f"unknown {location}.type '{type}'; it must be 'img', 'device' or 'passthrough'")
+
+        disk["path"] = path
+        path += disk["partition"]
 
         if path in paths:
             raise ValueError(f"duplicate disk path '{path}' for {location}")
@@ -110,7 +114,7 @@ def validate(cfg: dict):
             disks.insert(0, system_disk)
 
         if not cfg["is_vm"] and (system_disk["type"] != "device"):
-            raise ValueError(f"physical host '{cfg['hostname']}' system disk type must be 'dev'")
+            raise ValueError(f"physical host '{cfg['hostname']}' system disk type must be 'device'")
     else:
         if cfg["is_vm"]:
             # this image file will be created and formatted in yodel.sh by alpine-make-vm-image

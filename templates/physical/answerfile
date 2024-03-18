@@ -23,5 +23,5 @@ USEROPTS="-a -f $USER $USER"
 # install EFI system to $SYSTEM_DEV
 export DISKLABEL=gpt
 export USE_EFI=yes
-export ERASE_DISKS=$SYSTEM_DEV
-DISKOPTS="-m sys $SYSTEM_DEV"
+export ERASE_DISKS=$SYSTEM_DEV_REAL
+DISKOPTS="-m sys $SYSTEM_DEV_REAL"

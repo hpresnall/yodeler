@@ -29,5 +29,6 @@ disk: # optional; defaults to /dev/sda & partition 3
   # first and only disk => system disk for the OS
   # THIS MUST BE CORRECT
   # installation will reformat this drive during the install
+  # if there is more than one disk on the system, using /dev/disk/by-id may be more stable
   path: /dev/nvme0n1
   partition: p3

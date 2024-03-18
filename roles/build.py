@@ -46,6 +46,6 @@ class Build(Role):
         build_dir = self._cfg["build_dir"]
 
         user = self._cfg["user"]
-        setup.append(f"mkdir {build_dir}")
+        setup.append(f"mkdir -p {build_dir}")
         setup.append(f"chown {user}:{user} {build_dir}")
         setup.append(f"chmod 750 {build_dir}")
