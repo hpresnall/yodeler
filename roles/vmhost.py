@@ -179,17 +179,47 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
         file.copy_template(self.name, "network_hook", output_dir)
         file.copy_template(self.name, "qemu_hook", output_dir)
 
-        # libvirt hook script for startup
-        sriov = []
+        # libvirt hook script for daemon startup
+        # create a code block for each SRIOV interface
+        # config then requires setup for each virtual function
+        vf_cfg_template = string.Template(file.read_template(self.name, "sriov.sh"))
+        vf_cfg = []
+
+        # virtual functions are variable so just substitue the variable name for the interface
+        disable_vf_ipv6 = []
+        sysctl.add_disable_ipv6_to_script(disable_vf_ipv6, "$vf", "    ")
+        disable_vf_ipv6 = "\n".join(disable_vf_ipv6)
+
         for uplink, count in self._cfg["vf_counts"].items():
-            sriov.append(f"echo {count} > /sys/class/net/{uplink}/device/sriov_numvfs")
-        file.write("daemon_hook", file.substitute(self.name, "daemon_hook", {"sriov": "\n".join(sriov)}), output_dir)
+            disable_uplink_ipv6 = []
+            sysctl.add_disable_ipv6_to_script(disable_uplink_ipv6, uplink, "  ")
+
+            vf_cfg.append(vf_cfg_template.substitute({
+                "UPLINK": uplink, "COUNT": count,
+                "DISABLE_UPLINK_IPV6": "\n".join(disable_uplink_ipv6),
+                "DISABLE_VF_IPV6": disable_vf_ipv6}))
+
+        # combine all vf configs into a single substitution in the daemon script
+        file.substitute_and_write(self.name, "daemon_hook", {"sriov": "\n".join(vf_cfg)}, output_dir)
 
         file.copy_template(self.name, "logrotate-openvswitch", output_dir)
         setup.append("rootinstall $DIR/logrotate-openvswitch /etc/logrotate.d/openvswitch")
         setup.blank()
 
-        setup.append(file.substitute(self.name, "site_build.sh", self._cfg))
+        # setup the site build image
+        # also create a stand-along script for bootstrapping a new image if needed
+        site_build = file.substitute(self.name, "site_build.sh", self._cfg)
+        setup.append(site_build)
+
+        create_build = shell.ShellScript("create_build_img.sh")
+        create_build.append_self_dir()
+        create_build.append("""
+log () {
+  echo $*
+}
+""")
+        create_build.append(site_build)
+        create_build.write_file(output_dir)
 
         # call yodel.sh for each VM
         setup.comment("run yodel.sh for each VM for this site")
