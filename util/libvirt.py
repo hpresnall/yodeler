@@ -142,13 +142,33 @@ def macvtap_interface(cfg: dict, iface_name: str) -> xml.Element:
       <model type="virtio" />
     </interface>
     """
-    for vswitch in cfg["vswitches"].values():
-        if "uplink" in vswitch and vswitch["uplink"] == iface_name:
-            raise KeyError((f"invalid router uplink; cannot reuse uplink {iface_name} from vswitch {vswitch['name']}"))
-
     interface = xml.Element("interface", {"type": "direct"})
     xml.SubElement(interface, "source", {"dev": iface_name, "mode": "private"})
     xml.SubElement(interface, "model", {"type": "virtio"})
+
+    return interface
+
+
+def passthrough_interface(cfg: dict, bus: int, slot: int, function: int) -> xml.Element:
+    """Create an <interface> XML element that uses PCI passthrough to connect the host's iface to the VM.
+    The given iface_name is the name of the interface _on the host_.
+
+    <interface type="hostdev" managed="yes">       
+      <driver name='vfio'/>           
+      <source>                                                                   
+        <address type='pci' domain='0x0000' bus='0x01' slot='0x06' function='0x0'/>
+      </source>
+    </interface>
+    """
+    interface = xml.Element("interface", {"type": "hostdev", "managed": "yes"})
+    xml.SubElement(interface, "driver", {"name  ": "vfio"})
+    source = xml.SubElement(interface, "source")
+    xml.SubElement(source, "address",  {"type": "pci",
+                                        "domain": "0x0000",  # domain is always 0
+                                        "bus": f"{bus:#0{4}x}",  # padding count includes '0x'
+                                        "slot": f"{slot:#0{4}x}",
+                                        "function": f"{function:#0{3}x}"
+                                        })
 
     return interface
 

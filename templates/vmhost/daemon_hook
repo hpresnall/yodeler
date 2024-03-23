@@ -1,0 +1,13 @@
+#!/bin/sh
+# see https://www.libvirt.org/hooks.html
+# expecting command line args like '- start - start'
+
+if [ "$$2" = "start" ]; then
+  # ensure vfio is writable for PCI passthrough
+  if [ -f /dev/vfio/vfio ]; then
+    chmod 666 /dev/vfio/vfio
+  fi
+
+  # setup SR-IOV if needed for network passthrough
+  $SRIOV
+fi

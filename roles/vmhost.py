@@ -79,7 +79,55 @@ class VmHost(Role):
         self._cfg["before_chroot"].append(file.substitute("templates/vmhost/before_chroot.sh", self._cfg))
 
     def validate(self):
-        pass
+        # ensure no reused PCI addresses, uplink interfaces, disk images or disk devices
+        uplinks = set()
+        addresses = set()
+        disks = set()
+
+        # also track SRIOV virtual function counts by interface name
+        vf_counts = {}
+
+        for host in self._cfg["hosts"].values():
+            if "uplink" in host:
+                if "macvtap" in host["uplink"]:
+                    uplink = host["uplink"]["macvtap"]
+
+                    if uplink in uplinks:
+                        raise ValueError(f"cannot reuse interface {uplink} for uplink in host {host['hostname']}")
+
+                    uplinks.add(uplink)
+                elif "passthrough" in host["uplink"]:
+                    address = host["uplink"]["passthrough"]["pci_address"]
+                    uplink = host["uplink"]["passthrough"]["name"]
+
+                    if address in addresses:
+                        raise ValueError(f"cannot reuse PCI address {address} for uplink in host {host['hostname']}")
+                    if uplink in uplinks:
+                        raise ValueError(f"cannot reuse interface {uplink} for uplink in host {host['hostname']}")
+
+                    addresses.add(address)
+                    uplinks.add(uplink)
+                    if uplink in vf_counts:
+                        vf_counts[uplink] += 1
+                    else:
+                        vf_counts[uplink] = 1
+
+            for disk in host["disks"]:
+                path = disk["path"]
+
+                if path in disks:
+                    raise ValueError(f"cannot reuse disk {path} in host {host['hostname']}")
+
+                disks.add(path)
+
+                if disk["type"] == "passthrough":
+                    address = disk["pci_address"]
+                    if address in addresses:
+                        raise ValueError(f"cannot reuse PCI address {address} for uplink in host {host['hostname']}")
+
+                    addresses.add(address)
+
+        self._cfg["vf_counts"] = vf_counts
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         _setup_open_vswitch(self._cfg, setup,)
@@ -123,22 +171,21 @@ else
 fi
 sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
 """)
-            if not local:
-                setup.service("local")
-
-            file.write("vfio.start", "\n".join(
-                ["# ensure vfio is writable for PCI passthrough", "chmod 666 /dev/vfio/vfio"]), output_dir)
-            setup.append("install -o root -g root -m 750 $DIR/vfio.start /etc/local.d")
-            setup.append("sed -i -e \"s/after/after local/g\" /etc/init.d/libvirt.d")
-            setup.blank()
 
         # patch for alpine-make-vm-image if it exists
         if os.path.isfile("templates/vmhost/patch"):
             file.copy_template(self.name, "patch", output_dir)
 
-        # network hook scripts
+        # libvirt hook scripts for network
         file.copy_template(self.name, "network_hook", output_dir)
         file.copy_template(self.name, "qemu_hook", output_dir)
+
+        # libvirt hook script for startup
+        sriov = []
+        for uplink, count in self._cfg["vf_counts"].items():
+            sriov.append(f"echo {count} > /sys/class/net/{uplink}/device/sriov_numvfs")
+        file.write("daemon_hook", file.substitute(
+            "templates/vmhost/daemon_hook", {"sriov": "\n".join(sriov)}), output_dir)
 
         file.copy_template(self.name, "logrotate-openvswitch", output_dir)
         setup.append("rootinstall $DIR/logrotate-openvswitch /etc/logrotate.d/openvswitch")

@@ -130,6 +130,10 @@ class Router(Role):
             # uplink can be an existing vswitch or a physical iface on the host via macvtap
             if "macvtap" in uplink:
                 uplink_xml = util.libvirt.macvtap_interface(self._cfg, uplink["macvtap"])
+            elif "passthrough" in uplink:
+                passthrough = uplink["passthrough"]
+                uplink_xml = util.libvirt.passthrough_interface(
+                    self._cfg, passthrough["bus"], passthrough["slot"], passthrough["function"])
             else:  # use vswitch+vlan
                 uplink_xml = util.libvirt.interface_from_config(self._cfg["hostname"], uplink)
 

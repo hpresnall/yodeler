@@ -100,7 +100,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     # allow role.additional_packages() to use interfaces, aliases and additional config
     _configure_packages(site_cfg, host_yaml, host_cfg)
 
-    # note role.validate() is called _after_ all hosts are loaded
+    # note role.validate() is called _after_ all hosts are loaded in site.py
 
     return host_cfg
 

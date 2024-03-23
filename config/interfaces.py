@@ -7,6 +7,7 @@ from typing import Callable
 import config.vlan
 
 import util.parse as parse
+import util.pci as pci
 
 _logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def validate(cfg: dict):
         try:
             parse.set_default_string("type", iface, "std")
             _validate_network(iface, vswitches)
-            _validate_iface(iface)
+            _validate_iface(iface, location)
         except KeyError as err:
             msg = err.args[0]
             raise KeyError(f"{msg} for {location}") from err
@@ -102,7 +103,7 @@ def _validate_network(iface: dict, vswitches: dict):
     iface["firewall_zone"] = str(iface.get("firewall_zone", iface["vlan"]["name"])).upper()
 
 
-def _validate_iface(iface: dict):
+def _validate_iface(iface: dict, location: str):
     """Validate a single interface."""
     # vlan set by validate_network
     vlan = iface["vlan"]
@@ -114,7 +115,8 @@ def _validate_iface(iface: dict):
 
     if address == "dhcp":
         if not vlan["dhcp4_enabled"]:
-            raise ValueError(f"ipv4 dhcp requested but vlan '{vlan['name']}' has 'dhcp4_enabled' set to false")
+            raise ValueError(f"{location} ipv4 dhcp requested but vlan " +
+                             f"'{vlan['name']}' has 'dhcp4_enabled' set to false")
     else:
         _validate_ipaddress(iface, "ipv4")
 
@@ -124,9 +126,9 @@ def _validate_iface(iface: dict):
         try:
             iface["ipv4_gateway"] = ipaddress.ip_address(iface["ipv4_gateway"])
         except ValueError as ve:
-            raise ValueError(f"invalid 'ipv4_gateway' '{gateway}'") from ve
+            raise ValueError(f"{location} invalid 'ipv4_gateway' '{gateway}'") from ve
         if iface["ipv4_gateway"] not in subnet:
-            raise ValueError(f"invalid 'ipv4_gateway' '{gateway}'; it is not in subnet {subnet}")
+            raise ValueError(f"{location} invalid 'ipv4_gateway' '{gateway}'; it is not in subnet {subnet}")
     elif iface["vlan"]["routable"]:
         iface["ipv4_gateway"] = iface["vlan"]["ipv4_subnet"].network_address + 1
     else:
@@ -153,18 +155,18 @@ def _validate_iface(iface: dict):
         if (iface["type"] == "uplink") and (vlan["id"] == -1):
             # for uplinks with hardcoded ip addresess, a subnet is required
             if "ipv6_subnet" not in iface:
-                raise KeyError("ipv6_subnet must be set when using static ipv6_address")
+                raise KeyError(f"{location} ipv6_subnet must be set when using static ipv6_address")
             try:
                 iface["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
             except ValueError as ve:
-                raise ValueError("invalid ipv6_subnet defined") from ve
+                raise ValueError(f"{location} invalid ipv6_subnet defined") from ve
 
         _validate_ipaddress(iface, "ipv6")
     else:
         iface["ipv6_address"] = None
 
     additional = parse.read_string_list_plurals(
-        {"additional_ipv6_address", "additional_ipv6_address"}, iface, "additional_ipv6_addresses")
+        {"additional_ipv6_address", "additional_ipv6_address"}, iface, f"{location}.additional_ipv6_addresses")
     iface.pop("additional_ipv6_address", None)
     iface["additional_ipv6_addresses"] = []
 
@@ -172,11 +174,11 @@ def _validate_iface(iface: dict):
         try:
             iface["additional_ipv6_addresses"].append(ipaddress.ip_address(address))
         except ValueError as ve:
-            raise ValueError(f"invalid additional_ipv6_address '{address}'") from ve
+            raise ValueError(f"{location} invalid additional_ipv6_address '{address}'") from ve
 
     if iface["ipv6_dhcp"] and not vlan["dhcp6_managed"]:
         _logger.warning(
-            f"ipv6 dhcp enabled but vlan '{vlan['name']}' has 'dhcp6_managed' set to false; no DHCP request will be made")
+            f"{location} ipv6 dhcp enabled but vlan '{vlan['name']}' has 'dhcp6_managed' set to false; no DHCP request will be made")
 
     # default to True; dhcpcd will also create RFC 7217 addresses
     iface["ipv6_tempaddr"] = True if "ipv6_tempaddr" not in iface else bool(iface["ipv6_tempaddr"])
@@ -186,12 +188,12 @@ def _validate_iface(iface: dict):
 
     if iface["name"].startswith("wl"):  # wlxx or wlanx
         if not ("wifi_ssid" in iface) and not ("wifi_psk" in iface):
-            raise KeyError("both 'wifi_ssd' and 'wifi_psk' must be defined for WiFi interfaces")
+            raise KeyError(f"{location} both 'wifi_ssd' and 'wifi_psk' must be defined for WiFi interfaces")
 
     # for testing, allow asking for, but not assigning a prefix delegation
     iface["ipv6_ask_for_prefix"] = bool(iface.get("ipv6_ask_for_prefix"))
     if iface["ipv6_ask_for_prefix"]:
-        _validate_prefix_len(iface)
+        _validate_prefix_len(iface, location)
 
 
 def _validate_ipaddress(iface: dict, ip_version: str):
@@ -414,13 +416,15 @@ def for_port(name: str, comment: str, subtype: str, parent=None, uplink=None) ->
 
 
 def configure_uplink(cfg: dict):
-    """Configure the interface definition for a wan uplink.
+    """Configure the interface definition for a router's wan uplink.
     Allows partial configuration of IP addresses, including DHCP.
-    For VMs, requires either a 'macvtap' interface or a 'vswitch' + 'vlan' to use for connectivity."""
+    For VMs, requires either a 'macvtap' interface, a 'passthrough' interface + PCI address 
+    or a 'vswitch' + 'vlan' to use for connectivity."""
     uplink = cfg.get("uplink")
+    location = cfg["hostname"]
 
     if uplink is None:
-        raise KeyError("must define an uplink")
+        raise KeyError(f"{location} must define an uplink")
 
     # default to the first interface
     parse.set_default_string("name", uplink, "eth0")
@@ -433,37 +437,61 @@ def configure_uplink(cfg: dict):
     # delegated prefixes for ipv6; used by dhcpcd
     uplink["ipv6_delegated_prefixes"] = []
 
+    location += ".uplink"
+
     if cfg["is_vm"]:
-        # uplink can be an existing vswitch or a physical iface on the host via macvtap
+        # uplink can be an existing vswitch or a physical iface either on the host via macvtap or PCI passthrough
         if "macvtap" in uplink:
-            if not isinstance(uplink["macvtap"], str):
-                raise ValueError(("invald uplink; 'macvtap' must be a string"))
-            # set name here to distinguish from vswitch; validate will convert to full object
+            uplink_iface = uplink["macvtap"]
+
+            if not isinstance(uplink_iface, str):
+                raise ValueError(f"{location}.macvtap must define an interface as a string")
+
+            # ensure interface is not being used elsewhere
+            for vswitch in cfg["vswitches"].values():
+                if uplink_iface in vswitch["uplinks"]:
+                    raise ValueError(f"{location}.macvtap {uplink_iface} cannot be shared with the uplink " + f"for vswitch '{vswitch['name']}'")
+
+            # set name here to distinguish from vswitch uplink; validate will convert to full object
+            uplink["vswitch"] = "__unknown__"
+            uplink["vlan"] = _uplink_vlan
+        elif "passthrough" in uplink:
+            if not isinstance(uplink["passthrough"], dict):
+                raise ValueError(f"{location} 'passthrough' must be a dict of 'name' & 'pci_address")
+
+            passthrough = uplink["passthrough"]
+            passthrough["bus"], passthrough["slot"], passthrough["function"] = pci.split(
+                passthrough["pci_address"], location + ".passthough")
+
+            # passthrough will create a SR-IOV virtual function which _can_ be shared with other uplinks
+
+            # set name here to distinguish from vswitch uplink; validate will convert to full object
             uplink["vswitch"] = "__unknown__"
             uplink["vlan"] = _uplink_vlan
         elif "vswitch" not in uplink:
-            raise ValueError(("invald uplink; it must define a vswitch+vlan or a macvtap host interface"))
+            raise ValueError((f"{location} must define a vswitch+vlan or a macvtap/passthrough host interface"))
+
     else:  # physical host uplinks are treated like normal ifaces, but without a vswitch+vlan
         uplink["vswitch"] = "__unknown__"
         uplink["vlan"] = _uplink_vlan
 
-    _validate_prefix_len(uplink)
+    _validate_prefix_len(uplink, location)
 
-    # validate will check IP addresses
+    # validate will check IP address configuration
     return uplink
 
 
-def _validate_prefix_len(iface: dict):
+def _validate_prefix_len(iface: dict, location: str):
     prefixlen = iface.get("ipv6_pd_prefixlen")
 
     if prefixlen is None:
         iface["ipv6_pd_prefixlen"] = 56
     elif not isinstance(prefixlen, int):
-        raise ValueError(f"ipv6_pd_prefixlen {prefixlen} must be an integer")
+        raise ValueError(f"{location}.ipv6_pd_prefixlen {prefixlen} must be an integer")
     elif prefixlen >= 64:
-        raise ValueError(f"ipv6_pd_prefixlen {prefixlen} must be < 64")
+        raise ValueError(f"{location}.ipv6_pd_prefixlen {prefixlen} must be < 64")
     elif prefixlen < 48:
-        raise ValueError(f"ipv6_pd_prefixlen {prefixlen} must be >= 48")
+        raise ValueError(f"{location}.ipv6_pd_prefixlen {prefixlen} must be >= 48")
 
 
 def validate_renaming(cfg: dict):

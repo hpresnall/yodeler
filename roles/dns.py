@@ -194,7 +194,7 @@ def _add_zone(setup: util.shell.ShellScript, vlan: dict, dns_domain: str, dns_se
 
         subnets.append(str(vlan["ipv6_subnet"]))
 
-    setup.append(f"pdnsutil set-meta {vlan['domain']} ALLOW-DNSUPDATE-FROM {" ".join(subnets)}")
+    setup.append(f"pdnsutil set-meta {vlan['domain']} ALLOW-DNSUPDATE-FROM {' '.join(subnets)}")
 
     setup.blank()
 

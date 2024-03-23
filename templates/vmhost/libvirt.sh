@@ -77,6 +77,7 @@ chmod 750 /etc/libvirt/hooks
 chown root:libvirt /etc/libvirt/hooks
 install -o root -g libvirt -m 750 $$DIR/network_hook /etc/libvirt/hooks/network
 install -o root -g libvirt -m 750 $$DIR/qemu_hook /etc/libvirt/hooks/qemu
+install -o root -g libvirt -m 750 $$DIR/daemon_hook /etc/libvirt/hooks/daemon
 
 log "Configuring libvirt networks"
 # remove default DHCP network

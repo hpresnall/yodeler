@@ -2,9 +2,7 @@
 import re
 
 import util.parse as parse
-
-# like 00:00.0
-_VALID_PCI_ADDRESS = re.compile("^([0-9A-F]{2,4}):([0-9A-F]{2})\\.([09-A-F])$")
+import util.pci as pci
 
 
 def validate(cfg: dict):
@@ -83,15 +81,7 @@ def validate(cfg: dict):
             if not path.startswith("/dev/"):
                 raise ValueError(f"{location}.path '{path}' does not start with /dev/")
 
-            match = _VALID_PCI_ADDRESS.match(address.upper())
-            if not match:
-                raise ValueError(
-                    f"invalid PCI address '{address}' for {location}; it must match '{_VALID_PCI_ADDRESS.pattern}'")
-
-            # split PCI address into bus, slot & function; convert address components to hex
-            disk["bus"] = int(match.group(1), 16)
-            disk["slot"] = int(match.group(2), 16)
-            disk["function"] = int(match.group(3), 16)
+            disk["bus"], disk["slot"], disk["function"] = pci.split(address, location)
 
             # do not set fs_type; assume role will configure as needed
             disk["partition"] = ""  # only support complete devices
