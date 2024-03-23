@@ -130,10 +130,13 @@ def interface_from_config(hostname: str, iface: dict) -> xml.Element:
     xml.SubElement(interface, "target", {"dev": device})
     xml.SubElement(interface, "model", {"type": "virtio"})
 
+    if "mac_address" in iface:
+        xml.SubElement(interface, "mac", {"address": iface["mac_address"]})
+
     return interface
 
 
-def macvtap_interface(cfg: dict, iface_name: str) -> xml.Element:
+def macvtap_interface(iface: dict, iface_name: str) -> xml.Element:
     """Create an <interface> XML element that uses macvtap to connect the host's iface to the VM.
     The given iface_name is the name of the interface _on the host_.
 
@@ -146,10 +149,13 @@ def macvtap_interface(cfg: dict, iface_name: str) -> xml.Element:
     xml.SubElement(interface, "source", {"dev": iface_name, "mode": "private"})
     xml.SubElement(interface, "model", {"type": "virtio"})
 
+    if "mac_address" in iface:
+        xml.SubElement(interface, "mac", {"address": iface["mac_address"]})
+
     return interface
 
 
-def passthrough_interface(cfg: dict, bus: int, slot: int, function: int) -> xml.Element:
+def passthrough_interface(bus: int, slot: int, function: int, mac_address: str) -> xml.Element:
     """Create an <interface> XML element that uses PCI passthrough to connect the host's iface to the VM.
     The given iface_name is the name of the interface _on the host_.
 
@@ -168,10 +174,13 @@ def passthrough_interface(cfg: dict, bus: int, slot: int, function: int) -> xml.
                                         "function": f"{function:#0{3}x}"
                                         })
 
+    if mac_address:
+        xml.SubElement(interface, "mac", {"address": mac_address})
+
     return interface
 
 
-def router_interface(hostname: str, vswitch: dict) -> xml.Element:
+def router_interface(hostname: str, vswitch: dict, mac_address: str) -> xml.Element:
     """Create an <interface> XML element that trunks all routable vlans on the given vswitch.
 
     <interface type="network">
@@ -184,6 +193,7 @@ def router_interface(hostname: str, vswitch: dict) -> xml.Element:
     xml.SubElement(interface, "source",  {"network": vswitch["name"], "portgroup": "router"})
     xml.SubElement(interface, "target", {"dev": f"{hostname}-{vswitch['name']}"})
     xml.SubElement(interface, "model", {"type": "virtio"})
+    xml.SubElement(interface, "mac", {"address": mac_address})
 
     return interface
 

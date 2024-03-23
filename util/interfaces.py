@@ -5,8 +5,12 @@ It _will not_ be usable by the Alpine's default BusyBox ifupdown command or by
 the Debian's version from the ifupdown package."""
 import config.interfaces
 
+import util.file
+import util.shell
+import util.parse
 
-def from_config(cfg: dict) -> str:
+
+def from_config(cfg: dict, output_dir: str):
     """Convert the interfaces to a form for use in /etc/network/interfaces.
 
     The interfaces must be from a validated host configuration."""
@@ -30,7 +34,7 @@ iface lo
 
         all_interfaces.append(interface)
 
-    return "\n".join(all_interfaces)
+    util.file.write("interfaces", "\n".join(all_interfaces), output_dir)
 
 
 def _standard(iface: dict):
@@ -180,3 +184,27 @@ def _output_wifi(iface: dict, buffer: list[str]):
         buffer.append("  wifi-ssid {wifi_ssid}")
         buffer.append("  wifi-psk {wifi_psk}")
         buffer.append("")
+
+
+def rename_interfaces(rename_rules: list[dict], script: util.shell.ShellScript, output_dir: str, hostname: str):
+    # create init script & add it to boot
+    rename_cmds = []
+    for i, rule in enumerate(rename_rules, start=1):
+        if "mac_address" not in rule:
+            raise KeyError(f"no mac_address for rename rule {i} for host '{hostname}'")
+        if "name" not in rule:
+            raise KeyError(f"no name for rename rule {i} for host '{hostname}'")
+
+        name = rule["name"]
+        mac = rule["mac_address"]
+
+        util.parse.validate_mac_address(mac, f"rename rule {i} for host '{hostname}'")
+
+        rename_cmds.append(f"  rename_iface {mac} {name}")
+
+    util.file.substitute_and_write("common", "rename-eth", {"rename_cmds": "\n".join(rename_cmds)}, output_dir)
+
+    script.comment("rename ethernet devices at boot")
+    script.append("install -m 755 $DIR/rename-eth /etc/init.d")
+    script.service("rename-eth", "sysinit")
+    script.blank()

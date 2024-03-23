@@ -115,22 +115,11 @@ class Common(Role):
         if self._cfg["local_firewall"]:
             util.awall.configure(self._cfg["interfaces"], self._cfg["roles"], setup, output_dir)
 
-        util.file.write("interfaces", util.interfaces.from_config(self._cfg), output_dir)
+        util.interfaces.from_config(self._cfg, output_dir)
 
         util.sysctl.disable_ipv6(self._cfg, setup, output_dir)
 
-        if "rename_interfaces" in self._cfg:
-            # create init script & add it to boot
-            rename_cmds = []
-            for rename in self._cfg["rename_interfaces"]:
-                rename_cmds.append(f"  rename_iface {rename['mac_address']} {rename['name']}")
-
-            util.file.substitute_and_write("common", "rename-eth", {"rename_cmds": "\n".join(rename_cmds)}, output_dir)
-
-            setup.comment("rename ethernet devices at boot")
-            setup.append("install -m 755 $DIR/rename-eth /etc/init.d")
-            setup.service("rename-eth", "sysinit")
-            setup.blank()
+        util.interfaces.rename_interfaces(self._cfg["rename_interfaces"], setup, output_dir, self._cfg["hostname"])
 
         # create resolve.conf as needed, based on dhcp and ipv6 configuration
         # this also determines the need for dhcpcd

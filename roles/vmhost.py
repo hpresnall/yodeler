@@ -37,9 +37,8 @@ class VmHost(Role):
         for vswitch in self._cfg["vswitches"].values():
             vswitch_name = vswitch["name"]
 
-            # iface for vswitch itself
+            # create interfaces for iface for vswitch itself and its uplinks
             vswitch_interfaces.append(interfaces.for_port(vswitch_name, "vswitch", "vswitch"))
-
             vswitch_interfaces.extend(_create_uplink_ports(vswitch))
 
         # change original interface names to the open vswitch port name
@@ -249,12 +248,12 @@ def _create_uplink_ports(vswitch: dict) -> list[dict]:
         return []
     elif len(uplinks) == 1:
         uplink = uplinks[0]
-        return [interfaces.for_port(uplink, f"uplink for vswitch {vswitch_name}", "uplink", vswitch_name, uplink)]
+        return [interfaces.for_port(uplink, f"uplink for vswitch {vswitch_name}", "uplink", parent=vswitch_name, uplink=uplink)]
     else:
         ports = []
         for n, iface in enumerate(uplinks, start=1):
             ports.append(interfaces.for_port(
-                iface, f"uplink {n} of {len(uplinks)} for vswitch {vswitch_name}", "uplink", vswitch_name, iface))
+                iface, f"uplink {n} of {len(uplinks)} for vswitch {vswitch_name}", "uplink", parent=vswitch_name, uplink=iface))
         return ports
 
 

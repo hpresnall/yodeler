@@ -1,6 +1,7 @@
 """Handles parsing and validating interface configuration from host YAML files."""
 import logging
 import ipaddress
+import random
 
 from typing import Callable
 
@@ -350,7 +351,7 @@ def check_accessiblity(to_check: list[dict], vswitches: list[dict], ignore_vlan:
     return accessible_vlans
 
 
-def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:
+def for_vlan(parent: str, vswitch: dict, vlan: dict, mac_address: str | None) -> dict:
     if not vswitch:
         raise KeyError("vswitch must be specified")
     if not vlan:
@@ -371,7 +372,9 @@ def for_vlan(parent: str, vswitch: dict, vlan: dict) -> dict:
     iface["ipv4_address"] = str(vlan["ipv4_subnet"].network_address + 1)
 
     if vlan["id"] is None:
+        # this is the default, untagged vlan; it _is_ the interface
         iface["name"] = parent
+        iface["mac_address"] = mac_address
     else:
         iface["name"] = f"{parent}.{vlan['id']}"
         iface["parent"] = parent
@@ -397,7 +400,7 @@ _uplink_vlan = {
     "routable": False, "dhcp4_enabled": True, "ipv6_disabled": False, "dhcp6_managed": True}
 
 
-def for_port(name: str, comment: str, subtype: str, parent=None, uplink=None) -> dict:
+def for_port(name: str, comment: str, subtype: str, parent=None, uplink=None, mac_address=None) -> dict:
     """ Create an interface configuration for "port" interfaces like vswitches and vlan parents.
     Ports must be configured but will never have IP addressed assigned.
     """
@@ -411,11 +414,12 @@ def for_port(name: str, comment: str, subtype: str, parent=None, uplink=None) ->
         "uplink": uplink,
         "ipv4_address": ipaddress.ip_address("255.255.255.255"),
         "vlan": _port_vlan,
-        "vswitch": _unknown_vswitch
+        "vswitch": _unknown_vswitch,
+        "mac_address": mac_address
     }
 
 
-def configure_uplink(cfg: dict):
+def configure_uplink(cfg: dict, name: str):
     """Configure the interface definition for a router's wan uplink.
     Allows partial configuration of IP addresses, including DHCP.
     For VMs, requires either a 'macvtap' interface, a 'passthrough' interface + PCI address 
@@ -434,6 +438,14 @@ def configure_uplink(cfg: dict):
     uplink["type"] = "uplink"
     uplink["comment"] = "internet uplink"
     uplink["forward"] = True
+    uplink["name"] = name
+
+    if (cfg["is_vm"]):
+        uplink["mac_address"] = random_mac_address()
+    else:
+        # used for renaming; physical servers should set rename rules in yaml
+        uplink["mac_address"] = None
+
     # delegated prefixes for ipv6; used by dhcpcd
     uplink["ipv6_delegated_prefixes"] = []
 
@@ -450,7 +462,8 @@ def configure_uplink(cfg: dict):
             # ensure interface is not being used elsewhere
             for vswitch in cfg["vswitches"].values():
                 if uplink_iface in vswitch["uplinks"]:
-                    raise ValueError(f"{location}.macvtap {uplink_iface} cannot be shared with the uplink " + f"for vswitch '{vswitch['name']}'")
+                    raise ValueError(f"{location}.macvtap {
+                                     uplink_iface} cannot be shared with the uplink " + f"for vswitch '{vswitch['name']}'")
 
             # set name here to distinguish from vswitch uplink; validate will convert to full object
             uplink["vswitch"] = "__unknown__"
@@ -494,6 +507,14 @@ def _validate_prefix_len(iface: dict, location: str):
         raise ValueError(f"{location}.ipv6_pd_prefixlen {prefixlen} must be >= 48")
 
 
+def random_mac_address() -> str:
+    """Create a mac address for virtual interfaces."""
+    octets = ["52", "54"]  # all libvirt mac addresses start with 52:54
+    for i in range(4):
+        octets.append(format(random.randint(0, 255), "02x"))
+    return ":".join(octets)
+
+
 def validate_renaming(cfg: dict):
     """Validate rename_interfaces defined in the host, if any."""
     if "rename_interface" in cfg:
@@ -504,11 +525,6 @@ def validate_renaming(cfg: dict):
     else:
         # optional
         return
-
-    # vm interfaces always seem to come up in order, so this should not be needed
-    # in addition, MAC addresses are currently assigned at first vm boot and are not known at config time
-    if cfg["is_vm"]:
-        raise KeyError("cannot rename interfaces on a virtual machine")
 
     location = f"{cfg['hostname']}.rename_interfaces"
 

@@ -22,7 +22,10 @@ class Router(Role):
         return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "ndisc6", "tcpdump", "ethtool"}
 
     def configure_interfaces(self):
-        uplink = config.interfaces.configure_uplink(self._cfg)
+        uplink = config.interfaces.configure_uplink(self._cfg, "wan")
+
+        # rename router interfaces to avoid issues with startup order
+        self._cfg["rename_interfaces"].append({"name": uplink["name"], "mac_address": uplink["mac_address"]})
 
         # add an interface for each vswitch that has routable vlans
         iface_counter = 1  # start at eth1
@@ -35,10 +38,13 @@ class Router(Role):
         vswitch_interfaces = []
 
         for vswitch in self._cfg["vswitches"].values():
+            mac_address = None
+
             # create a unique interface for each vswitch
             if self._cfg["is_vm"]:
-                iface_name = f"eth{iface_counter}"
+                iface_name = vswitch["name"]
                 iface_counter += 1
+                mac_address = config.interfaces.random_mac_address()
             elif vswitch["uplinks"]:
                 # TODO handle multiple uplinks; maybe just error instead of creating physical bond ifaces
                 # TODO if site also has a separate, physical vmhost, then need a way to
@@ -47,7 +53,7 @@ class Router(Role):
                 # vswitch validation already confirmed uplink uniqueness
             else:
                 # note that this assumes ethernet layout of non-vm hosts
-                iface_name = f"eth{iface_counter}"
+                iface_name = vswitch["name"]
                 iface_counter += 1
 
             vswitch["router_iface"] = iface_name
@@ -61,7 +67,7 @@ class Router(Role):
                 if vlan["id"] is None:
                     untagged = True
 
-                vlan_iface = config.interfaces.for_vlan(iface_name, vswitch, vlan)
+                vlan_iface = config.interfaces.for_vlan(iface_name, vswitch, vlan, mac_address)
                 vlan["router_iface"] = vlan_iface
                 vlan_interfaces.append(vlan_iface)
 
@@ -81,12 +87,20 @@ class Router(Role):
                     vlan_interfaces[0]["comment"] = comment
                 else:  # add the base interface as a port
                     # append to vswitch_interfaces to ensure it is the first definition
-                    vswitch_interfaces.append(config.interfaces.for_port(iface_name, comment, "vlan"))
+                    vswitch_interfaces.append(config.interfaces.for_port(
+                        iface_name, comment, "vlan", mac_address=mac_address))
 
                 vswitch_interfaces.extend(vlan_interfaces)
+        # end for all vswitches
 
         # set uplink after vswitch interfaces in /etc/interfaces so all the vlans are up before prefix delgation
         interfaces = self._cfg.setdefault("interfaces", [])
+
+        # rename all the interfaces that have a mac address, i.e. this is a vm and these are virtual interfaces
+        # non-vm routers should set rename rules in the yaml config
+        for iface in vswitch_interfaces:
+            if "mac_address" in iface:
+                self._cfg["rename_interfaces"].append({"name": iface["name"], "mac_address": iface["mac_address"]})
 
         if not isinstance(interfaces, list):
             raise KeyError(f"cfg['interfaces'] must be a list")
@@ -132,8 +146,7 @@ class Router(Role):
                 uplink_xml = util.libvirt.macvtap_interface(self._cfg, uplink["macvtap"])
             elif "passthrough" in uplink:
                 passthrough = uplink["passthrough"]
-                uplink_xml = util.libvirt.passthrough_interface(
-                    self._cfg, passthrough["bus"], passthrough["slot"], passthrough["function"])
+                uplink_xml = util.libvirt.passthrough_interface(passthrough["bus"], passthrough["slot"], passthrough["function"], uplink["mac_address"])
             else:  # use vswitch+vlan
                 uplink_xml = util.libvirt.interface_from_config(self._cfg["hostname"], uplink)
 
@@ -202,8 +215,10 @@ class Router(Role):
                 shorewall["params6"].append(param)
 
                 if self._cfg["is_vm"]:
+                    mac_address = config.interfaces.random_mac_address()
                     # new libvirt interface to trunk the vlans
-                    libvirt_interfaces.append(util.libvirt.router_interface(self._cfg['hostname'], vswitch))
+                    libvirt_interfaces.append(util.libvirt.router_interface(
+                        self._cfg['hostname'], vswitch, mac_address))
 
         # blank line after ping rules from vlan to firewall
         shorewall["rules"].append("")

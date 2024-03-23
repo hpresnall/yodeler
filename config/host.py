@@ -480,6 +480,7 @@ DEFAULT_CONFIG = {
     # domain for the host when it has multiple interfaces; used for DNS search
     "primary_domain": "",
     "before_chroot": [],
+    "rename_interfaces": [],
     "prometheus_collectors": ["cpu", "diskstats", "filefd", "filesystem", "meminfo", "netdev", "netstat",
                               "schedstat", "sockstat", "stat", "udp_queues", "uname", "vmstat"]
 }
@@ -500,5 +501,6 @@ _DEFAULT_CONFIG_TYPES = {
     "primary_domain": str,
     "install_interfaces": str,
     "before_chroot": list,
+    "rename_interfaces": list,
     "prometheus_collectors": list
 }
