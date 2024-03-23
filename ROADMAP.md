@@ -13,6 +13,7 @@
 - [x] Open vSwitch configuration with multiple switches and vlans
 - [x] Automated VM setup for an entire site
 - [x] Configure apk_cache and pass it to install media & VMs
+- [x] Support PCI passthrough of both disks & SR-IOV network interfaces
 - [ ] Let's Encrypt support for wildcard domains and distribution to VMs
 
 ## Router
@@ -27,15 +28,16 @@
 - [ ] [WireGuard](https://www.wireguard.com/) VPN support
 
 ## DNS
-- [x] Basic BIND 9 configuration
+- [x] PowerDNS configuration
 - [x] YAML-based configuration for additional DNS entries
-- [x] Replace Bind with PowerDNS
+- [x] Add DHCP reservations & aliases to DNS
+- [x] Configure blackhole hosts file like Pi-Hole
 - [ ] Add / update IPv6 SLAAC addresses
 - [ ] DNSSEC
 
 ## DHCP
 - [x] Kea configuration for IPv4 and IPv6 with host reservations
-- [x] Update DNS on DHCP changes
+- [x] DDNS support to update DNS on DHCP changes
 - [x] DHCP client support via dhcpcd for both IPv4 and IPv6 (autoconf & managed)
 - [ ] Track DHCP reservations and IPv6 SLAAC addresses over time
 
@@ -54,14 +56,15 @@
 - [ ] Configure Samba
 - [ ] Add separate storage volume, outside of the VM
 - [ ] Configure ZFS
-- [x] Add PCI passthrough support for storage volumes
+- [x] Support for image, device and PCI passthrough disks on VMs
 - [x] Add backup and / or shared mount support for durable VM configuration data
 - [] Add backup scripts for each server role & configure nightly backups
 
 ## Build Server
 - [x] Configure basic build tools
-- [ ] Create process for building executables and sharing with other VMs
+- [x] Create process for building executables and sharing with other VMs
 - [x] Create durable build partition for builds without network access
+- [] Allow custom scripts to run as part of server builds
 
 ## XWindows
 - [x] Configure basic XFCE GUI

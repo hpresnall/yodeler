@@ -49,14 +49,7 @@ class Dns(Role):
 
     def additional_configuration(self):
         site_name = self._cfg["site_name"]
-        self._cfg["before_chroot"] = [
-            "# before chroot, use the site build image to create a pi-hole like hosts file",
-            "log \"building extended hosts file\"",
-            "chmod +x $DIR/build_hosts.sh",
-            f"chroot \"/media/{site_name}_build\" $DIR/build_hosts.sh",
-            "# script puts hosts in chrooted /tmp; copy to /tmp that will be inside the vm for setup.sh"
-            f"cp \"/media/{site_name}_build/tmp\" /tmp/{self._cfg['hostname']}/tmp/"
-        ]
+        self._cfg["before_chroot"] = [util.file.substitute("templates/dns/before_chroot.sh", self._cfg)]
 
     def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""

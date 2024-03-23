@@ -44,6 +44,7 @@ mount ${SYSTEM_DEV}${SYSTEM_PARTITION} "$$INSTALLED"
 
 log "Copying yodeler scripts & apk_cache for site '$SITE_NAME' to $$INSTALLED/root/" 
 # do not include logs dir as that will stop output for this script
+# includes existing build image
 rsync -r --exclude logs "$$SITE_DIR" "$$INSTALLED/root"
 
 # still using Alpine installer's network configuration in chroot
@@ -110,7 +111,7 @@ if [ -d "$$INSTALLED/root/$SITE_NAME/logs" ]; then
 fi
 
 if [ -f "$$INSTALLED/root/$SITE_NAME/build.img" ]; then
-  rm "$$SITE_DIR/build.img"
+  rm -f "$$SITE_DIR/build.img"
   cp "$$INSTALLED/root/$SITE_NAME/build.img" "$$SITE_DIR/build.img"
 fi
 

@@ -1,20 +1,22 @@
 # setup shared build image
 # other vms can use this before chrooting
 if [ ! -f "$$SITE_DIR/build.img" ]; then
-  #log "Creating shared build image"
+  log "Creating shared build image"
   $VM_IMAGES_PATH/alpine-make-vm-image/alpine-make-vm-image \
   --image-format raw \
   --serial-console \
-  --image-size 1024M \
+  --image-size 2048M \
   --repositories-file /etc/apk/repositories \
   "$$SITE_DIR/build.img"
 fi
 
-BUILD_MOUNT="/media/${SITE_NAME}_build"
-mkdir -p $$BUILD_MOUNT
-mount -o loop "$$SITE_DIR/build.img" "$$BUILD_MOUNT"
+log "Setting up shared build image"
 
-cd "$$BUILD_MOUNT"
+SITE_BUILD_IMG="/media/${SITE_NAME}_build"
+mkdir -p $$SITE_BUILD_IMG
+mount -o loop "$$SITE_DIR/build.img" "$$SITE_BUILD_IMG"
+
+cd "$$SITE_BUILD_IMG"
 mkdir -p build
 
 # use host's resolv
