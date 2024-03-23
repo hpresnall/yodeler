@@ -47,6 +47,17 @@ class Dns(Role):
     def maximum_instances(site_cfg: dict) -> int:
         return 2  # no need for additional redundancy
 
+    def additional_configuration(self):
+        site_name = self._cfg["site_name"]
+        self._cfg["before_chroot"] = [
+            "# before chroot, use the site build image to create a pi-hole like hosts file",
+            "log \"building extended hosts file\"",
+            "chmod +x $DIR/build_hosts.sh",
+            f"chroot \"/media/{site_name}_build\" $DIR/build_hosts.sh",
+            "# script puts hosts in chrooted /tmp; copy to /tmp that will be inside the vm for setup.sh"
+            f"cp \"/media/{site_name}_build/tmp\" /tmp/{self._cfg['hostname']}/tmp/"
+        ]
+
     def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
         util.sysctl.enable_tcp_fastopen(setup, output_dir)
@@ -154,6 +165,8 @@ class Dns(Role):
         util.file.write("pdns.conf", util.file.substitute("templates/dns/pdns.conf", pdns_conf), output_dir)
         util.file.write("recursor.conf", util.file.substitute("templates/dns/recursor.conf", pdns_conf), output_dir)
 
+        util.file.copy_template("dns", "build_hosts.sh", output_dir)
+
         if self._cfg["additional_dns_entries"]:
             hosts = [""]
             for additional_dns in self._cfg["additional_dns_entries"]:
@@ -164,7 +177,10 @@ class Dns(Role):
 
             hosts.append("")
             util.file.write("other_hosts", "\n".join(hosts), output_dir)
+            setup.blank()
+            setup.comment("assemble complete hosts file")
             setup.append("cat $DIR/other_hosts >> /etc/hosts")
+            setup.append("cat /tmp/hosts >> /etc/hosts")
 
 
 def _add_zone(setup: util.shell.ShellScript, vlan: dict, dns_domain: str, dns_server: str):

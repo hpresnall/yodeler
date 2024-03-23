@@ -100,13 +100,18 @@ set -o errexit
 # mount status gets reset sometimes; ensure still writable
 mount -o remount,rw $$YODELER_DEV
 
-log "Copying APK cache out of chroot"
+log "Copying APK cache, logs, and build image out of chroot"
 # copy any new APKS back to the site APK cache, deleting old versions
 rsync -r --delete "$$INSTALLED/root/$SITE_NAME/apk_cache" "$$SITE_DIR"
 
 if [ -d "$$INSTALLED/root/$SITE_NAME/logs" ]; then
   log "Copying logs from chroot to '$$LOG_DIR'"
   rsync -r "$$INSTALLED/root/$SITE_NAME/logs" "$$SITE_DIR"
+fi
+
+if [ -f "$$INSTALLED/root/$SITE_NAME/build.img" ]; then
+  rm "$$SITE_DIR/build.img"
+  cp "$$INSTALLED/root/$SITE_NAME/build.img" "$$SITE_DIR/build.img"
 fi
 
 # copy back final resolv.conf

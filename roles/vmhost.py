@@ -191,6 +191,8 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
         setup.append("rootinstall $DIR/logrotate-openvswitch /etc/logrotate.d/openvswitch")
         setup.blank()
 
+        setup.append(file.substitute("templates/vmhost/site_build.sh", self._cfg))
+
         # call yodel.sh for each VM
         setup.comment("run yodel.sh for each VM for this site")
         setup.append("cd $SITE_DIR")
