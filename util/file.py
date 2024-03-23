@@ -12,16 +12,15 @@ except ImportError:
     loader, dumper = yaml.Loader, yaml.Dumper
 
 
-def read(path: str, base_dir=None):
+def read_template(role_name: str, template: str):
     """Read the entire file into a string."""
-    if base_dir is not None:
-        path = os.path.join(base_dir, path)
+    path = os.path.join("templates", role_name, template)
 
     with open(path) as file:
         return file.read()
 
 
-def write(path: str, data_str: str, base_dir=None):
+def write(path: str, data_str: str, base_dir: str | None = None):
     """Write the given string to a file."""
     if base_dir is not None:
         path = os.path.join(base_dir, path)
@@ -30,12 +29,20 @@ def write(path: str, data_str: str, base_dir=None):
         return file.write(data_str)
 
 
-def substitute(path: str, cfg: dict):
+def substitute(role_name: str, file_name: str, cfg: dict):
     """Read the given file and do $variable substitution from the given config. Return the content as a string."""
     # use $UPPERCASE in scripts
     upper_cfg = {k.upper(): v for (k, v) in cfg.items()}
-    template = string.Template(read(path))
+    template = string.Template(read_template(role_name, file_name))
     return template.substitute(**upper_cfg)
+
+
+def substitute_and_write(role_name: str, file_name: str, cfg: dict, base_dir: str | None = None, new_name: str | None = None):
+    """Read the given file and do $variable substitution from the given config. Write the file to the given location."""
+    if not new_name:
+        new_name = file_name
+
+    write(new_name, substitute(role_name, file_name, cfg), base_dir)
 
 
 def load_yaml(path: str):

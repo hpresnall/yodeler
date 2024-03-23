@@ -363,16 +363,16 @@ def _bootstrap_physical(cfg: dict, output_dir: str):
     yodel.comment("Run in a booted Alpine Linux install image")
     yodel.blank()
     yodel.append_self_dir()
-    yodel.substitute("templates/physical/ensure_writable.sh", cfg)
+    yodel.substitute("physical", "ensure_writable.sh", cfg)
     yodel.setup_logging(cfg["hostname"])
-    yodel.substitute("templates/physical/create_physical.sh", cfg)
+    yodel.substitute("physical", "create_physical.sh", cfg)
     yodel.write_file(output_dir)
 
     # create Alpine setup answerfile
     # use external DNS for initial Alpine setup
     cfg["external_dns_str"] = " ".join(cfg["external_dns"])
 
-    file.write("answerfile", file.substitute("templates/physical/answerfile", cfg), output_dir)
+    file.substitute_and_write("physical", "answerfile", cfg, output_dir)
 
 
 def _bootstrap_vm(cfg: dict, output_dir: str):
@@ -383,17 +383,17 @@ def _bootstrap_vm(cfg: dict, output_dir: str):
     yodel.blank()
     yodel.append_self_dir()
     yodel.setup_logging(cfg["hostname"])
-    yodel.substitute("templates/vm/create_vm.sh", cfg)
+    yodel.substitute("vm", "create_vm.sh", cfg)
     yodel.write_file(output_dir)
 
     # helper script to delete VM image & remove VM
     delete_vm = shell.ShellScript("delete_vm.sh", errexit=False)
-    delete_vm.substitute("templates/vm/delete_vm.sh", cfg)
+    delete_vm.substitute("vm", "delete_vm.sh", cfg)
     delete_vm.write_file(output_dir)
 
     # helper script to start VM
     start_vm = shell.ShellScript("start_vm.sh", errexit=False)
-    start_vm.substitute("templates/vm/start_vm.sh", cfg)
+    start_vm.substitute("vm", "start_vm.sh", cfg)
     start_vm.write_file(output_dir)
 
 

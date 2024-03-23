@@ -19,7 +19,7 @@ class Router(Role):
      vlans to the internet"""
 
     def additional_packages(self):
-        return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "ndisc6", "tcpdump"}
+        return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "ndisc6", "tcpdump", "ethtool"}
 
     def configure_interfaces(self):
         uplink = config.interfaces.configure_uplink(self._cfg)
@@ -144,7 +144,7 @@ class Router(Role):
 
         routable_vlans = []
 
-        radvd_template = file.read("templates/router/radvd.conf")
+        radvd_template = file.read_template(self.name, "radvd.conf")
         radvd_config = []
 
         dhrelay4_ifaces = []
@@ -270,7 +270,7 @@ def _write_dhcrelay_config(cfg: dict, setup: util.shell.ShellScript, dhrelay4_if
         if not dhcp_addresses["ipv6_address"]:
             raise ValueError("router needs to relay DHCP but cannot find any reachable IPv6 addresses")
 
-        setup.append(file.read("templates/router/dhcrelay6.sh"))
+        setup.append(file.read_template("router", "dhcrelay6.sh"))
 
     if dhrelay4_ifaces:
         if not dhcp_addresses["ipv4_address"]:
@@ -320,8 +320,8 @@ def _init_shorewall(cfg: dict):
     shorewall["interfaces6"] = ["inet\t$INTERNET\ttcpflags,dhcp,rpfilter,accept_ra=0"]
     shorewall["policy"] = []
     shorewall["snat"] = []
-    shorewall["rules"] = [file.read("templates/router/shorewall/rules")]
-    shorewall["rules6"] = [file.read("templates/router/shorewall/rules6")]
+    shorewall["rules"] = [file.read_template("router/shorewall", "rules")]
+    shorewall["rules6"] = [file.read_template("router/shorewall", "rules6")]
 
     return shorewall
 
@@ -713,11 +713,11 @@ all all REJECT  NFLOG({0})
     file.write("rules", "\n".join(shorewall["rules6"]), shorewall6)
 
     setup.comment("# shorewall config")
-    setup.substitute("templates/router/shorewall.sh", cfg)
+    setup.substitute("router", "shorewall.sh", cfg)
 
 
 def _write_ipsets(cfg: dict, setup: util.shell.ShellScript):
-    setup.append(file.read("templates/router/ipsets.sh"))
+    setup.append(file.read_template("router", "ipsets.sh"))
 
     for name, ipset in cfg["firewall"]["ipsets4"].items():
         setup.append(

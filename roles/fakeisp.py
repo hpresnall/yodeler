@@ -122,10 +122,10 @@ class FakeISP(Role):
             "FAKEINTERNET_IFACE": fakeinternet["name"],
             "FAKEISP_IFACE": fakeisp["name"]
         }
-        setup.substitute("templates/fakeisp/iptables.sh", iptables)
+        setup.substitute(self.name, "iptables.sh", iptables)
         setup.service("iptables", "boot")
         setup.blank()
-        setup.substitute("templates/fakeisp/ip6tables.sh", iptables)
+        setup.substitute(self.name, "ip6tables.sh", iptables)
         setup.service("ip6tables", "boot")
         setup.blank()
 
@@ -198,7 +198,7 @@ class FakeISP(Role):
             setup.blank()
 
             # setup radvd on the fakeisp interface
-            radvd_template = util.file.read("templates/router/radvd.conf")
+            radvd_template = util.file.read_template("router", "radvd.conf")
             radvd_template = radvd_template.format(fakeisp["name"], "on", "", "")  # AdvManagedFlag on => use DHCP6
             util.file.write("radvd.conf", radvd_template, output_dir)
 

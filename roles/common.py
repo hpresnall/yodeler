@@ -97,7 +97,7 @@ class Common(Role):
             setup.append("apk -q del " + " ".join(self._cfg["remove_packages"]))
             setup.blank()
 
-        setup.substitute("templates/common/common.sh", self._cfg)
+        setup.substitute(self.name, "common.sh", self._cfg)
 
         # directly copy /etc/hosts
         util.file.copy_template(self.name, "hosts", output_dir)
@@ -125,8 +125,7 @@ class Common(Role):
             for rename in self._cfg["rename_interfaces"]:
                 rename_cmds.append(f"  rename_iface {rename['mac_address']} {rename['name']}")
 
-            util.file.write("rename-eth", util.file.substitute(
-                "templates/common/rename-eth", {"rename_cmds": "\n".join(rename_cmds)}), output_dir)
+            util.file.substitute_and_write("common", "rename-eth", {"rename_cmds": "\n".join(rename_cmds)}, output_dir)
 
             setup.comment("rename ethernet devices at boot")
             setup.append("install -m 755 $DIR/rename-eth /etc/init.d")

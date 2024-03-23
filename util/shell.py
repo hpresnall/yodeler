@@ -32,13 +32,13 @@ class ShellScript():
         """Add a comment to the script."""
         self.append("# " + comment)
 
-    def append(self, fragment) -> None:
+    def append(self, fragment: str) -> None:
         """Add code to the script."""
         self._script_fragments.append(fragment)
 
-    def substitute(self, file, cfg) -> None:
+    def substitute(self, role_name: str, file_name: str, cfg: dict) -> None:
         """Append the given template file to the script, after performing variable substitution."""
-        self.append(util.file.substitute(file, cfg))
+        self.append(util.file.substitute(role_name, file_name, cfg))
 
     def append_self_dir(self) -> None:
         """Append code that puts the directory where this shell script is located into the $DIR variable.
@@ -63,7 +63,7 @@ class ShellScript():
         """Make this script log to $SITE_DIR/logs/<yyyymmdd>_<hhmmss>/<hostname>.log.
         This removes to need to explicitly redirect all commands in the script.
         All scripts should use the log() function rather than echo."""
-        self.append(util.file.substitute("templates/common/logging.sh", {"hostname": hostname}))
+        self.append(util.file.substitute("common", "logging.sh", {"hostname": hostname}))
         self.add_log_function()
 
         # add trap to log on errors before exiting

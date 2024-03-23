@@ -153,15 +153,13 @@ def passthrough_interface(cfg: dict, bus: int, slot: int, function: int) -> xml.
     """Create an <interface> XML element that uses PCI passthrough to connect the host's iface to the VM.
     The given iface_name is the name of the interface _on the host_.
 
-    <interface type="hostdev" managed="yes">       
-      <driver name='vfio'/>           
+    <interface type="hostdev" managed="yes">               
       <source>                                                                   
         <address type='pci' domain='0x0000' bus='0x01' slot='0x06' function='0x0'/>
       </source>
     </interface>
     """
     interface = xml.Element("interface", {"type": "hostdev", "managed": "yes"})
-    xml.SubElement(interface, "driver", {"name  ": "vfio"})
     source = xml.SubElement(interface, "source")
     xml.SubElement(source, "address",  {"type": "pci",
                                         "domain": "0x0000",  # domain is always 0

@@ -49,7 +49,7 @@ class Dns(Role):
 
     def additional_configuration(self):
         site_name = self._cfg["site_name"]
-        self._cfg["before_chroot"] = [util.file.substitute("templates/dns/before_chroot.sh", self._cfg)]
+        self._cfg["before_chroot"] = [util.file.substitute("dns", "before_chroot.sh", self._cfg)]
 
     def write_config(self, setup: util.shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
@@ -155,8 +155,8 @@ class Dns(Role):
             "web_allow_subnets": "127.0.0.1,::1"
         }
 
-        util.file.write("pdns.conf", util.file.substitute("templates/dns/pdns.conf", pdns_conf), output_dir)
-        util.file.write("recursor.conf", util.file.substitute("templates/dns/recursor.conf", pdns_conf), output_dir)
+        util.file.write("pdns.conf", util.file.substitute(self.name, "pdns.conf", pdns_conf), output_dir)
+        util.file.write("recursor.conf", util.file.substitute(self.name, "recursor.conf", pdns_conf), output_dir)
 
         util.file.copy_template("dns", "build_hosts.sh", output_dir)
 

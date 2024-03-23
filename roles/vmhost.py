@@ -1,6 +1,7 @@
 """Configuration & setup for the main KVM & Openvswitch Alpine host."""
 
 import os
+import string
 
 from roles.role import Role
 
@@ -10,6 +11,7 @@ import config.vlan as vlan
 import util.file as file
 import util.shell as shell
 import util.libvirt as libvirt
+import util.sysctl as sysctl
 
 
 class VmHost(Role):
@@ -19,7 +21,7 @@ class VmHost(Role):
         # packages for openvswitch, qemu, libvirt and alpine-make-vm-image
         return {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
                 "libvirt", "libvirt-daemon", "libvirt-qemu", "ovmf", "dbus", "polkit",
-                "virtiofsd", "e2fsprogs", "rsync", "sfdisk", "git", "xmlstarlet"}
+                "virtiofsd", "e2fsprogs", "rsync", "sfdisk", "git", "xmlstarlet", "ethtool"}
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -76,7 +78,7 @@ class VmHost(Role):
             self._cfg["prometheus_collectors"].extend(["cgroups"])
 
         # additional physical server config before running chroot during setup
-        self._cfg["before_chroot"].append(file.substitute("templates/vmhost/before_chroot.sh", self._cfg))
+        self._cfg["before_chroot"].append(file.substitute("vmhost", "before_chroot.sh", self._cfg))
 
     def validate(self):
         # ensure no reused PCI addresses, uplink interfaces, disk images or disk devices
@@ -145,16 +147,13 @@ class VmHost(Role):
 
             if iface["ipv6_disabled"]:
                 local = True
-                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.disable_ipv6=1")
-                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.accept_ra=0")
-                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.autoconf=0\n")
+                sysctl.add_disable_ipv6_to_script(local_conf, name)
+                local_conf.append("\n")
 
             if iface["ipv6_tempaddr"]:
                 local = True
-                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.use_tempaddr=2")
-                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.temp_prefered_lft=86400")
-                local_conf.append(f"sysctl -w net.ipv6.conf.{name}.temp_valid_lft=172800\n")
-
+                sysctl.add_tmpaddr_ipv6_to_script(local_conf, name)
+                local_conf.append("\n")
         if local:
             file.write("ipv6.start", "\n".join(local_conf), output_dir)
             setup.comment("configure ipv6 on this host's network interfaces")
@@ -184,14 +183,13 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
         sriov = []
         for uplink, count in self._cfg["vf_counts"].items():
             sriov.append(f"echo {count} > /sys/class/net/{uplink}/device/sriov_numvfs")
-        file.write("daemon_hook", file.substitute(
-            "templates/vmhost/daemon_hook", {"sriov": "\n".join(sriov)}), output_dir)
+        file.write("daemon_hook", file.substitute(self.name, "daemon_hook", {"sriov": "\n".join(sriov)}), output_dir)
 
         file.copy_template(self.name, "logrotate-openvswitch", output_dir)
         setup.append("rootinstall $DIR/logrotate-openvswitch /etc/logrotate.d/openvswitch")
         setup.blank()
 
-        setup.append(file.substitute("templates/vmhost/site_build.sh", self._cfg))
+        setup.append(file.substitute(self.name, "site_build.sh", self._cfg))
 
         # call yodel.sh for each VM
         setup.comment("run yodel.sh for each VM for this site")
@@ -231,7 +229,7 @@ def _create_uplink_ports(vswitch: dict) -> list[dict]:
 
 
 def _setup_open_vswitch(cfg, setup):
-    setup.substitute("templates/vmhost/openvswitch.sh", cfg)
+    setup.substitute("vmhost", "openvswitch.sh", cfg)
 
     # create vswitches for each definition
     # add uplink ports with correct tagging where specified
@@ -306,7 +304,7 @@ def _create_vswitch_uplink(vswitch, setup):
 
 
 def _setup_libvirt(cfg, setup, output_dir):
-    setup.substitute("templates/vmhost/libvirt.sh", cfg)
+    setup.substitute("vmhost", "libvirt.sh", cfg)
 
     # for each vswitch, create an XML network definition
     for vswitch in cfg["vswitches"].values():
