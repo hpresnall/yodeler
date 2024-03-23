@@ -62,6 +62,7 @@ def validate(site_yaml: dict | str | None) -> dict:
     # order matters here; vswitch / vlans first since the firewall config needs that information
     vswitch.validate(site_cfg)
     firewall.validate(site_cfg)
+    _validate_additional_dns_entries(site_cfg)
 
     # map hostname to host config
     site_cfg["hosts"] = {}
@@ -165,3 +166,35 @@ def _validate_full_site(site_cfg: dict):
 
     # finally, confirm that all the firewall rules point to valid hostnames
     firewall.validate_rule_hostnames(site_cfg)
+
+
+def _validate_additional_dns_entries(cfg: dict):
+    if not "additional_dns_entries" in cfg:
+        cfg["additional_dns_entries"] = []
+        return
+
+    additional_dns = cfg["additional_dns_entries"]
+    location = "additional_dns_entries"
+
+    if not isinstance(additional_dns, list):
+        raise ValueError(f"{location} must be a list")
+
+    for i, entry in enumerate(additional_dns, start=1):
+        if not isinstance(entry, dict):
+            raise ValueError(f"{location}[{i}] must be a dict")
+
+        entry["hostnames"] = parse.read_string_list_plurals({"hostname", "hostnames"}, entry, location)
+        entry.pop("hostname", None)
+
+        if "ipv4_address" not in entry:
+            raise KeyError(f"{location} must specify an ipv4_address")
+        try:
+            entry["ipv4_address"] = ipaddress.ip_address(entry["ipv4_address"])
+        except ValueError as ve:
+            raise KeyError(f"invalid ipv4_address for {location}") from ve
+
+        if "ipv6_address" in entry:
+            try:
+                entry["ipv6_address"] = ipaddress.ip_address(entry["ipv6_address"])
+            except ValueError as ve:
+                raise KeyError(f"invalid ipv6_address for {location}") from ve

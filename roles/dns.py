@@ -1,6 +1,4 @@
 """Configuration & setup for a BIND9 DNS server."""
-import os.path
-
 import util.shell
 import util.file
 import util.address
@@ -155,6 +153,18 @@ class Dns(Role):
 
         util.file.write("pdns.conf", util.file.substitute("templates/dns/pdns.conf", pdns_conf), output_dir)
         util.file.write("recursor.conf", util.file.substitute("templates/dns/recursor.conf", pdns_conf), output_dir)
+
+        if self._cfg["additional_dns_entries"]:
+            hosts = [""]
+            for additional_dns in self._cfg["additional_dns_entries"]:
+                hosts.append(str(additional_dns["ipv4_address"]) + " " + " ".join(additional_dns["hostnames"]))
+
+                if "ipv6_address" in additional_dns:
+                    hosts.append(str(additional_dns["ipv4_address"]) + " " + " ".join(additional_dns["hostnames"]))
+
+            hosts.append("")
+            util.file.write("other_hosts", "\n".join(hosts), output_dir)
+            setup.append("cat $DIR/other_hosts >> /etc/hosts")
 
 
 def _add_zone(setup: util.shell.ShellScript, vlan: dict, dns_domain: str, dns_server: str):
