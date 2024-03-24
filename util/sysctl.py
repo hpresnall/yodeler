@@ -27,7 +27,7 @@ def disable_ipv6(cfg: dict, setup: shell.ShellScript, output_dir: str):
             disabled = True
             name = iface["name"]
 
-            add_disable_ipv6_to_script(sysctl_conf, name)
+            add_disable_ipv6_to_script(sysctl_conf, name, with_sysctl=False)
             sysctl_conf.append("")
 
             _logger.debug("disabling ipv6 for %s %s",  cfg["hostname"], name)
@@ -54,7 +54,7 @@ def enable_temp_addresses(cfg: dict, setup: shell.ShellScript, output_dir: str):
             addresses = True
             name = iface["name"]
 
-            add_tmpaddr_ipv6_to_script(sysctl_conf, name)
+            add_tmpaddr_ipv6_to_script(sysctl_conf, name, with_sysctl=False)
             sysctl_conf.append("")
 
             _logger.debug("enabling ipv6 temp addresses for %s %s",  cfg["hostname"], name)
@@ -95,15 +95,26 @@ def _create_file(name: str, sysctl_conf: list[str], setup: shell.ShellScript, ou
     setup.blank()
 
 
-def add_disable_ipv6_to_script(script: shell.ShellScript | list[str], interface: str, indent=""):
-    script.append(f"{indent}net.ipv6.conf.{interface}.disable_ipv6 = 1")
-    script.append(f"{indent}net.ipv6.conf.{interface}.accept_ra = 0")
-    script.append(f"{indent}net.ipv6.conf.{interface}.autoconf = 0")
+def add_disable_ipv6_to_script(script: shell.ShellScript | list[str], interface: str, indent="", with_sysctl: bool=True):
+    if with_sysctl:
+        script.append(f"{indent}sysctl -w net.ipv6.conf.{interface}.disable_ipv6=1")
+        script.append(f"{indent}sysctl -w net.ipv6.conf.{interface}.accept_ra=0")
+        script.append(f"{indent}sysctl -w net.ipv6.conf.{interface}.autoconf=0")
+    else:
+        script.append(f"{indent}net.ipv6.conf.{interface}.disable_ipv6 = 1")
+        script.append(f"{indent}net.ipv6.conf.{interface}.accept_ra = 0")
+        script.append(f"{indent}net.ipv6.conf.{interface}.autoconf = 0")
 
 
-def add_tmpaddr_ipv6_to_script(script: shell.ShellScript | list[str], interface: str, indent=""):
-    script.append(f"{indent}net.ipv6.conf.{interface}.use_tempaddr = 2")  # 2 =>use and prefer
-    # use for 1 day, remove after 2
-    # incorrect spelling is the valid value
-    script.append(f"{indent}net.ipv6.conf.{interface}.temp_prefered_lft = 86400")
-    script.append(f"{indent}net.ipv6.conf.{interface}.temp_valid_lft = 172800")
+def add_tmpaddr_ipv6_to_script(script: shell.ShellScript | list[str], interface: str, indent="", with_sysctl: bool=True):
+    if with_sysctl:
+        script.append(f"{indent}sysctl -w net.ipv6.conf.{interface}.use_tempaddr=2")  # 2 =>use and prefer
+        # use for 1 day, remove after 2
+        # incorrect spelling is the valid value
+        script.append(f"{indent}sysctl -w net.ipv6.conf.{interface}.temp_prefered_lft=86400")
+        script.append(f"{indent}sysctl -w net.ipv6.conf.{interface}.temp_valid_lft=172800")
+    else:
+        script.append(f"{indent}net.ipv6.conf.{interface}.use_tempaddr = 2")
+        script.append(f"{indent}net.ipv6.conf.{interface}.temp_prefered_lft = 86400")
+        script.append(f"{indent}net.ipv6.conf.{interface}.temp_valid_lft = 172800")
+
