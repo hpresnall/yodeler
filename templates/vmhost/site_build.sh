@@ -8,11 +8,19 @@ if [ ! -f "$$SITE_DIR/build.img" ]; then
   --image-size 2048M \
   --repositories-file /etc/apk/repositories \
   "$$SITE_DIR/build.img"
+else
+  log "Using existing build image $$SITE_DIR/build.img"
+fi
+
+SITE_BUILD_IMG="/media/${SITE_NAME}_build"
+
+if [ -n "$$(mount | grep $$SITE_BUILD_IMG)" ]; then
+  log "Build image already mounted at $$SITE_BUILD_IMG"
+  exit
 fi
 
 log "Setting up shared build image"
 
-SITE_BUILD_IMG="/media/${SITE_NAME}_build"
 mkdir -p $$SITE_BUILD_IMG
 mount -o loop "$$SITE_DIR/build.img" "$$SITE_BUILD_IMG"
 

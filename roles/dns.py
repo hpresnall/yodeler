@@ -57,6 +57,8 @@ class Dns(Role):
 
         setup.append(f"install -o pdns -g pdns -m 600 $DIR/pdns.conf /etc/pdns")
         setup.append(f"install -o recursor -g recursor -m 600 $DIR/recursor.conf /etc/pdns")
+        setup.comment("# blackhole script created before chroot in vmhost's build image")
+        setup.append(f"install -o recursor -g recursor -m 600 /tmp/blackhole.lua /etc/pdns")
         setup.blank()
 
         setup.comment("ensure startup does not log to the console")
@@ -158,7 +160,8 @@ class Dns(Role):
         util.file.write("pdns.conf", util.file.substitute(self.name, "pdns.conf", pdns_conf), output_dir)
         util.file.write("recursor.conf", util.file.substitute(self.name, "recursor.conf", pdns_conf), output_dir)
 
-        util.file.copy_template("dns", "build_hosts.sh", output_dir)
+        util.file.copy_template("dns", "build_recursor_lua.sh", output_dir)
+        util.file.copy_template("dns", "create_lua_blackhole.py", output_dir)
 
         if self._cfg["additional_dns_entries"]:
             hosts = [""]

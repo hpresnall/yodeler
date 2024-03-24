@@ -462,8 +462,8 @@ def configure_uplink(cfg: dict, name: str):
             # ensure interface is not being used elsewhere
             for vswitch in cfg["vswitches"].values():
                 if uplink_iface in vswitch["uplinks"]:
-                    raise ValueError(f"{location}.macvtap {
-                                     uplink_iface} cannot be shared with the uplink " + f"for vswitch '{vswitch['name']}'")
+                    raise ValueError(f"{location}.macvtap "
+                                     "{uplink_iface} cannot be shared with the uplink " + f"for vswitch '{vswitch['name']}'")
 
             # set name here to distinguish from vswitch uplink; validate will convert to full object
             uplink["vswitch"] = "__unknown__"

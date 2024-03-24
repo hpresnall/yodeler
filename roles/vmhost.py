@@ -205,20 +205,7 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
         setup.append("rootinstall $DIR/logrotate-openvswitch /etc/logrotate.d/openvswitch")
         setup.blank()
 
-        # setup the site build image
-        # also create a stand-along script for bootstrapping a new image if needed
-        site_build = file.substitute(self.name, "site_build.sh", self._cfg)
-        setup.append(site_build)
-
-        create_build = shell.ShellScript("create_build_img.sh")
-        create_build.append_self_dir()
-        create_build.append("""
-log () {
-  echo $*
-}
-""")
-        create_build.append(site_build)
-        create_build.write_file(output_dir)
+        _create_site_build_image(self._cfg, setup, output_dir)
 
         # call yodel.sh for each VM
         setup.comment("run yodel.sh for each VM for this site")
@@ -257,7 +244,7 @@ def _create_uplink_ports(vswitch: dict) -> list[dict]:
         return ports
 
 
-def _setup_open_vswitch(cfg, setup):
+def _setup_open_vswitch(cfg: dict, setup: shell.ShellScript):
     setup.substitute("vmhost", "openvswitch.sh", cfg)
 
     # create vswitches for each definition
@@ -287,7 +274,7 @@ def _setup_open_vswitch(cfg, setup):
         setup.blank()
 
 
-def _create_vswitch_uplink(vswitch, setup):
+def _create_vswitch_uplink(vswitch: dict, setup: shell.ShellScript):
     # for each uplink, create a port on the vswitch
     uplinks = vswitch["uplinks"]
 
@@ -332,7 +319,7 @@ def _create_vswitch_uplink(vswitch, setup):
     setup.blank()
 
 
-def _setup_libvirt(cfg, setup, output_dir):
+def _setup_libvirt(cfg: dict, setup: shell.ShellScript, output_dir: str):
     setup.substitute("vmhost", "libvirt.sh", cfg)
 
     # for each vswitch, create an XML network definition
@@ -343,3 +330,30 @@ def _setup_libvirt(cfg, setup, output_dir):
         setup.append(f"virsh net-start {vswitch['name']}")
         setup.append(f"virsh net-autostart {vswitch['name']}")
         setup.blank()
+
+
+def _create_site_build_image(cfg: dict, setup: shell.ShellScript, output_dir: str):
+    # setup the site build image
+    # also create a stand-along script for bootstrapping a new image if needed
+    site_build = file.substitute("vmhost", "site_build.sh", cfg)
+    setup.append(site_build)
+
+    create_build = shell.ShellScript("create_build_img.sh")
+    create_build.append_self_dir()
+    create_build.append("""log () {
+  echo $*
+}
+""")
+    create_build.append(site_build)
+    create_build.append("log \"Build image mounted at $SITE_BUILD_IMG\"")
+    create_build.write_file(output_dir)
+
+    unmount_build = shell.ShellScript("unmount_build_img.sh")
+    unmount_build.append_self_dir()
+    unmount_build.append(f"SITE_BUILD_IMG=\"/media/{cfg['site_name']}_build\"")
+    unmount_build.blank()
+    unmount_build.append("umount $SITE_BUILD_IMG/tmp/apk_cache")
+    unmount_build.append("umount $SITE_BUILD_IMG")
+    unmount_build.blank()
+    unmount_build.append("echo \"Unmounted $SITE_BUILD_IMG\"")
+    unmount_build.write_file(output_dir)
