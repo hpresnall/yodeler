@@ -12,7 +12,7 @@ done
 sed -i -E 's/(STARTUP_ENABLED=)No/\1Yes/' /etc/shorewall/shorewall.conf
 sed -i -E 's/(LOG_LEVEL=)info/\1NFLOG(4,0,1)/' /etc/shorewall/shorewall.conf
 sed -i -E 's/(IP_FORWARDING=)Keep/\1Yes/' /etc/shorewall/shorewall.conf
-sed -i -E 's/(SAVE_IPSETS=)No/\1Yes/' /etc/shorewall/shorewall.conf
+sed -i -E 's/(SAVE_IPSETS=)No/\1ipv4/' /etc/shorewall/shorewall.conf
 sed -i -E 's/(USE_NFLOG_SIZE=)No/\1Yes/' /etc/shorewall/shorewall.conf
 
 sed -i -E 's/(STARTUP_ENABLED=)No/\1Yes/' /etc/shorewall6/shorewall6.conf

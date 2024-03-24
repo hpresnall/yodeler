@@ -240,6 +240,10 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
             # not a valid vlan with a hostname, but continue processing for ipsets which can be external
             vlan_obj = {"name": "internet", "dhcp_reservations": []}
             vlan = "internet"
+        elif "firewall" == vlan:
+            # not a valid vlan, but continue processing other locations
+            vlan_obj = {"name": "firewall", "dhcp_reservations": []}
+            vlan = "firewall"
         else:
             vswitch = parse.non_empty_string("vswitch", loc, loc_name)
 
@@ -257,6 +261,8 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
         if "hostname" in loc:
             if vlan == "internet":
                 raise KeyError(f"cannot set hostname when vlan is 'internet' for {loc_name}")
+            if vlan == "firewall":
+                raise KeyError(f"cannot set hostname when vlan is 'firewall for {loc_name}")
             if "ipset" in loc:
                 raise KeyError(f"cannot set hostname and ipset for {loc_name}")
             if ("ipv4_address" in loc) or ("ipv6_address" in loc):
@@ -268,6 +274,9 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
             parsed_location4["hostname"] = hostname
             parsed_location6["hostname"] = hostname
         elif "ipset" in loc:  # possibly add rule for the ipset
+            if vlan == "firewall":
+                raise KeyError(f"cannot set ipset when vlan is 'firewall for {loc_name}")
+
             if ("ipv4_address" in loc) or ("ipv6_address" in loc):
                 raise KeyError(f"cannot set ipset and ip address for {loc_name}")
 
@@ -280,7 +289,10 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
             else:
                 raise ValueError(f"uknown ipset '{ipset}' for {loc_name}")
         else:
-            if "ipv4_address" in loc:
+            if vlan == "firewall":
+                if ("ipv4_address" in loc) or ("ipv6_address" in loc):
+                    raise KeyError(f"cannot set ip address when vlan is 'firewall for {loc_name}")
+            elif "ipv4_address" in loc:
                 try:
                     address = ipaddress.ip_address(loc["ipv4_address"])
                 except ValueError as ve:

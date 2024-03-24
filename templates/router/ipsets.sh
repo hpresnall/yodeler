@@ -1,10 +1,12 @@
 # shorewall can use and save ipsets, but cannot create
 IPSETS_4=/var/lib/shorewall/ipsets.save
+rm $IPSETS_4
 touch $IPSETS_4
 chown root:root $IPSETS_4
 chmod 600 $IPSETS_4
 
 IPSETS_6=/var/lib/shorewall6/ipsets.save
+rm $IPSETS_6
 touch $IPSETS_6
 chown root:root $IPSETS_6
 chmod 600 $IPSETS_6

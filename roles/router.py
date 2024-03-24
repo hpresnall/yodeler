@@ -112,6 +112,7 @@ class Router(Role):
         self._cfg["local_firewall"] = False
 
         self.add_alias("gateway")
+        self.add_alias("firewall")
 
         if self._cfg["metrics"]:
             self._cfg["prometheus_collectors"].extend(["conntrack", "network_route"])
@@ -595,6 +596,8 @@ def _parse_firewall_location(cfg: dict, location: dict, ip_version: int,  loc_na
 
     if vlan["name"] == "internet":
         vlan = "inet"  # match Shorewall interfaces file
+    elif vlan["name"] == "firewall":
+        vlan = "$FW"  # match Shorewall firewall zone name
     else:
         vlan = vlan["name"]
 
