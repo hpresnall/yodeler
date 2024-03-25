@@ -190,10 +190,10 @@ def rename_interfaces(rename_rules: list[dict], script: util.shell.ShellScript, 
     # create init script & add it to boot
     rename_cmds = []
     for i, rule in enumerate(rename_rules, start=1):
-        if "mac_address" not in rule:
-            raise KeyError(f"no mac_address for rename rule {i} for host '{hostname}'")
         if "name" not in rule:
             raise KeyError(f"no name for rename rule {i} for host '{hostname}'")
+        if "mac_address" not in rule:
+            raise KeyError(f"no mac_address for rename rule {i} for host '{hostname}'")
 
         name = rule["name"]
         mac = rule["mac_address"]

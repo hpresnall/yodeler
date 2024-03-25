@@ -11,12 +11,25 @@ uplink:
   # request a DHCP6 address in addtion to SLAAC and DHCP6 options
   ipv6_dhcp: true
   # request an IPv6 prefix delegation of this length
-  # this will be distributed to the vlans, possibly using the ipv6_pd_network setting 
+  # this will be distributed to the vlans, possibly using the ipv6_pd_network setting
   ipv6_pd_prefixlen: 56
   # note that eth0 _cannot_ also be an uplink for a vswitch
   # this interface is dedicated to the router by the KVM host using macvtap
-  # could also set vswitch + vlan here instead of macvtap
-  # this would require a separate vswitch just for the router
   macvtap: eth0
+  # other options instead of macvtap:
+  # 1) vswitch + vlan to specify a vswitch on the vmhost
+  #    this would probably require a separate vswith just for the router
+  # 2) PCI passthrough
+  # passthrough:
+  #   name: e10p0 # the (possibly renamed) interface on the host
+  #   pci_address: "01:02.3" # from lspci grep PCI_SLOT_NAME /sys/class/net/*/device/uevent
+  # not that this is the PCI address of the _virtual function_, so you must boot the vmhost
+  # and create virtual functions to know what this address is
+  #
+  # note that an uplink name is not required for vms; it defaults to 'wan'
+  # this name will be stable across reboots
+  # the macvtap interface, however _is_ using the host's naming convention
+  # if stable interfaces are required, 'rename_interfaces' should be set in the vmhost's config
+# note, no interfaces stanza required; the wan and lan interfaces will be configured by the router
 # not on the mgmt vlan for security
 # if desired anyway, that interface would need to be manually added since it is not routable

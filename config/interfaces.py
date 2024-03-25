@@ -378,6 +378,7 @@ def for_vlan(parent: str, vswitch: dict, vlan: dict, mac_address: str | None) ->
     else:
         iface["name"] = f"{parent}.{vlan['id']}"
         iface["parent"] = parent
+        iface["mac_address"] = None
 
     if vlan.get("ipv6_subnet"):
         # manually set the IPv6 address
@@ -419,7 +420,7 @@ def for_port(name: str, comment: str, subtype: str, parent=None, uplink=None, ma
     }
 
 
-def configure_uplink(cfg: dict, name: str):
+def configure_uplink(cfg: dict):
     """Configure the interface definition for a router's wan uplink.
     Allows partial configuration of IP addresses, including DHCP.
     For VMs, requires either a 'macvtap' interface, a 'passthrough' interface + PCI address 
@@ -430,28 +431,22 @@ def configure_uplink(cfg: dict, name: str):
     if uplink is None:
         raise KeyError(f"{location} must define an uplink")
 
-    # default to the first interface
-    parse.set_default_string("name", uplink, "eth0")
+    location += ".uplink"
 
     # allow some end user configuration of the uplink interface YAML
     # but it will always use forwarding
     uplink["type"] = "uplink"
-    uplink["comment"] = "internet uplink"
+    uplink["comment"] = parse.set_default_string("comment", uplink, "internet uplink")
     uplink["forward"] = True
-    uplink["name"] = name
-
-    if (cfg["is_vm"]):
-        uplink["mac_address"] = random_mac_address()
-    else:
-        # used for renaming; physical servers should set rename rules in yaml
-        uplink["mac_address"] = None
 
     # delegated prefixes for ipv6; used by dhcpcd
     uplink["ipv6_delegated_prefixes"] = []
 
-    location += ".uplink"
-
     if cfg["is_vm"]:
+        # create a random mac address and use that for renaming
+        uplink["mac_address"] = random_mac_address()
+        uplink["name"] = parse.set_default_string("name", uplink, "wan")
+
         # uplink can be an existing vswitch or a physical iface either on the host via macvtap or PCI passthrough
         if "macvtap" in uplink:
             uplink_iface = uplink["macvtap"]
@@ -483,8 +478,19 @@ def configure_uplink(cfg: dict, name: str):
             uplink["vlan"] = _uplink_vlan
         elif "vswitch" not in uplink:
             raise ValueError((f"{location} must define a vswitch+vlan or a macvtap/passthrough host interface"))
+    else:  # physical server
 
-    else:  # physical host uplinks are treated like normal ifaces, but without a vswitch+vlan
+        uplink["mac_address"] = uplink.get("mac_address", None)
+
+        if uplink["mac_address"]:
+            parse.validate_mac_address(uplink["mac_address"], location)
+            # mac address is set; renaming will use the name
+            uplink["name"] = parse.set_default_string("name", uplink, "wan")
+        else:
+            # cannot rename without mac address; use existing name
+            parse.non_empty_string("name", uplink, location)
+
+        # physical host uplinks are treated like normal ifaces, but without a vswitch+vlan
         uplink["vswitch"] = "__unknown__"
         uplink["vlan"] = _uplink_vlan
 

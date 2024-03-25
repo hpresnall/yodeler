@@ -16,6 +16,9 @@ uplink:
   # note that eth0 _cannot_ also be an uplink for a vswitch
   # this is the WAN port on the router
   name: eth0
+  # on physical servers, set an optional mac address to _rename_ the interface and ensure naming is stable across reboots
+  # if mac_address is set, name should be set to a _non ethX_ name; it defaults to 'wan'
+  # mac_address: ab:cd:ef:12:34:56
 disk: # optional; defaults to /dev/sda & partition 3
   # can also be an array
   # first and only disk => system disk for the OS

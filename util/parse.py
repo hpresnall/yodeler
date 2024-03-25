@@ -178,7 +178,7 @@ def validate_mac_address(mac_address, location: str):
     Upper and lowercase are accepted as well as ':' or '-' separators."""
 
     if not isinstance(mac_address, str):
-        raise ValueError(f"invalid mac_address '{mac_address}' for {location}")
+        raise ValueError(f"invalid mac_address '{mac_address}' for {location}; it must be a string")
     if not _VALID_MAC.match(mac_address.upper()):
         # mac address case is up to the client, but upper() for regex here
         raise ValueError(f"invalid mac_address '{mac_address}' for {location}")

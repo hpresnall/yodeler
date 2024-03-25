@@ -22,10 +22,12 @@ class Router(Role):
         return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "ndisc6", "tcpdump", "ethtool"}
 
     def configure_interfaces(self):
-        uplink = config.interfaces.configure_uplink(self._cfg, "wan")
+        uplink = config.interfaces.configure_uplink(self._cfg)
 
         # rename router interfaces to avoid issues with startup order
-        self._cfg["rename_interfaces"].append({"name": uplink["name"], "mac_address": uplink["mac_address"]})
+        # physical servers are only renamed if the config sets a mac address
+        if uplink["mac_address"]:
+            self._cfg["rename_interfaces"].append({"name": uplink["name"], "mac_address": uplink["mac_address"]})
 
         # add an interface for each vswitch that has routable vlans
         iface_counter = 1  # start at eth1
@@ -86,7 +88,7 @@ class Router(Role):
                 if untagged:  # interface with no vlan tag already created; add the comment on the first interface
                     vlan_interfaces[0]["comment"] = comment
                 else:  # add the base interface as a port
-                    # append to vswitch_interfaces to ensure it is the first definition
+                    # append to vswitch_interfaces to ensure it is defined before the sub-interfaces for the vlans
                     vswitch_interfaces.append(config.interfaces.for_port(
                         iface_name, comment, "vlan", mac_address=mac_address))
 
@@ -98,8 +100,9 @@ class Router(Role):
 
         # rename all the interfaces that have a mac address, i.e. this is a vm and these are virtual interfaces
         # non-vm routers should set rename rules in the yaml config
+        # TODO add optional 'downlink' configuration to allow physical servers to set an interface & mac_address; require vswitch name if more than one
         for iface in vswitch_interfaces:
-            if "mac_address" in iface:
+            if iface["mac_address"]:
                 self._cfg["rename_interfaces"].append({"name": iface["name"], "mac_address": iface["mac_address"]})
 
         if not isinstance(interfaces, list):
@@ -144,10 +147,9 @@ class Router(Role):
         if self._cfg["is_vm"]:
             # uplink can be an existing vswitch or a physical iface on the host via macvtap
             if "macvtap" in uplink:
-                uplink_xml = util.libvirt.macvtap_interface(self._cfg, uplink["macvtap"])
+                uplink_xml = util.libvirt.macvtap_interface(uplink)
             elif "passthrough" in uplink:
-                passthrough = uplink["passthrough"]
-                uplink_xml = util.libvirt.passthrough_interface(passthrough["bus"], passthrough["slot"], passthrough["function"], uplink["mac_address"])
+                uplink_xml = util.libvirt.passthrough_interface(uplink["passthrough"], uplink["mac_address"])
             else:  # use vswitch+vlan
                 uplink_xml = util.libvirt.interface_from_config(self._cfg["hostname"], uplink)
 

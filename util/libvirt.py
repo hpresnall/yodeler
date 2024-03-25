@@ -136,7 +136,7 @@ def interface_from_config(hostname: str, iface: dict) -> xml.Element:
     return interface
 
 
-def macvtap_interface(iface: dict, iface_name: str) -> xml.Element:
+def macvtap_interface(iface: dict) -> xml.Element:
     """Create an <interface> XML element that uses macvtap to connect the host's iface to the VM.
     The given iface_name is the name of the interface _on the host_.
 
@@ -146,7 +146,7 @@ def macvtap_interface(iface: dict, iface_name: str) -> xml.Element:
     </interface>
     """
     interface = xml.Element("interface", {"type": "direct"})
-    xml.SubElement(interface, "source", {"dev": iface_name, "mode": "private"})
+    xml.SubElement(interface, "source", {"dev": iface["macvtap"], "mode": "private"})
     xml.SubElement(interface, "model", {"type": "virtio"})
 
     if "mac_address" in iface:
@@ -155,7 +155,7 @@ def macvtap_interface(iface: dict, iface_name: str) -> xml.Element:
     return interface
 
 
-def passthrough_interface(bus: int, slot: int, function: int, mac_address: str) -> xml.Element:
+def passthrough_interface(passthrough: dict, mac_address: str) -> xml.Element:
     """Create an <interface> XML element that uses PCI passthrough to connect the host's iface to the VM.
     The given iface_name is the name of the interface _on the host_.
 
@@ -167,12 +167,13 @@ def passthrough_interface(bus: int, slot: int, function: int, mac_address: str) 
     """
     interface = xml.Element("interface", {"type": "hostdev", "managed": "yes"})
     source = xml.SubElement(interface, "source")
-    xml.SubElement(source, "address",  {"type": "pci",
-                                        "domain": "0x0000",  # domain is always 0
-                                        "bus": f"{bus:#0{4}x}",  # padding count includes '0x'
-                                        "slot": f"{slot:#0{4}x}",
-                                        "function": f"{function:#0{3}x}"
-                                        })
+    xml.SubElement(source, "address",
+                   {"type": "pci",
+                    "domain": "0x0000",  # domain is always 0
+                    "bus": f"{passthrough['bus']:#0{4}x}",  # padding count includes '0x'
+                    "slot": f"{passthrough['slot']:#0{4}x}",
+                    "function": f"{passthrough['function']:#0{3}x}"
+                    })
 
     if mac_address:
         xml.SubElement(interface, "mac", {"address": mac_address})

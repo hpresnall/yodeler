@@ -32,3 +32,12 @@ disk: # optional; defaults to /dev/sda & partition 3
   # if there is more than one disk on the system, using /dev/disk/by-id may be more stable
   path: /dev/nvme0n1
   partition: p3
+# optional configuration to ensure stable interface names across reboots
+# not that the names used here _must_ also be used for
+# 1) vswitch uplinks in the site configuration
+# 2) uplinks in a router vm's configuration
+# rename_interfaces:
+#   - name: en0
+#     mac_address: ab:cd:ef:12:34:56
+#   - name: en1
+#     mac_address: ab:cd:ef:12:34:57

@@ -10,6 +10,7 @@ import util.shell
 import util.sysctl
 import util.file
 import util.interfaces
+import util.parse
 
 _logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ class FakeISP(Role):
                     parent, "vlans on 'fakeisp' vswitch", "vswitch"))
 
             if (finet_vlan["id"] is not None):
-                parent = fakeinternet.get("name", "eth0")
+                parent = util.parse.non_empty_string("name", fakeinternet, "eth0")
                 # insert before fakeinternet
                 self._cfg["interfaces"].insert(0, config.interfaces.for_port(
                     parent, "vlans on 'fakeiternet' vswitch", "vswitch"))
