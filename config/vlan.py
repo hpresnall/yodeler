@@ -19,6 +19,13 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
     vlans_by_id = vswitch["vlans_by_id"] = {}
     vlans_by_name = vswitch["vlans_by_name"] = {}
 
+    # possibly delegate an IPv6 prefix to each vlan
+    # start at 1 => do not delegate the 0 network
+    # prefix for each vlan is in the order they are defined unless vlan['ipv6_pd_network'] is set
+    # each vswitch will need a _separate_ prefix delegation
+    ipv6_pd_networks = set()
+    ipv6_pd_network_count = 1
+
     for i, vlan in enumerate(vlans, start=1):
         cfg_name = f"vswitch['{vswitch_name}'].vlan[{i}]"
         parse.non_empty_dict(cfg_name, vlan)
@@ -62,6 +69,7 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
         _validate_vlan_subnet(vswitch_name, vlan, "ipv4")
         _validate_vlan_subnet(vswitch_name, vlan, "ipv6")
         _validate_vlan_dhcp_reservations(vswitch_name, vlan)
+        _validate_vlan_ipv6_pd_network(vlan, ipv6_pd_networks, ipv6_pd_network_count)
 
         # domain must be a subdomain of the top-level site
         if vlan["domain"] and ((domain not in vlan["domain"]) or (domain == vlan["domain"])):
@@ -71,13 +79,6 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
         # single vlan's domain is the site domain
         if not vlan["domain"] and (len(vlans) == 1):
             vlan["domain"] = domain
-
-        ipv6_pd_network = vlan.setdefault("ipv6_pd_network", None)
-        if ipv6_pd_network is not None:
-            if not isinstance(ipv6_pd_network, int):
-                raise ValueError(f"ipv6_pd_network '{ipv6_pd_network}' must be an integer")
-            if ipv6_pd_network < 1:
-                raise ValueError(f"ipv6_pd_network '{ipv6_pd_network}' must be greater than 0")
 
     _configure_default_vlan(vswitch)
     _validate_access_vlans(vswitch)
@@ -183,6 +184,30 @@ def _validate_vlan_dhcp_reservations(vswitch_name: str, vlan: dict):
     _logger.debug("%s known_aliases=%s", cfg_name, known_aliases)
 
 
+def _validate_vlan_ipv6_pd_network(vlan: dict, ipv6_pd_networks: set, ipv6_pd_network_count):
+    # ensure prefix delegation network is valid and not reused
+    if (vlan["ipv6_disabled"]):
+        vlan["ipv6_pd_network"] = None
+        return
+
+    ipv6_pd_network = vlan.get("ipv6_pd_network", None)
+    vlan_name = vlan["name"]
+
+    if ipv6_pd_network is not None:
+        if not isinstance(ipv6_pd_network, int):
+            raise ValueError(f"vlan['{vlan_name}'].ipv6_pd_network '{ipv6_pd_network}' must be an integer")
+        if ipv6_pd_network < 1:
+            raise ValueError(f"vlan['{vlan_name}'].ipv6_pd_network '{ipv6_pd_network}' must be greater than 0")
+    else:
+        vlan["ipv6_pd_network"] = ipv6_pd_network = ipv6_pd_network_count
+
+    if ipv6_pd_network in ipv6_pd_networks:
+        raise ValueError(f"vlan['{vlan_name}'].ipv6_pd_network '{ipv6_pd_network}' already used for this vlan")
+
+    ipv6_pd_network_count += 1
+    ipv6_pd_networks.add(ipv6_pd_network)
+
+
 def _validate_ipaddress(ip_version: str, index: int, vlan: dict, location: str):
     key = ip_version + "_address"
 
@@ -241,8 +266,7 @@ def _validate_access_vlans(vswitch: dict):
                 access_vlan = lookup(vlan_id, vswitch)
                 access_vlans.append(access_vlan["name"])
             except KeyError as ke:
-                msg = ke.args[0]
-                raise ValueError(f"invalid access_vlan in vlan '{vlan['name']}': {msg}") from ke
+                raise ValueError(f"invalid access_vlan in vlan '{vlan['name']}'") from ke
 
         vlan["access_vlans"] = access_vlans
 

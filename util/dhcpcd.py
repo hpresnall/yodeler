@@ -40,14 +40,14 @@ def create_conf(cfg: dict, output_dir: str):
 
         if prefixes:
             buffer.append("")
-            prefixes.insert(0, f"  ia_pd 1/::{iface['ipv6_pd_prefixlen']}")
+            prefixes.insert(0, f"  ia_pd 1/{iface['name']}/{iface['ipv6_pd_prefixlen']}")
             buffer.append("  # request prefix delegation and distribute to all routable vlans")
             buffer.append(" ".join(prefixes))
 
         if iface["ipv6_ask_for_prefix"]:
             buffer.append("")
             buffer.append("  # request prefix delegation, but do not assign to any interfaces")
-            buffer.append(f"  ia_pd 1/::{iface['ipv6_pd_prefixlen']}")
+            buffer.append(f"  ia_pd 1/{iface['name']}/{iface['ipv6_pd_prefixlen']}")
 
         if len(buffer) > 0:
             interfaces[iface["name"]] = buffer

@@ -1,4 +1,4 @@
-"""Configuration & setup for a BIND9 DNS server."""
+"""Configuration & setup for a PowerDNS server."""
 import util.shell
 import util.file
 import util.address
@@ -48,7 +48,6 @@ class Dns(Role):
         return 2  # no need for additional redundancy
 
     def additional_configuration(self):
-        site_name = self._cfg["site_name"]
         self._cfg["before_chroot"] = [util.file.substitute("dns", "before_chroot.sh", self._cfg)]
 
     def write_config(self, setup: util.shell.ShellScript, output_dir: str):

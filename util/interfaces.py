@@ -155,11 +155,10 @@ def _vlan(iface: dict):
 
     _output_forward(iface, buffer)
 
-    subnet = vlan["ipv4_subnet"] if "ipv4_subnet" else iface["ipv4_subnet"]
-    buffer.append("  address " + str(iface["ipv4_address"]) + "/" + str(subnet.prefixlen))
+    buffer.append("  address " + str(iface["ipv4_address"]) + "/" + str(vlan["ipv4_subnet"].prefixlen))
     # this interface _is_ the gateway, so gateway is not needed
 
-    # add IPv6 address for subnet
+    # add IPv6 address for subnet if IPv6 is enabled
     if vlan.get("ipv6_subnet"):
         # manually set the IPv6 address
         buffer.append("\n  address " + str(iface["ipv6_address"]) + "/" + str(vlan["ipv6_subnet"].prefixlen))

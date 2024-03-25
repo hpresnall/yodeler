@@ -1,4 +1,4 @@
-"""Configuration & setup for the main KVM & Openvswitch Alpine host."""
+"""Configuration & setup for the main KVM & Openvswitch Alpine server that runs other roles as VMs."""
 
 import os
 import string
@@ -135,7 +135,7 @@ class VmHost(Role):
         _setup_libvirt(self._cfg, setup, output_dir)
 
         local = False
-        local_conf = ["# for vmhost interfaces, disable ipv6 on ipv4 only networks and enable ipv6 temporary addresses\n"]
+        local_conf = ["# for vmhost interfaces, disable ipv6 on ipv4 only networks and enable ipv6 temporary addresses", ""]
         # run using the local service which runs _after_ the interfaces have been created by openvswitch
         # sysctl would run before the openvswitch port is created
         for iface in self._cfg["interfaces"]:
@@ -147,12 +147,13 @@ class VmHost(Role):
             if iface["ipv6_disabled"]:
                 local = True
                 sysctl.add_disable_ipv6_to_script(local_conf, name)
-                local_conf.append("\n")
+                local_conf.append("")
 
             if iface["ipv6_tempaddr"]:
                 local = True
                 sysctl.add_tmpaddr_ipv6_to_script(local_conf, name)
-                local_conf.append("\n")
+                local_conf.append("")
+
         if local:
             file.write("ipv6.start", "\n".join(local_conf), output_dir)
             setup.comment("configure ipv6 on this host's network interfaces")

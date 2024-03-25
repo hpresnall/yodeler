@@ -32,11 +32,6 @@ class Router(Role):
         # add an interface for each vswitch that has routable vlans
         iface_counter = 1  # start at eth1
 
-        # delegate IPv6 delegated prefixes across all vswitches
-        # network for each vlan is in the order they are defined unless vlan['ipv6_pd_network'] is set
-        # start at 1 => do not delegate the 0 network
-        prefix_counter = 1
-
         vswitch_interfaces = []
 
         for vswitch in self._cfg["vswitches"].values():
@@ -75,9 +70,6 @@ class Router(Role):
 
                 # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
                 pd_network = vlan["ipv6_pd_network"]
-                if pd_network is None:
-                    pd_network = prefix_counter
-                    prefix_counter += 1
                 _validate_vlan_pd_network(uplink["ipv6_pd_prefixlen"], pd_network)
                 uplink["ipv6_delegated_prefixes"].append(f"{vlan_iface['name']}/{pd_network}")
 
