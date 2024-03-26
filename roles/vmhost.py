@@ -124,7 +124,7 @@ class VmHost(Role):
                 if disk["type"] == "passthrough":
                     address = disk["pci_address"]
                     if address in addresses:
-                        raise ValueError(f"cannot reuse PCI address {address} for uplink in host {host['hostname']}")
+                        raise ValueError(f"cannot reuse PCI address {address} for disk in host {host['hostname']}")
 
                     addresses.add(address)
 
