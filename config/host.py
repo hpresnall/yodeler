@@ -152,6 +152,10 @@ def write_scripts(host_cfg: dict, output_dir: str):
         host_cfg["before_chroot"] = "# no configuration needed before chroot"
     else:
         host_cfg["before_chroot"] = "\n".join(host_cfg["before_chroot"])
+    if not host_cfg["after_chroot"]:
+        host_cfg["afterchroot"] = "# no configuration needed after chroot"
+    else:
+        host_cfg["after_chroot"] = "\n".join(host_cfg["after_chroot"])
 
     if host_cfg["is_vm"]:
         _bootstrap_vm(host_cfg, host_dir)
@@ -480,6 +484,7 @@ DEFAULT_CONFIG = {
     # domain for the host when it has multiple interfaces; used for DNS search
     "primary_domain": "",
     "before_chroot": [],
+    "after_chroot": [],
     "rename_interfaces": [],
     "prometheus_collectors": ["cpu", "diskstats", "filefd", "filesystem", "meminfo", "netdev", "netstat",
                               "schedstat", "sockstat", "stat", "udp_queues", "uname", "vmstat"]
@@ -501,6 +506,7 @@ _DEFAULT_CONFIG_TYPES = {
     "primary_domain": str,
     "install_interfaces": str,
     "before_chroot": list,
+    "after_chroot": list,
     "rename_interfaces": list,
     "prometheus_collectors": list
 }

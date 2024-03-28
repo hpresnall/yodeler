@@ -1,4 +1,4 @@
-"""Common configuration & setup for all Alpine hosts."""
+"""Common configuration & setup for all Alpine servers."""
 import util.awall
 import util.disks
 import util.dhcpcd
@@ -32,6 +32,11 @@ class Common(Role):
         for disk in self._cfg["disks"]:
             if disk["type"] != "img":
                 packages.add("lsblk")
+
+        # add disk utilities for physical servers
+        if not self._cfg["is_vm"]:
+            packages.add("nvme")
+            packages.add("smartmontools")
 
         return packages
 
@@ -107,8 +112,9 @@ class Common(Role):
             setup.service("node-exporter")
             # awful formatting; put each prometheus arg on a separate line ending with '\'
             # then, the whole command needs to be echoed to a file as a quoted param
+            collectors = set(self._cfg["prometheus_collectors"])
             node_exporter_cmd = " \\\n".join(_PROMETHEUS_ARGS) + " "  \
-                + " \\\n".join("--collector.%s" % c for c in self._cfg["prometheus_collectors"])
+                + " \\\n".join("--collector.%s" % c for c in collectors)
             setup.append("echo \"ARGS=\\\"" + node_exporter_cmd + "\\\"\" > /etc/conf.d/node-exporter")
             setup.blank()
 

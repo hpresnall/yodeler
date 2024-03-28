@@ -12,17 +12,17 @@ def from_config(cfg: dict, setup: util.shell.ShellScript):
         if (disk["type"] == "passthrough"):
             # for host passthrough, let other roles format the disk and handle fstab
             continue
-        else:
-            if not disk.get("mountpoint"):
-                # other roles should have set the mountpoint
-                raise ValueError(f"no mountpoint defined for disk '{disk['name']}'")
+
+        if not disk.get("mountpoint"):
+            # other roles should have set the mountpoint
+            raise ValueError(f"no mountpoint defined for disk '{disk['name']}'")
 
         if cfg["is_vm"]:
             # for vms, setup the disk before chroot
             if disk["type"] == "img":
                 cfg["before_chroot"].append(_create_image(disk))
             elif disk["type"] == "device":
-                # note formatting with the host's disk path; it will be a different (vda) dev in a running vm
+                # note formatting with the host's disk path; it will be a different dev (e.g. vda) in a running vm
                 cfg["before_chroot"].append(format(disk))
 
             cfg["before_chroot"].append(_add_uuid_to_envvars(cfg['hostname'], disk))

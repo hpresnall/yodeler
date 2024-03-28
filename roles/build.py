@@ -1,4 +1,4 @@
-"""Configuration for host with standard build & compile tools."""
+"""Configuration for server with standard build & compile tools."""
 import util.shell as shell
 
 from roles.role import Role
@@ -24,16 +24,6 @@ class Build(Role):
 
         return packages
 
-    def additional_configuration(self):
-        self._cfg["build_dir"] = "/build"
-
-        # optional disk for builds, if defined
-        # otherwise just use a directory on the system disk
-        for disk in self._cfg["disks"]:
-            if disk["name"] == "build":
-                self._cfg["build_dir"] = parse.set_default_string("mountpoint", disk, "/build")
-                break
-
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         return 0
@@ -41,6 +31,34 @@ class Build(Role):
     def validate(self):
         if self._cfg["is_vm"] and (self._cfg["disk_size_mb"] < 1024):
             raise ValueError("build server must set 'disk_size_mb' to at least 1,024")
+
+        # optional disk for builds, if defined
+        build_disk = None
+
+        for disk in self._cfg["disks"]:
+            if disk["name"] == "build":
+                build_disk = disk
+                # = parse.set_default_string("mountpoint", disk, "/build")
+                break
+
+        if build_disk:
+            mountpoint = disk.get("mountpoint", None)
+
+            if mountpoint:
+                build_dir = self._cfg.get("build_dir", None)
+
+                # both build and mount point set => override mount point with build_dir
+                if build_dir:
+                    disk["mountpoint"] = build_dir
+                else:  # set the build_dir to the mount point
+                    parse.set_default_string("build_dir", self._cfg, mountpoint)
+            else:
+                # no mount point, set both to the build_dir
+                build_dir = parse.set_default_string("build_dir", self._cfg, "/build")
+                disk["mountpoint"] = build_dir
+        else:
+            # no disk; just use /build on the system disk
+            build_dir = parse.set_default_string("build_dir", self._cfg, "/build")
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         build_dir = self._cfg["build_dir"]

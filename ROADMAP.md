@@ -53,9 +53,9 @@
 - [ ] Add SNMP support for network metrics
 
 ## Storage
-- [ ] Configure Samba
-- [ ] Add separate storage volume, outside of the VM
-- [ ] Configure ZFS
+- [x] Configure Samba
+- [x] Allow separate storage volume that can persist on VM rebuilds
+- [x] Configure ZFS
 - [x] Support for image, device and PCI passthrough disks on VMs
 - [x] Add backup and / or shared mount support for durable VM configuration data
 - [] Add backup scripts for each server role & configure nightly backups

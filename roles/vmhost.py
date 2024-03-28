@@ -78,6 +78,7 @@ class VmHost(Role):
 
         # additional physical server config before running chroot during setup
         self._cfg["before_chroot"].append(file.substitute("vmhost", "before_chroot.sh", self._cfg))
+        self._cfg["after_chroot"].append(file.substitute("vmhost", "after_chroot.sh", self._cfg))
 
     def validate(self):
         # ensure no reused PCI addresses, uplink interfaces, disk images or disk devices
@@ -124,7 +125,7 @@ class VmHost(Role):
                 if disk["type"] == "passthrough":
                     address = disk["pci_address"]
                     if address in addresses:
-                        raise ValueError(f"cannot reuse PCI address {address} for uplink in host {host['hostname']}")
+                        raise ValueError(f"cannot reuse PCI address {address} for disk in host {host['hostname']}")
 
                     addresses.add(address)
 

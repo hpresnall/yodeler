@@ -1,5 +1,4 @@
 """Handles parsing and validating disk configuration from host YAML files."""
-import re
 
 import util.parse as parse
 import util.pci as pci
