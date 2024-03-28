@@ -58,7 +58,7 @@ def configure(interfaces: list[dict], roles: list[Role], setup: util.shell.Shell
     util.file.write("base.json", util.file.output_json(base), awall)
     util.file.write("custom-services.json", util.file.output_json(custom_services), awall)
 
-    setup.append("log \"Configuring awall\"")
+    setup.log("Configuring awall")
     setup.append("rootinstall $DIR/awall/base.json /etc/awall/private")
     setup.append("rootinstall $DIR/awall/custom-services.json /etc/awall/private")
 

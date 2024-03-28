@@ -221,7 +221,7 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
                 continue
 
             setup.append(hostname + "/yodel.sh")
-            setup.append("log \"\"")
+            setup.log("")
 
         setup.blank()
         setup.comment("add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity")
@@ -347,7 +347,7 @@ def _create_site_build_image(cfg: dict, setup: shell.ShellScript, output_dir: st
 }
 """)
     create_build.append(site_build)
-    create_build.append("log \"Build image mounted at $SITE_BUILD_IMG\"")
+    create_build.log("Build image mounted at $SITE_BUILD_IMG")
     create_build.write_file(output_dir)
 
     unmount_build = shell.ShellScript("unmount_build_img.sh")

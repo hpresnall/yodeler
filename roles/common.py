@@ -90,7 +90,7 @@ class Common(Role):
             setup.append("apk -q update")
             setup.append("apk cache sync")
             setup.blank()
-            setup.append("log \"Installing required packages\"")
+            setup.log("Installing required packages")
             setup.comment("this server could be using a repo with newer package versions")
             setup.comment("upgrade any packages added by alpine installer, then install the required packages")
             setup.append("apk -q --no-progress upgrade")
@@ -98,7 +98,7 @@ class Common(Role):
             setup.blank()
 
         if (self._cfg["remove_packages"]):
-            setup.append("log \"Removing unneeded packages\"")
+            setup.log("Removing unneeded packages")
             setup.append("apk -q del " + " ".join(self._cfg["remove_packages"]))
             setup.blank()
 
@@ -108,7 +108,7 @@ class Common(Role):
         util.file.copy_template(self.name, "hosts", output_dir)
 
         if self._cfg["metrics"]:
-            setup.append("log \"Configuring Prometheus\"")
+            setup.log("Configuring Prometheus")
             setup.service("node-exporter")
             # awful formatting; put each prometheus arg on a separate line ending with '\'
             # then, the whole command needs to be echoed to a file as a quoted param
@@ -171,7 +171,7 @@ class Common(Role):
 
 
 def _setup_repos(cfg: dict, setup: util.shell.ShellScript):
-    setup.append("log \"Setting up APK repositories\"")
+    setup.log("Setting up APK repositories")
     setup.blank()
 
     repos = list(cfg["alpine_repositories"])

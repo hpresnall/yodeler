@@ -52,23 +52,23 @@ class Storage(Role):
 
         setup.append("zpool import 2>&1 | grep storage &>/dev/null && ret=$? || ret=$?")
         setup.append("if [ $ret -eq 0 ]; then")
-        setup.append(f"  log \"Importing existing ZFS storage pool to {storage_dir}\"")
+        setup.log(f"Importing existing ZFS storage pool to {storage_dir}", indent="  ")
         setup.append("  zpool import storage")
         setup.append("else")
-        setup.append(f"  log \"Creating ZFS storage pool at {storage_dir}\"")
+        setup.log(f"Creating ZFS storage pool at {storage_dir}", indent="  ")
         setup.append(zpool)
         setup.append("fi")
         setup.blank()
 
         group = storage_cfg["group"]
-        setup.append(f"log \"Creating the group '{group}' & all share users\"")
+        setup.log(f"Creating group '{group}' & all share users")
         setup.blank()
 
         setup.comment("change file permissions even if group or user already existed")
         setup.append(f"id \"{group}\" &>/dev/null && ret=$? || ret=$?")
         setup.append(f"if [ $ret -ne 0 ]; then")
         setup.append("  addgroup -g 512 " + group)
-        setup.append(f"  adduser -D -S -s /sbin/nologin -h {storage_dir} -u 512 {group} {group}")
+        setup.append(f"  adduser -D -S -s /sbin/nologin -h {storage_dir}  -g storage -G {group} -u 512 {group}")
         setup.append("fi")
         setup.blank()
 
@@ -86,8 +86,7 @@ class Storage(Role):
             setup.blank()
             uid += 1
 
-        setup.blank()
-        setup.comment("update base dir after users since adduser updates the perms of the shared home dir")
+        setup.comment("update base storage dir after users since users share that home dir and adduser updates the perms")
         setup.append(f"chown {group}:{group} {storage_dir}")
         setup.append("chmod 750 " + storage_dir)
         setup.blank()
@@ -115,10 +114,10 @@ class Storage(Role):
                     owner = group
 
             setup.append(f"if [ ! -e \"{os_path}\" ]; then")
-            setup.append(f"  log \"Creating share '{path}'\"")
+            setup.log(f"Creating share '{path}'", indent="  ")
             setup.append(f"  zfs create storage/{path}")  # also creates directory
             setup.append("else")
-            setup.append(f"  log \"Using existing share '{path}'\"")
+            setup.log(f"Using existing share '{path}'", indent="  ")
             setup.append("fi")
             setup.blank()
 

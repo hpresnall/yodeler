@@ -32,6 +32,10 @@ class ShellScript():
         """Add a comment to the script."""
         self.append("# " + comment)
 
+    def log(self, log, indent="") -> None:
+        """Add log output to the script."""
+        self.append(indent + "log \"" + log + "\"")
+
     def append(self, fragment: str) -> None:
         """Add code to the script."""
         self._script_fragments.append(fragment)
