@@ -45,7 +45,8 @@ def configure(interfaces: list[dict], roles: list[Role], setup: util.shell.Shell
 
         # all zones can recieve traffic for all services
         for service in services.values():
-            service["filter"][0]["in"].append(zone)
+            for filter in service["filter"]:
+                filter["in"].append(zone)
 
     # main service just imports base and custom-services
     services["main.json"] = {"import": ["base", "custom-services"]}

@@ -122,6 +122,8 @@ if [ -f "$$RESOLV_CONF_PATH/resolv.orig" ]; then
   install -o root -g root -m 644 "$$RESOLV_CONF_PATH/$$RESOLV_CONF" "$$INSTALLED/etc"
 fi
 
+$AFTER_CHROOT
+
 if [ "$$RESULT" == 0 ]; then
   log -e "\nSuccessful Yodel for '$HOSTNAME'!\nThe system will now reboot\n"
   # reboot

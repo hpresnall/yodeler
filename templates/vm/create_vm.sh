@@ -44,6 +44,8 @@ fi
 trap error ERR
 set -o errexit
 
+$AFTER_CHROOT
+
 # define the VM
 log "Creating VM definition"
 virsh define $$DIR/$HOSTNAME.xml

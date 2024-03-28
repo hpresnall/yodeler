@@ -1,0 +1,20 @@
+{
+  "description": "allow DNS",
+  "filter": [
+    {
+      "in": [],
+      "service": "microsoft-ds",
+      "action": "accept"
+    },
+    {
+      "in": [],
+      "service": "netbios-ns",
+      "action": "accept"
+    },
+    {
+      "in": [],
+      "service": "netbios-ssn",
+      "action": "accept"
+    }
+  ]
+}

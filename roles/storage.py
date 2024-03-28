@@ -26,21 +26,22 @@ class Storage(Role):
         parse.set_default_string("storage_user", self._cfg, "storage")
         parse.set_default_string("storage_group", self._cfg, "storage")
 
+        self._cfg["before_chroot"] = ["apk add zfs", "modprobe zfs"]
+        self._cfg["after_chroot"] = ["modprobe -r zfs", "apk del zfs"]
+
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         return 0
 
     def validate(self):
-        _configure_storage(self._cfg)
+        _validate_storage(self._cfg)
         _configure_zfs(self._cfg)
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         storage_cfg = self._cfg["storage"]
         storage_dir = storage_cfg["base_dir"]
 
-        # TODO check if exists
-        setup.append(f"log \"Creating storage ZFS pool at {storage_dir}\"")
-        zpool = "zpool create -o ashift=12 -O normalization=formD -O atime=off -o autotrim=on"
+        zpool = "  zpool create -o ashift=12 -O normalization=formD -O atime=off -o autotrim=on"
         zpool += " -O mountpoint=" + storage_dir
         zpool += " storage "
         zpool += self._cfg["zpool_vdev_type"] + " "
@@ -49,22 +50,46 @@ class Storage(Role):
             if disk["name"].startswith("storage"):
                 zpool += disk["path"] + " "
 
+        setup.append("zpool import 2>&1 | grep storage &>/dev/null && ret=$? || ret=$?")
+        setup.append("if [ $ret -eq 0 ]; then")
+        setup.append(f"  log \"Importing existing ZFS storage pool to {storage_dir}\"")
+        setup.append("  zpool import storage")
+        setup.append("else")
+        setup.append(f"  log \"Creating ZFS storage pool at {storage_dir}\"")
         setup.append(zpool)
+        setup.append("fi")
+        setup.blank()
 
         group = storage_cfg["group"]
         setup.append(f"log \"Creating the group '{group}' & all share users\"")
-        setup.append("addgroup -g 512 " + group)
-        setup.append(f"adduser -D -S -s /sbin/nologin -h {storage_dir} -u 512 {group} {group}")
-        setup.append(f"chown {group}:{group} {storage_dir}")
-        setup.append("chmod 750 " + storage_dir)
+        setup.blank()
+
+        setup.comment("change file permissions even if group or user already existed")
+        setup.append(f"id \"{group}\" &>/dev/null && ret=$? || ret=$?")
+        setup.append(f"if [ $ret -ne 0 ]; then")
+        setup.append("  addgroup -g 512 " + group)
+        setup.append(f"  adduser -D -S -s /sbin/nologin -h {storage_dir} -u 512 {group} {group}")
+        setup.append("fi")
         setup.blank()
 
         uid = 1024
         for user in storage_cfg["users"]:
+            name = user["name"]
+            pwd = user["password"]
+
             # need real users for samba; ensure they cannot log in & set home to storage_dir
-            setup.append(f"adduser -D -s /sbin/nologin -h {storage_dir} -u {uid} {user['name']} {group}")
+            setup.append(f"id \"{name}\" &>/dev/null && ret=$? || ret=$?")
+            setup.append(f"if [ $ret -ne 0 ]; then")
+            setup.append(f"  adduser -D -s /sbin/nologin -h {storage_dir} -g storage -G {group} -u {uid} {name}")
+            setup.append(f"  echo -e \"{pwd}\\n{pwd}\\n\" | smbpasswd -a -s {name}")
+            setup.append("fi")
+            setup.blank()
             uid += 1
 
+        setup.blank()
+        setup.comment("update base dir after users since adduser updates the perms of the shared home dir")
+        setup.append(f"chown {group}:{group} {storage_dir}")
+        setup.append("chmod 750 " + storage_dir)
         setup.blank()
 
         smb_conf = [file.substitute(self.name, "smb.conf", {
@@ -79,28 +104,50 @@ class Storage(Role):
             # note zfs syntax uses pool name as base
             # directories and samba use mountpoint
             path = share["path"]
-            setup.append(f"zfs create storage/{path}")  # also creates directory
+
+            os_path = storage_dir + "/" + path
+            # owner of the path is explicitly set, the only writer or the group's user
+            owner = share['owner']
+            if not owner:
+                if len(share["writers"]) == 1:
+                    owner = share["writers"][0]
+                else:
+                    owner = group
+
+            setup.append(f"if [ ! -e \"{os_path}\" ]; then")
+            setup.append(f"  log \"Creating share '{path}'\"")
+            setup.append(f"  zfs create storage/{path}")  # also creates directory
+            setup.append("else")
+            setup.append(f"  log \"Using existing share '{path}'\"")
+            setup.append("fi")
+            setup.blank()
+
             if share["quota"] != "infinite":
                 setup.append(f"zfs set quota={share['quota']} storage/{path}")
-
-            path = storage_dir + "/" + path
-            setup.append(f"chown {share['owner']}:{group} {path}")
-            setup.append("chmod 750 " + path)
+            setup.append(f"chown {owner}:{group} {os_path}")
+            setup.append("chmod 750 " + os_path)
             setup.blank()
 
             smb_conf.append(f"[{share['name']}]")
-            smb_conf.append("  path = " + path)
+            smb_conf.append("  path = " + os_path)
 
             if share["readers"]:
                 readers = share["readers"]
-                if "all" in readers:
+                if readers[0] == group:
                     smb_conf.append("  read list = " + "+" + group)
                 else:
-                    smb_conf.append("  read list = " + ", ".join([reader for reader in readers]))
+                    smb_conf.append("  read list = " + ", ".join(readers))
 
             if share["writers"]:
-                smb_conf.append("  write list = " + ", ".join([writer for writer in share["writers"]]))
-                if len(share["writers"]) > 1:
+                writers = share["writers"]
+                if writers[0] == group:
+                    smb_conf.append("  write list = " + "+" + group)
+                else:
+                    smb_conf.append("  write list = " + ", ".join(writers))
+
+                # if no owner is set, let samba set the owner to the connected user
+                # group perms for new files will still be set to group readable due to create/directory mask in smb.conf
+                if share["owner"]:
                     smb_conf.append("  force user = " + share["owner"])
             else:
                 smb_conf.append("  writable = no")
@@ -110,6 +157,7 @@ class Storage(Role):
 
             smb_conf.append("")
 
+        smb_conf.append("")
         file.write("smb.conf", "\n".join(smb_conf), output_dir)
 
         setup.append("rootinstall smb.conf /etc/samba")
@@ -121,7 +169,7 @@ class Storage(Role):
         setup.blank()
 
 
-def _configure_storage(cfg: dict):
+def _validate_storage(cfg: dict):
     storage_loc = cfg["hostname"] + ".storage"
     storage = parse.non_empty_dict(storage_loc, cfg.get("storage"))
 
@@ -136,8 +184,8 @@ def _configure_storage(cfg: dict):
         raise ValueError(f"{storage_loc} illegal group name '{group}'")
 
     location = storage_loc + ".users"
-    names = {group}
-    names.update(invalid_names)
+    invalid_names.add("group")  # cannot add group name as a user
+    user_names = set()
 
     users = parse.non_empty_list(location, storage.get("users"))
     for i, user in enumerate(users, start=1):
@@ -146,16 +194,18 @@ def _configure_storage(cfg: dict):
         u_loc = location + f"[{i}]"
         name = parse.non_empty_string("name", user, u_loc)
 
-        if name in names:
+        if name in invalid_names:
             raise ValueError(f"{u_loc} duplicate or illegal username '{name}'")
-        names.add(name)
+        # ensure no duplicate names; track user names for use in shares
+        invalid_names.add(name)
+        user_names.add(name)
 
         parse.non_empty_string("password", user, u_loc)
 
     location = storage_loc + ".shares"
     shares = parse.non_empty_list(location, storage.get("shares"))
-    snames = set()
-    spaths = set()
+    share_names = set()
+    share_paths = set()
 
     for i, share in enumerate(shares, start=1):
         parse.non_empty_dict(location, share)
@@ -163,57 +213,71 @@ def _configure_storage(cfg: dict):
         s_loc = location + f"[{i}]"
 
         name = parse.non_empty_string("name", share, s_loc)
-        if name in snames:
+        if name in share_names:
             raise ValueError(f"{s_loc} duplicate share name '{name}'")
-        snames.add(name)
+        share_names.add(name)
 
-        # optional path; will be relative to base_dir
+        # optional path; defaults to lowercase share name with substitutions
+        # will be relative to base_dir
         path = parse.set_default_string("path", share, name.lower().replace(" ", "_"))
         if "/" in path:
             raise ValueError(f"{s_loc} share path '{path}' cannot contain '/'")
-        if path in spaths:
+        if path in share_paths:
             raise ValueError(f"{s_loc} duplicate share path '{path}'")
-        spaths.add(name)
+        share_paths.add(name)
 
         share["path"] = path
 
-        share["writers"] = writers = parse.read_string_list_plurals({"writer", "writers"}, share, s_loc)
-        share.pop("writer", None)
-        for w, writer in enumerate(writers, start=1):
-            if writer not in names:
-                raise ValueError(f"{s_loc}.writer[{w}] '{writer}' not in list of storage users")
-        # empty writers => read only = yes
-
-        # TODO if group is in readers or writers that should also mean all
-        share["readers"] = readers = parse.read_string_list_plurals({"reader", "readers"}, share, s_loc)
-        share.pop("reader", None)
-        # TODO readers defaults to all if writers is empty
-        if "all" in readers:
-            readers = ["all"]
-        else:
-            for r, reader in enumerate(readers, start=1):
-                # all => storage group can read
-                if reader not in names:
-                    raise ValueError(f"{s_loc}.reader[{r}] '{reader}' not in list of storage users")
+        # empty writers => read only; readers must have at least one user
         # empty readers => only read+write users
+        writers = _get_user_list(share, "writer", group, user_names, s_loc)
+        readers = _get_user_list(share, "reader", group, user_names, s_loc)
 
         if not readers and not writers:
             raise ValueError(f"{s_loc} must set at least 1 reader or writer")
 
+        # no need for readers list if writers is the same
+        if readers == writers:
+            share["readers"] = []
+        else:
+            # if a user is a writer, it does not need to be in the readers list
+            share["readers"] = list(readers - writers)
+        share["writers"] = list(writers)
+
         parse.set_default_string("quota", share, "infinite")
 
-        # TODO change owner to default_user; if None, do not set force user in smb
-        # do not set if length is 1 or set to the first writer
-        if writers:
-            # default to the first writer being the owner
-            owner = parse.set_default_string("owner", share, writers[0])
-            if (owner not in names):
+        owner = share.setdefault("owner", None)
+        if owner:
+            if not isinstance(owner, str):
+                raise ValueError(f"{s_loc}.owner '{owner}' must be a string")
+            if (owner not in user_names):
                 raise ValueError(f"{s_loc}.owner '{owner}' not in list of storage users")
-        else:
-            # just readers, set owner to base storage user
-            parse.set_default_string("owner", share, group)
+            if (owner not in writers):
+                raise ValueError(f"{s_loc}.owner '{owner}' not in list of writers for the share")
 
         share.setdefault("allow_guests", False)
+
+
+def _get_user_list(share: dict, type: str, group: str, user_names: set, location: str) -> set:
+    plural = type + 's'
+    user_list = parse.read_string_list_plurals({type, plural}, share, location)
+    share.pop(type, None)  # remove singular; caller must ensure plural is set to this function's return value
+
+    for i, user in enumerate(user_list, start=1):
+        if user == group:  # no need for any other writers
+            user_list = [group]
+            break
+        if user not in user_names:
+            raise ValueError(f"{location}.{type}[{i}] '{user}' not in list of storage users")
+
+    user_set = set(user_list)
+
+    # all users, just use the group name
+    if user_set == user_names:
+        share[type] = [group]
+        user_set = {group}
+
+    return user_set
 
 
 def _configure_zfs(cfg: dict):
