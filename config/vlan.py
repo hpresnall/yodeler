@@ -70,6 +70,7 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
         _validate_vlan_subnet(vswitch_name, vlan, "ipv6")
         _validate_vlan_dhcp_reservations(vswitch_name, vlan)
         _validate_vlan_ipv6_pd_network(vlan, ipv6_pd_networks, ipv6_pd_network_count)
+        ipv6_pd_network_count += 1
 
         # domain must be a subdomain of the top-level site
         if vlan["domain"] and ((domain not in vlan["domain"]) or (domain == vlan["domain"])):
@@ -204,7 +205,6 @@ def _validate_vlan_ipv6_pd_network(vlan: dict, ipv6_pd_networks: set, ipv6_pd_ne
     if ipv6_pd_network in ipv6_pd_networks:
         raise ValueError(f"vlan['{vlan_name}'].ipv6_pd_network '{ipv6_pd_network}' already used for this vlan")
 
-    ipv6_pd_network_count += 1
     ipv6_pd_networks.add(ipv6_pd_network)
 
 

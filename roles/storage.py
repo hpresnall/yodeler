@@ -15,7 +15,7 @@ class Storage(Role):
 
     def additional_configuration(self):
         if self._cfg["metrics"]:
-            self._cfg["prometheus_collectors"].extend(["nvme", "samba"])
+            self._cfg["prometheus_collectors"].extend(["nvme", "zfs"])
 
         self.add_alias("storage")
         self.add_alias("nas")
@@ -67,12 +67,12 @@ class Storage(Role):
         setup.comment("change file permissions even if group or user already existed")
         setup.append(f"id \"{group}\" &>/dev/null && ret=$? || ret=$?")
         setup.append(f"if [ $ret -ne 0 ]; then")
-        setup.append("  addgroup -g 512 " + group)
-        setup.append(f"  adduser -D -S -s /sbin/nologin -h {storage_dir}  -g storage -G {group} -u 512 {group}")
+        setup.append("  addgroup -g 1024 " + group)
+        setup.append(f"  adduser -D -s /sbin/nologin -h {storage_dir}  -g storage -G {group} -u 1024 {group}")
         setup.append("fi")
         setup.blank()
 
-        uid = 1024
+        uid = 2048
         for user in storage_cfg["users"]:
             name = user["name"]
             pwd = user["password"]
@@ -81,14 +81,14 @@ class Storage(Role):
             setup.append(f"id \"{name}\" &>/dev/null && ret=$? || ret=$?")
             setup.append(f"if [ $ret -ne 0 ]; then")
             setup.append(f"  adduser -D -s /sbin/nologin -h {storage_dir} -g storage -G {group} -u {uid} {name}")
-            setup.append(f"  echo -e \"{pwd}\\n{pwd}\\n\" | smbpasswd -a -s {name}")
+            setup.append(f"  echo -e \"{pwd}\\n{pwd}\\n\" | pdbedit -a -t -u {name}")
             setup.append("fi")
             setup.blank()
             uid += 1
 
         setup.comment("update base storage dir after users since users share that home dir and adduser updates the perms")
         setup.append(f"chown {group}:{group} {storage_dir}")
-        setup.append("chmod 750 " + storage_dir)
+        setup.append("chmod 770 " + storage_dir)
         setup.blank()
 
         smb_conf = [file.substitute(self.name, "smb.conf", {
@@ -105,13 +105,18 @@ class Storage(Role):
             path = share["path"]
 
             os_path = storage_dir + "/" + path
-            # owner of the path is explicitly set, the only writer or the group's user
+            # if owner of the path is explicitly set use it
+            # otherwise, use the only writer or the group's user
             owner = share['owner']
+            perm = 750
             if not owner:
                 if len(share["writers"]) == 1:
                     owner = share["writers"][0]
                 else:
                     owner = group
+                    if writers:  # more than 1 writer => entire group needs write access
+                        perm = 770
+                    # otherwise, only readers; leave at 750
 
             setup.append(f"if [ ! -e \"{os_path}\" ]; then")
             setup.log(f"Creating share '{path}'", indent="  ")
@@ -124,7 +129,7 @@ class Storage(Role):
             if share["quota"] != "infinite":
                 setup.append(f"zfs set quota={share['quota']} storage/{path}")
             setup.append(f"chown {owner}:{group} {os_path}")
-            setup.append("chmod 750 " + os_path)
+            setup.append(f"chmod {perm} {os_path}")
             setup.blank()
 
             smb_conf.append(f"[{share['name']}]")
@@ -165,6 +170,10 @@ class Storage(Role):
         setup.service("zfs-import", "boot")
         setup.service("zfs-mount", "boot")
         setup.service("samba")
+        setup.blank()
+
+        setup.append("echo -e \"#!/bin/sh\nzpool scrub storage\n\" > /etc/periodic/weekly/zfs_scrub")
+        setup.append("chmod 755 /etc/periodic/weekly/zfs_scrub")
         setup.blank()
 
 
