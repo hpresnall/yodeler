@@ -1,8 +1,8 @@
-"""Utility functions for formatting disks and creating /etc/fstab entries in setup scripts."""
-import util.shell
+"""Create shell script fragments formatting disks and adding /etc/fstab entries in setup scripts."""
+import script.shell as shell
 
 
-def from_config(cfg: dict, setup: util.shell.ShellScript):
+def from_config(cfg: dict, setup: shell.ShellScript):
     # create disks, format them and add fstab entries, as needed
     # defer to other roles if mounting is needed during setup
     for disk in cfg["disks"]:
@@ -63,7 +63,7 @@ def format(disk: dict) -> str:
     return f"""# only format the '{disk['name']}' disk if there are no existing, formatted partitions
 has_fs=false
 for fs in $(lsblk -ln -o FSTYPE {path}); do
-  if [ -n $fs ]; then 
+  if [ -n $fs ]; then
     has_fs=true
     break
   fi
@@ -90,4 +90,5 @@ def _set_uuid_to_local_var(disk: dict) -> str:
 def create_fstab_entry(disk: dict) -> str:
     """Add an entry to /etc/fstab for the given disk UUID & mount point."""
     return f"# mount '{disk['name']}' disk at boot\n" + \
-        f"echo -e \"UUID=${disk['name'].upper()}_UUID\\t{disk['mountpoint']}\\t{disk['fs_type']}\\trw,relatime\\t0\\t2\" >> /etc/fstab"
+        f"echo -e \"UUID=${disk['name'].upper()}_UUID\\t{disk['mountpoint']}\\t{disk['fs_type']}\\trw,relatime\\t0\\t2\"" + \
+        " >> /etc/fstab"

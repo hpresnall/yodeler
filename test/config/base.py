@@ -10,7 +10,7 @@ import util.file as file
 
 import config.site as site
 import config.host as host
-import roles.role
+import role.roles as roles
 
 class TestCfgBase(unittest.TestCase):
     """Base class for testing Yodler configuration functions."""
@@ -31,7 +31,7 @@ class TestCfgBase(unittest.TestCase):
 
         cls._site_yaml = file.load_yaml(os.path.join(cls._base_path, "sites", "minimal.yaml"))
 
-        roles.role.load_all_roles()
+        roles.load_all()
 
     def setUp(self):
         # minimal yaml has all; split up into site and host parts

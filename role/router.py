@@ -2,16 +2,16 @@
 import os.path
 import os
 
+from role.roles import Role
+
 import util.file as file
-import util.libvirt
-import util.shell
-import util.sysctl
-import util.dhcpcd
-
-from roles.role import Role
-
-import config.interfaces
 import util.parse as parse
+
+import script.libvirt as libvirt
+import script.shell as shell
+import script.sysctl as sysctl
+
+import config.interfaces as interfaces
 
 
 class Router(Role):
@@ -22,7 +22,7 @@ class Router(Role):
         return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "ndisc6", "tcpdump", "ethtool"}
 
     def configure_interfaces(self):
-        uplink = config.interfaces.configure_uplink(self._cfg)
+        uplink = interfaces.configure_uplink(self._cfg)
 
         # rename router interfaces to avoid issues with startup order
         # physical servers are only renamed if the config sets a mac address
@@ -41,7 +41,7 @@ class Router(Role):
             if self._cfg["is_vm"]:
                 iface_name = vswitch["name"]
                 iface_counter += 1
-                mac_address = config.interfaces.random_mac_address()
+                mac_address = interfaces.random_mac_address()
             elif vswitch["uplinks"]:
                 # TODO handle multiple uplinks; maybe just error instead of creating physical bond ifaces
                 # TODO if site also has a separate, physical vmhost, then need a way to
@@ -64,7 +64,7 @@ class Router(Role):
                 if vlan["id"] is None:
                     untagged = True
 
-                vlan_iface = config.interfaces.for_vlan(iface_name, vswitch, vlan, mac_address)
+                vlan_iface = interfaces.for_vlan(iface_name, vswitch, vlan, mac_address)
                 vlan["router_iface"] = vlan_iface
                 vlan_interfaces.append(vlan_iface)
 
@@ -81,14 +81,13 @@ class Router(Role):
                     vlan_interfaces[0]["comment"] = comment
                 else:  # add the base interface as a port
                     # append to vswitch_interfaces to ensure it is defined before the sub-interfaces for the vlans
-                    vswitch_interfaces.append(config.interfaces.for_port(
-                        iface_name, comment, "vlan", mac_address=mac_address))
+                    vswitch_interfaces.append(interfaces.for_port(iface_name, comment, "vlan", mac_address=mac_address))
 
                 vswitch_interfaces.extend(vlan_interfaces)
         # end for all vswitches
 
         # set uplink after vswitch interfaces in /etc/interfaces so all the vlans are up before prefix delgation
-        interfaces = self._cfg.setdefault("interfaces", [])
+        ifaces = self._cfg.setdefault("interfaces", [])
 
         # rename all the interfaces that have a mac address, i.e. this is a vm and these are virtual interfaces
         # non-vm routers should set rename rules in the yaml config
@@ -97,10 +96,10 @@ class Router(Role):
             if iface["mac_address"]:
                 self._cfg["rename_interfaces"].append({"name": iface["name"], "mac_address": iface["mac_address"]})
 
-        if not isinstance(interfaces, list):
+        if not isinstance(ifaces, list):
             raise KeyError(f"cfg['interfaces'] must be a list")
 
-        self._cfg["interfaces"] = vswitch_interfaces + [uplink] + interfaces
+        self._cfg["interfaces"] = vswitch_interfaces + [uplink] + ifaces
 
     def additional_configuration(self):
         # router will use Shorewall instead
@@ -130,7 +129,7 @@ class Router(Role):
         if not routable_vlans:
             raise ValueError("router not needed if there are no routable vlans")
 
-    def write_config(self, setup: util.shell.ShellScript, output_dir: str):
+    def write_config(self, setup: shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
         uplink = parse.non_empty_dict("router 'uplink'", self._cfg.get("uplink"))
 
@@ -139,11 +138,11 @@ class Router(Role):
         if self._cfg["is_vm"]:
             # uplink can be an existing vswitch or a physical iface on the host via macvtap
             if "macvtap" in uplink:
-                uplink_xml = util.libvirt.macvtap_interface(uplink)
+                uplink_xml = libvirt.macvtap_interface(uplink)
             elif "passthrough" in uplink:
-                uplink_xml = util.libvirt.passthrough_interface(uplink["passthrough"], uplink["mac_address"])
+                uplink_xml = libvirt.passthrough_interface(uplink["passthrough"], uplink["mac_address"])
             else:  # use vswitch+vlan
-                uplink_xml = util.libvirt.interface_from_config(self._cfg["hostname"], uplink)
+                uplink_xml = libvirt.interface_from_config(self._cfg["hostname"], uplink)
 
             # add an interface to the host's libvirt definition for each vswitch; order matches network_interfaces
             libvirt_interfaces = [uplink_xml]
@@ -179,7 +178,7 @@ class Router(Role):
                     # find all accessible DNS addresses for this vlan and add them to the RDNSS entry for radvd
                     dns_addresses = []
                     for dns_hostname in self._cfg["roles_to_hostnames"]["dns"]:
-                        for match in config.interfaces.find_ips_from_vlan(vswitch, vlan, self._cfg["hosts"][dns_hostname]["interfaces"]):
+                        for match in interfaces.find_ips_from_vlan(vswitch, vlan, self._cfg["hosts"][dns_hostname]["interfaces"]):
                             if match["ipv6_address"]:
                                 dns_addresses.append(str(match["ipv6_address"]))
                     rdnss = "RDNSS " + " ".join(dns_addresses) + \
@@ -210,9 +209,9 @@ class Router(Role):
                 shorewall["params6"].append(param)
 
                 if self._cfg["is_vm"]:
-                    mac_address = config.interfaces.random_mac_address()
+                    mac_address = interfaces.random_mac_address()
                     # new libvirt interface to trunk the vlans
-                    libvirt_interfaces.append(util.libvirt.router_interface(
+                    libvirt_interfaces.append(libvirt.router_interface(
                         self._cfg['hostname'], vswitch, mac_address))
 
         # blank line after ping rules from vlan to firewall
@@ -235,7 +234,7 @@ class Router(Role):
         file.copy_template("router", "logrotate-firewall", output_dir)
 
         if self._cfg["is_vm"]:
-            util.libvirt.update_interfaces(self._cfg['hostname'], libvirt_interfaces, output_dir)
+            libvirt.update_interfaces(self._cfg['hostname'], libvirt_interfaces, output_dir)
 
         if radvd_config:
             file.write("radvd.conf", "\n".join(radvd_config), output_dir)
@@ -244,7 +243,7 @@ class Router(Role):
             setup.service("radvd", "boot")
 
         if dhrelay6_ifaces:  # at least one interface needs dhcp6
-            util.sysctl.enable_ipv6_forwarding(setup, output_dir)
+            sysctl.enable_ipv6_forwarding(setup, output_dir)
 
 
 def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
@@ -255,9 +254,9 @@ def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
                             f" networks available with the 'ipv6_pd_prefixlen' of {prefixlen}"))
 
 
-def _write_dhcrelay_config(cfg: dict, setup: util.shell.ShellScript, dhrelay4_ifaces: list, dhrelay6_ifaces: list, shorewall: dict):
+def _write_dhcrelay_config(cfg: dict, setup: shell.ShellScript, dhrelay4_ifaces: list, dhrelay6_ifaces: list, shorewall: dict):
     dhcp_server = cfg["hosts"][cfg["roles_to_hostnames"]["dhcp"][0]]
-    dhcp_addresses = config.interfaces.find_ips_to_interfaces(cfg, dhcp_server["interfaces"], first_match_only=False)
+    dhcp_addresses = interfaces.find_ips_to_interfaces(cfg, dhcp_server["interfaces"], first_match_only=False)
 
     if not dhcp_addresses:
         raise ValueError("router needs to relay DHCP but cannot find any reachable DHCP servers")
@@ -676,7 +675,7 @@ def _add_shorewall_action(cfg: dict, rule: dict, rule_idx: int, ip_version: int,
         shorewall[key].append("")
 
 
-def _write_shorewall_config(cfg: dict, shorewall: dict, setup: util.shell.ShellScript, output_dir: str):
+def _write_shorewall_config(cfg: dict, shorewall: dict, setup: shell.ShellScript, output_dir: str):
     shorewall4 = os.path.join(output_dir, "shorewall")
     shorewall6 = os.path.join(output_dir, "shorewall6")
 
@@ -728,7 +727,7 @@ all all REJECT  NFLOG({0})
     setup.substitute("router", "shorewall.sh", cfg)
 
 
-def _write_ipsets(cfg: dict, setup: util.shell.ShellScript):
+def _write_ipsets(cfg: dict, setup: shell.ShellScript):
     setup.append(file.read_template("router", "ipsets.sh"))
 
     for name, ipset in cfg["firewall"]["ipsets4"].items():

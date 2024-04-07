@@ -1,8 +1,8 @@
 import sys
 
-from roles.role import Role
+from role.roles import Role
 
-import util.shell as shell
+import script.shell as shell
 
 
 class Test(Role):

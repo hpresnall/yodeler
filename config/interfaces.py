@@ -5,7 +5,7 @@ import random
 
 from typing import Callable
 
-import config.vlan
+import config.vlan as vlan
 
 import util.parse as parse
 import util.pci as pci
@@ -100,7 +100,7 @@ def _validate_network(iface: dict, vswitches: dict):
     iface["vswitch"] = vswitch
 
     vlan_id = iface.get("vlan")
-    iface["vlan"] = config.vlan.lookup(vlan_id, vswitch)
+    iface["vlan"] = vlan.lookup(vlan_id, vswitch)
     iface["firewall_zone"] = str(iface.get("firewall_zone", iface["vlan"]["name"])).upper()
 
 

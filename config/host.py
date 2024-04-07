@@ -4,18 +4,17 @@ import os
 import shutil
 import sys
 import re
+import ipaddress
 
 import util.file as file
-import util.shell as shell
 import util.parse as parse
+
+import script.shell as shell
 
 import config.interfaces
 import config.disks
 
-import roles.role
-import roles.common
-
-import ipaddress
+import role.roles as roles
 
 _logger = logging.getLogger(__name__)
 
@@ -217,7 +216,7 @@ def _load_roles(cfg: dict):
     cfg.pop("role", None)
 
     # Common _must_ be the first so it is configured and setup first
-    common = roles.role.load("common", cfg)
+    common = roles.load("common", cfg)
     cfg["roles"] = [common]
     role_names.discard("common")
 
@@ -241,7 +240,7 @@ def _load_roles(cfg: dict):
         _logger.debug("loading role '%s' for '%s'", role_name, cfg["hostname"])
 
         role_name = role_name.lower()
-        role = roles.role.load(role_name, cfg)
+        role = roles.load(role_name, cfg)
 
         cfg["roles"].append(role)
 

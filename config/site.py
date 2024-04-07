@@ -7,14 +7,15 @@ import copy
 import errno
 import ipaddress
 
-import util.file as file
-import util.parse as parse
+import role.roles as roles
 
 import config.vswitch as vswitch
 import config.firewall as firewall
 import config.host as host
 
-import roles.role
+import util.file as file
+import util.parse as parse
+
 
 _logger = logging.getLogger(__name__)
 
@@ -127,14 +128,14 @@ def write_host_scripts(site_cfg: dict, output_dir: str):
 
 def _validate_full_site(site_cfg: dict):
     # confirm site contains all necessary roles
-    for role_name in roles.role.names():
+    for role_name in roles.names():
         if role_name == "common":
             continue
 
         hostnames = site_cfg["roles_to_hostnames"][role_name] if role_name in site_cfg["roles_to_hostnames"] else []
         count = len(hostnames)
 
-        clazz = roles.role.class_for_name(role_name)
+        clazz = roles.class_for_name(role_name)
         min = clazz.minimum_instances(site_cfg)
         max = clazz.maximum_instances(site_cfg)
 

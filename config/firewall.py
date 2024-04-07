@@ -5,7 +5,7 @@ import ipaddress
 import util.parse as parse
 import util.address as address
 
-import roles.role
+import role.roles as roles
 
 import config.vlan as vlans
 
@@ -46,7 +46,7 @@ def _parse_static_hosts(cfg: dict, firewall: dict):
         raise KeyError(f"firewall.static_hosts must be a list")
 
     static_hosts = {}  # map by hostname
-    role_names = roles.role.names()
+    role_names = roles.names()
 
     for i, host in enumerate(hosts, start=1):
         location = f"firewall.static_hosts[{i}]"

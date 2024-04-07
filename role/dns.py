@@ -1,12 +1,13 @@
 """Configuration & setup for a PowerDNS server."""
-import util.shell
-import util.file
-import util.address
-import util.sysctl
+from role.roles import Role
 
 import config.interfaces as interfaces
 
-from roles.role import Role
+import util.file as file
+import util.address as address
+
+import script.shell as shell
+import script.sysctl as sysctl
 
 
 class Dns(Role):
@@ -48,11 +49,11 @@ class Dns(Role):
         return 2  # no need for additional redundancy
 
     def additional_configuration(self):
-        self._cfg["before_chroot"] = [util.file.substitute("dns", "before_chroot.sh", self._cfg)]
+        self._cfg["before_chroot"] = [file.substitute("dns", "before_chroot.sh", self._cfg)]
 
-    def write_config(self, setup: util.shell.ShellScript, output_dir: str):
+    def write_config(self, setup: shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
-        util.sysctl.enable_tcp_fastopen(setup, output_dir)
+        sysctl.enable_tcp_fastopen(setup, output_dir)
 
         setup.append(f"install -o pdns -g pdns -m 600 $DIR/pdns.conf /etc/pdns")
         setup.append(f"install -o recursor -g recursor -m 600 $DIR/recursor.conf /etc/pdns")
@@ -156,11 +157,11 @@ class Dns(Role):
             "web_allow_subnets": "127.0.0.1,::1"
         }
 
-        util.file.write("pdns.conf", util.file.substitute(self.name, "pdns.conf", pdns_conf), output_dir)
-        util.file.write("recursor.conf", util.file.substitute(self.name, "recursor.conf", pdns_conf), output_dir)
+        file.write("pdns.conf", file.substitute(self.name, "pdns.conf", pdns_conf), output_dir)
+        file.write("recursor.conf", file.substitute(self.name, "recursor.conf", pdns_conf), output_dir)
 
-        util.file.copy_template("dns", "build_recursor_lua.sh", output_dir)
-        util.file.copy_template("dns", "create_lua_blackhole.py", output_dir)
+        file.copy_template("dns", "build_recursor_lua.sh", output_dir)
+        file.copy_template("dns", "create_lua_blackhole.py", output_dir)
 
         if self._cfg["additional_dns_entries"]:
             hosts = [""]
@@ -171,14 +172,14 @@ class Dns(Role):
                     hosts.append(str(additional_dns["ipv4_address"]) + " " + " ".join(additional_dns["hostnames"]))
 
             hosts.append("")
-            util.file.write("other_hosts", "\n".join(hosts), output_dir)
+            file.write("other_hosts", "\n".join(hosts), output_dir)
             setup.blank()
             setup.comment("assemble complete hosts file")
             setup.append("cat $DIR/other_hosts >> /etc/hosts")
             setup.append("cat /tmp/hosts >> /etc/hosts")
 
 
-def _add_zone(setup: util.shell.ShellScript, vlan: dict, dns_domain: str, dns_server: str):
+def _add_zone(setup: shell.ShellScript, vlan: dict, dns_domain: str, dns_server: str):
     if vlan["name"] == "top-level":
         setup.comment("creating zone for top-level domain")
         vlan["name"] = "dns"
@@ -202,14 +203,14 @@ def _add_zone(setup: util.shell.ShellScript, vlan: dict, dns_domain: str, dns_se
 
     # reverse zones
     if vlan["ipv4_subnet"]:
-        domain = str(util.address.rptr_ipv4(vlan["ipv4_subnet"]))
+        domain = str(address.rptr_ipv4(vlan["ipv4_subnet"]))
         setup.append(f"pdnsutil create-zone {domain} {dns_server}")
         setup.append(f"pdnsutil secure-zone {domain}")
 
         subnets.append(str(vlan["ipv4_subnet"]))
 
     if vlan["ipv6_subnet"]:
-        domain = str(util.address.rptr_ipv6(vlan["ipv6_subnet"]))
+        domain = str(address.rptr_ipv6(vlan["ipv6_subnet"]))
         setup.append(f"pdnsutil create-zone {domain} {dns_server}")
         setup.append(f"pdnsutil secure-zone {domain}")
 
@@ -220,7 +221,7 @@ def _add_zone(setup: util.shell.ShellScript, vlan: dict, dns_domain: str, dns_se
     setup.blank()
 
 
-def _add_entry(setup: util.shell.ShellScript, host: dict, add_ptr: bool = True) -> bool:
+def _add_entry(setup: shell.ShellScript, host: dict, add_ptr: bool = True) -> bool:
     # create A, AAAA and PTR records for each host
     domain = host["domain"]
 
@@ -236,8 +237,8 @@ def _add_entry(setup: util.shell.ShellScript, host: dict, add_ptr: bool = True) 
         setup.append(f"pdnsutil add-record {domain} {name} A {str(host['ipv4_address'])}")
 
         if add_ptr:
-            rdomain = util.address.rptr_ipv4(host["ipv4_subnet"])
-            ptr = util.address.hostpart_ipv4(host["ipv4_address"])
+            rdomain = address.rptr_ipv4(host["ipv4_subnet"])
+            ptr = address.hostpart_ipv4(host["ipv4_address"])
             setup.append(f"pdnsutil add-record {rdomain} {ptr} PTR {name}.{domain}")
 
         output = True
@@ -246,8 +247,8 @@ def _add_entry(setup: util.shell.ShellScript, host: dict, add_ptr: bool = True) 
         setup.append(f"pdnsutil add-record {domain} {name} AAAA {str(host['ipv6_address'])}")
 
         if add_ptr:
-            rdomain = util.address.rptr_ipv6(host["ipv6_subnet"])
-            ptr = util.address.hostpart_ipv6(host["ipv6_address"], host["ipv6_subnet"].prefixlen)
+            rdomain = address.rptr_ipv6(host["ipv6_subnet"])
+            ptr = address.hostpart_ipv6(host["ipv6_address"], host["ipv6_subnet"].prefixlen)
             setup.append(f"pdnsutil add-record {rdomain} {ptr} PTR {name}.{domain}")
 
         output = True
@@ -255,13 +256,13 @@ def _add_entry(setup: util.shell.ShellScript, host: dict, add_ptr: bool = True) 
     return output
 
 
-def _add_alias(setup: util.shell.ShellScript,  alias: str, host: dict):
+def _add_alias(setup: shell.ShellScript,  alias: str, host: dict):
     # create CNAMEs for aliases
     domain = host['domain']
     setup.append(f"pdnsutil add-record {domain} {alias} CNAME {host['name']}.{domain}")
 
 
-def _create_host_entries(setup: util.shell.ShellScript, cfg: dict, dns_domain: str):
+def _create_host_entries(setup: shell.ShellScript, cfg: dict, dns_domain: str):
     setup.comment("DNS entries for each host")
 
     for host_cfg in cfg["hosts"].values():
@@ -326,7 +327,7 @@ def _create_host_entries(setup: util.shell.ShellScript, cfg: dict, dns_domain: s
                 setup.blank()
 
 
-def _create_reservation_entries(setup: util.shell.ShellScript, cfg: dict):
+def _create_reservation_entries(setup: shell.ShellScript, cfg: dict):
     setup.comment("DNS entries for each DHCP reservation")
 
     for vswitch in cfg["vswitches"].values():

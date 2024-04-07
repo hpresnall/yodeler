@@ -1,10 +1,10 @@
-"""Configuration for NAS server ."""
-import util.shell as shell
-
-from roles.role import Role
-
+"""Configuration for ZFS based NAS server running Samba."""
 import util.file as file
 import util.parse as parse
+
+import script.shell as shell
+
+from role.roles import Role
 
 
 class Storage(Role):

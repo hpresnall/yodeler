@@ -1,9 +1,9 @@
 """Configuration for server with standard build & compile tools."""
-import util.shell as shell
-
-from roles.role import Role
+from role.roles import Role
 
 import util.parse as parse
+
+import script.shell as shell
 
 
 class Build(Role):

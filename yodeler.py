@@ -3,7 +3,8 @@ import sys
 import logging
 
 import config.site as site
-import roles.role
+
+import role.roles as roles
 
 
 def yodel():
@@ -15,7 +16,7 @@ def yodel():
         print("usage: yodeler.py <site_path> <output_dir>")
         sys.exit(1)
 
-    roles.role.load_all_roles()
+    roles.load_all()
 
     site_cfg = site.load(sys.argv[1])
     site.write_host_scripts(site_cfg, sys.argv[2])

@@ -1,16 +1,20 @@
+"""Role for creating a fake ISP. This server will run a simple router and DHCP server.
+The purpose of this role is to add a buffer between and existing Yodeler side and a testbed site
+using the _same_ network configuration. The fake ISP can be configured to serve IPv4 addresses and IPv6 addresses
+that match the current Yodeler site's upstream (wan) ISP configuration."""
 import logging
 import ipaddress
 
-from roles.role import Role
+from role.roles import Role
 
-import config.vlan
+import config.vlan as vlan
 import config.interfaces
 
-import util.shell
-import util.sysctl
-import util.file
-import util.interfaces
-import util.parse
+import util.parse as parse
+import util.file as file
+
+import script.shell as shell
+import script.sysctl as sysctl
 
 _logger = logging.getLogger(__name__)
 
@@ -27,8 +31,8 @@ class FakeISP(Role):
             raise ValueError(f"site '{self._cfg['site']}' does not define a 'fakeisp' vswitch")
 
         # note vlan=fakeinet but vswitch=fakeinternet
-        finet_vlan = config.vlan.lookup("fakeinet", self._cfg["vswitches"]["fakeinternet"])
-        fisp_vlan = config.vlan.lookup("fakeisp", self._cfg["vswitches"]["fakeisp"])
+        finet_vlan = vlan.lookup("fakeinet", self._cfg["vswitches"]["fakeinternet"])
+        fisp_vlan = vlan.lookup("fakeisp", self._cfg["vswitches"]["fakeisp"])
 
         fisp_vlan["dhcp6_managed"] = True  # allow DHCP6 requests
 
@@ -95,7 +99,7 @@ class FakeISP(Role):
                     parent, "vlans on 'fakeisp' vswitch", "vswitch"))
 
             if (finet_vlan["id"] is not None):
-                parent = util.parse.non_empty_string("name", fakeinternet, "eth0")
+                parent = parse.non_empty_string("name", fakeinternet, "eth0")
                 # insert before fakeinternet
                 self._cfg["interfaces"].insert(0, config.interfaces.for_port(
                     parent, "vlans on 'fakeiternet' vswitch", "vswitch"))
@@ -109,7 +113,7 @@ class FakeISP(Role):
     def validate(self):
         pass
 
-    def write_config(self, setup: util.shell.ShellScript, output_dir: str):
+    def write_config(self, setup: shell.ShellScript, output_dir: str):
         fakeinternet = fakeisp = vlan = {}
 
         for iface in self._cfg["interfaces"]:
@@ -135,7 +139,7 @@ class FakeISP(Role):
         subnet = vlan["ipv4_subnet"]
         dns = [str(ip) for ip in external_dns if ip.version == 4]
 
-        dhcp4_json = util.file.load_json("templates/kea/kea-dhcp4.conf")
+        dhcp4_json = file.load_json("templates/kea/kea-dhcp4.conf")
         dhcp4_config = dhcp4_json["Dhcp4"]
         dhcp4_config["interfaces-config"]["interfaces"] = [fakeisp["name"]]
         dhcp4_config["dhcp-ddns"] = {"enable-updates": False}
@@ -149,7 +153,7 @@ class FakeISP(Role):
         if dns:
             dhcp4_config["subnet4"][0]["option-data"].append({"name": "domain-name-servers", "data":  ", ".join(dns)})
 
-        util.file.write("kea-dhcp4.conf", util.file.output_json(dhcp4_json), output_dir)
+        file.write("kea-dhcp4.conf", file.output_json(dhcp4_json), output_dir)
         setup.append("rootinstall $DIR/kea-dhcp4.conf /etc/kea")
         setup.service("kea-dhcp4")
         setup.blank()
@@ -159,7 +163,7 @@ class FakeISP(Role):
         if subnet:
             dns = [str(ip) for ip in external_dns if ip.version == 6]
 
-            dhcp6_json = util.file.load_json("templates/kea/kea-dhcp6.conf")
+            dhcp6_json = file.load_json("templates/kea/kea-dhcp6.conf")
             dhcp6_config = dhcp6_json["Dhcp6"]
             dhcp6_config["interfaces-config"]["interfaces"] = [fakeisp["name"] + "/" + str(fakeisp["ipv6_address"])]
             dhcp6_config["dhcp-ddns"] = {"enable-updates": False}
@@ -185,23 +189,23 @@ class FakeISP(Role):
                 }
             ]
 
-            util.file.write("kea-dhcp6.conf", util.file.output_json(dhcp6_json), output_dir)
+            file.write("kea-dhcp6.conf", file.output_json(dhcp6_json), output_dir)
 
             setup.append("rootinstall $DIR/kea-dhcp6.conf /etc/kea")
             setup.service("kea-dhcp6")
             setup.blank()
 
             # directly copy the kea hook script
-            util.file.copy_template(self.name, "pdroute.sh", output_dir)
+            file.copy_template(self.name, "pdroute.sh", output_dir)
             setup.comment("allow kea to modify routes for prefix delegation")
             setup.append("echo \"permit nopass kea cmd /sbin/ip\" >> /etc/doas.d/doas.conf")
             setup.append("install -o kea -g kea -m 750 $DIR/pdroute.sh /usr/lib/kea/hooks/")
             setup.blank()
 
             # setup radvd on the fakeisp interface
-            radvd_template = util.file.read_template("router", "radvd.conf")
+            radvd_template = file.read_template("router", "radvd.conf")
             radvd_template = radvd_template.format(fakeisp["name"], "on", "", "")  # AdvManagedFlag on => use DHCP6
-            util.file.write("radvd.conf", radvd_template, output_dir)
+            file.write("radvd.conf", radvd_template, output_dir)
 
             setup.append("rootinstall radvd.conf /etc")
             setup.service("radvd", "boot")
@@ -210,15 +214,15 @@ class FakeISP(Role):
         # fakeisp runs before vmhost, create the directory here; let vmhost role chmod & chown
         setup.append("mkdir -p " + self._cfg["vm_images_path"])
 
-        for file in ["add_boot_iso.sh", "rm_boot_iso.sh"]:
-            util.file.copy_template(self.name, file, output_dir)
-            setup.append(f"install -o nobody -g libvirt -m 750 $DIR/{file} {self._cfg['vm_images_path']}")
-        for file in ["add_boot_iso.py", "rm_boot_iso.py"]:
-            util.file.copy_template(self.name, file, output_dir)
-            setup.append(f"install -o nobody -g libvirt -m 640 $DIR/{file} {self._cfg['vm_images_path']}")
+        for script in ["add_boot_iso.sh", "rm_boot_iso.sh"]:
+            file.copy_template(self.name, script, output_dir)
+            setup.append(f"install -o nobody -g libvirt -m 750 $DIR/{script} {self._cfg['vm_images_path']}")
+        for script in ["add_boot_iso.py", "rm_boot_iso.py"]:
+            file.copy_template(self.name, script, output_dir)
+            setup.append(f"install -o nobody -g libvirt -m 640 $DIR/{script} {self._cfg['vm_images_path']}")
         setup.blank()
 
-        util.sysctl.enable_ipv6_forwarding(setup, output_dir)
+        sysctl.enable_ipv6_forwarding(setup, output_dir)
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

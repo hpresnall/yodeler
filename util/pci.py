@@ -1,3 +1,4 @@
+"""Utilities for handling PCI addresses."""
 import re
 
 # like 00:00.0

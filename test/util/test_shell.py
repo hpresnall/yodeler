@@ -3,7 +3,7 @@
 # pylint: disable=missing-function-docstring
 import unittest
 
-import util.shell as shell
+import script.shell as shell
 
 
 class TestShell(unittest.TestCase):

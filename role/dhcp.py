@@ -1,12 +1,12 @@
 """Configuration & setup for a Kea DHCP server."""
-import util.shell
-import util.file
-import util.address
+from role.roles import Role
+
+import util.file as file
+import util.address as address
+
+import script.shell as shell
 
 import config.interfaces as interfaces
-
-from roles.role import Role
-
 
 class Dhcp(Role):
     """Dhcp defines the configuration needed to setup Kea DHCP."""
@@ -31,7 +31,7 @@ class Dhcp(Role):
     def minimum_instances(site_cfg: dict) -> int:
         return 0 if 'fakeisp' in site_cfg["roles_to_hostnames"] else 1
 
-    def write_config(self, setup: util.shell.ShellScript, output_dir: str):
+    def write_config(self, setup: shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
         ifaces4 = []
         ifaces6 = []
@@ -44,7 +44,7 @@ class Dhcp(Role):
                 ifaces6.append(iface["name"] + "/" + str(iface["ipv6_address"]))
             ifaces_by_vswitch[iface["vswitch"]["name"]] = iface["name"]
 
-        dhcp4_json = util.file.load_json("templates/kea/kea-dhcp4.conf")
+        dhcp4_json = file.load_json("templates/kea/kea-dhcp4.conf")
         dhcp4_config = dhcp4_json["Dhcp4"]
         dhcp4_config["option-data"] = [
             {
@@ -58,7 +58,7 @@ class Dhcp(Role):
         ]
         dhcp4_config["interfaces-config"]["interfaces"] = ifaces4
 
-        dhcp6_json = util.file.load_json("templates/kea/kea-dhcp6.conf")
+        dhcp6_json = file.load_json("templates/kea/kea-dhcp6.conf")
         dhcp6_config = dhcp6_json["Dhcp6"]
         dhcp6_config["interfaces-config"]["interfaces"] = ifaces6
         dhcp6_config["option-data"] = [
@@ -95,7 +95,7 @@ class Dhcp(Role):
             ddns_config = {}
             ddns_dns_addresses = []
         else:
-            ddns_json = util.file.load_json("templates/kea/kea-dhcp-ddns.conf")
+            ddns_json = file.load_json("templates/kea/kea-dhcp-ddns.conf")
             ddns_config = ddns_json["DhcpDdns"]
             # top-level domain will never have any DHCP hosts, so no need to configure DDNS forward / reverse zones
 
@@ -153,7 +153,7 @@ class Dhcp(Role):
                         ddns_config["forward-ddns"]["ddns-domains"].append(
                             {"name": vlan["domain"] + ".", "dns-servers": ddns_dns_addresses})
                         ddns_config["reverse-ddns"]["ddns-domains"].append(
-                            {"name": util.address.rptr_ipv4(ip4_subnet) + ".", "dns-servers": ddns_dns_addresses})
+                            {"name": address.rptr_ipv4(ip4_subnet) + ".", "dns-servers": ddns_dns_addresses})
                     subnet4["option-data"] = [{"name": "domain-name-servers", "data":  ", ".join(dns4)},
                                               {"name": "domain-name", "data": f"{vlan['domain']}"}]
                     if domains:
@@ -185,7 +185,7 @@ class Dhcp(Role):
                                 {"name": vlan["domain"] + ".", "dns-servers": ddns_dns_addresses})
                         # forward dns already handled by ipv4
                         ddns_config["reverse-ddns"]["ddns-domains"].append(
-                            {"name": util.address.rptr_ipv6(ip6_subnet) + ".", "dns-servers": ddns_dns_addresses})
+                            {"name": address.rptr_ipv6(ip6_subnet) + ".", "dns-servers": ddns_dns_addresses})
                     subnet6["option-data"] = [{"name": "dns-servers", "data":  ", ".join(dns6)}]
                     if domains:
                         subnet6["option-data"].append({"name": "domain-search", "data": ", ".join(domains)})
@@ -215,7 +215,7 @@ class Dhcp(Role):
 
         if subnets_4:
             dhcp4_config["subnet4"] = subnets_4
-            util.file.write("kea-dhcp4.conf", util.file.output_json(dhcp4_json), output_dir)
+            file.write("kea-dhcp4.conf", file.output_json(dhcp4_json), output_dir)
             setup.service("kea-dhcp4")
             setup.append("rootinstall $DIR/kea-dhcp4.conf /etc/kea")
             setup.append("tz=$(find /etc/zoneinfo | tail -n 1)")
@@ -224,7 +224,7 @@ class Dhcp(Role):
             setup.blank()
         if subnets_6:
             dhcp6_config["subnet6"] = subnets_6
-            util.file.write("kea-dhcp6.conf", util.file.output_json(dhcp6_json), output_dir)
+            file.write("kea-dhcp6.conf", file.output_json(dhcp6_json), output_dir)
             setup.service("kea-dhcp6")
             setup.append("rootinstall $DIR/kea-dhcp6.conf /etc/kea")
             setup.append("tz=$(find /etc/zoneinfo | tail -n 1)")
@@ -232,7 +232,7 @@ class Dhcp(Role):
                 "sed -e \"s/{tzposix}/$(tail -n1 $tz)/g\" -e \"s#{tzname}#${tz:14}#g\" -i /etc/kea/kea-dhcp6.conf")
             setup.blank()
         if ddns:
-            util.file.write("kea-dhcp-ddns.conf", util.file.output_json(ddns_json), output_dir)
+            file.write("kea-dhcp-ddns.conf", file.output_json(ddns_json), output_dir)
             setup.service("kea-dhcp-ddns")
             setup.append("rootinstall $DIR/kea-dhcp-ddns.conf /etc/kea")
             setup.blank()

@@ -1,16 +1,17 @@
-"""Utility for awall configuration."""
+"""Create the awall firewall configuration for a host."""
 import logging
 import os
 
-import util.file
-import util.shell
+import util.file as file
 
-from roles.role import Role
+import script.shell as shell
+
+from role.roles import Role
 
 _logger = logging.getLogger(__name__)
 
 
-def configure(interfaces: list[dict], roles: list[Role], setup: util.shell.ShellScript, output_dir: str):
+def configure(interfaces: list[dict], roles: list[Role], setup: shell.ShellScript, output_dir: str):
     """Create awall configuration for the given interfaces.
     Outputs all JSON to <output_dir>/awall.
     Returns a shell script fragment to process the JSON files and create iptables rules."""
@@ -55,15 +56,15 @@ def configure(interfaces: list[dict], roles: list[Role], setup: util.shell.Shell
     awall = os.path.join(output_dir, "awall")
     os.mkdir(awall)
 
-    util.file.write("base.json", util.file.output_json(base), awall)
-    util.file.write("custom-services.json", util.file.output_json(custom_services), awall)
+    file.write("base.json", file.output_json(base), awall)
+    file.write("custom-services.json", file.output_json(custom_services), awall)
 
     setup.log("Configuring awall")
     setup.append("rootinstall $DIR/awall/base.json /etc/awall/private")
     setup.append("rootinstall $DIR/awall/custom-services.json /etc/awall/private")
 
     for name, service in services.items():
-        util.file.write(name, util.file.output_json(service), awall)
+        file.write(name, file.output_json(service), awall)
 
         setup.append(f"rootinstall $DIR/awall/{name} /etc/awall/optional")
         setup.append("awall enable {}".format(name[:-5]))  # name without .json
@@ -84,7 +85,7 @@ def _load_templates(services: dict, template_dir: str):
         return
 
     for path in os.listdir(template_dir):
-        service = util.file.load_json(os.path.join(template_dir, path))
+        service = file.load_json(os.path.join(template_dir, path))
 
         if os.path.isdir(path):
             continue

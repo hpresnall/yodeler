@@ -6,7 +6,7 @@ import os.path
 import tempfile
 
 import config.site as site
-import roles.role as role
+import role.roles as role
 
 
 class TestSite(unittest.TestCase):
@@ -41,7 +41,7 @@ class TestSite(unittest.TestCase):
             site.validate({"site_name": ""})
 
     def test_load_test_site(self):
-        role.load_all_roles()
+        role.load_all()
 
         site_cfg = site.load(os.path.join(self._base_path, "sites", "test"))
 

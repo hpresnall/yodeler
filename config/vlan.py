@@ -4,7 +4,7 @@ import ipaddress
 
 import util.parse as parse
 
-import roles.role
+import role.roles as roles
 
 _logger = logging.getLogger(__name__)
 
@@ -139,7 +139,7 @@ def _validate_vlan_dhcp_reservations(vswitch_name: str, vlan: dict):
         raise KeyError(f"dhcp_reservations in {cfg_name} must be an array")
 
     known_aliases = set()
-    role_names = roles.role.names()
+    role_names = roles.names()
 
     for i, res in enumerate(reservations, start=1):
         location = f"{cfg_name}.dhcp_reservations[{i}]"

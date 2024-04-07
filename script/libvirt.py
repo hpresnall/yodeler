@@ -1,4 +1,4 @@
-"""Utility functions for creating libvirt XML files."""
+"""Utility functions for creating & manipulating libvirt XML files."""
 import xml.etree.ElementTree as xml
 import os.path
 

@@ -1,9 +1,10 @@
-"""Utility functions for creating files in /etc/sysctl.d.
+"""Utility functions for creating files in /etc/sysctl.d or adding similar sysctl commands to shell scripts.
 """
 import logging
 
 import util.file as file
-import util.shell as shell
+
+import script.shell as shell
 
 _logger = logging.getLogger(__name__)
 
@@ -95,7 +96,7 @@ def _create_file(name: str, sysctl_conf: list[str], setup: shell.ShellScript, ou
     setup.blank()
 
 
-def add_disable_ipv6_to_script(script: shell.ShellScript | list[str], interface: str, indent="", with_sysctl: bool=True):
+def add_disable_ipv6_to_script(script: shell.ShellScript | list[str], interface: str, indent="", with_sysctl: bool = True):
     if with_sysctl:
         script.append(f"{indent}sysctl -w net.ipv6.conf.{interface}.disable_ipv6=1")
         script.append(f"{indent}sysctl -w net.ipv6.conf.{interface}.accept_ra=0")
@@ -106,7 +107,7 @@ def add_disable_ipv6_to_script(script: shell.ShellScript | list[str], interface:
         script.append(f"{indent}net.ipv6.conf.{interface}.autoconf = 0")
 
 
-def add_tmpaddr_ipv6_to_script(script: shell.ShellScript | list[str], interface: str, indent="", with_sysctl: bool=True):
+def add_tmpaddr_ipv6_to_script(script: shell.ShellScript | list[str], interface: str, indent="", with_sysctl: bool = True):
     if with_sysctl:
         script.append(f"{indent}sysctl -w net.ipv6.conf.{interface}.use_tempaddr=2")  # 2 =>use and prefer
         # use for 1 day, remove after 2
@@ -117,4 +118,3 @@ def add_tmpaddr_ipv6_to_script(script: shell.ShellScript | list[str], interface:
         script.append(f"{indent}net.ipv6.conf.{interface}.use_tempaddr = 2")
         script.append(f"{indent}net.ipv6.conf.{interface}.temp_prefered_lft = 86400")
         script.append(f"{indent}net.ipv6.conf.{interface}.temp_valid_lft = 172800")
-

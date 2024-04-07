@@ -1,53 +1,10 @@
-"""Configuration & setup for a Chrony NTP server."""
-import logging
-
-import util.shell
-import util.file
-import util.address
+"""Create crony.conf for a host from Yodeler configuration for NTP. Handles client & server configuration."""
+import util.file as file
 
 import config.interfaces as interfaces
 
-from roles.role import Role
 
-_logger = logging.getLogger(__name__)
-
-
-class NTP(Role):
-    """NTP defines the configuration needed to setup Chrony NTP."""
-
-    def additional_packages(self):
-        return set()  # create_chrony_conf() already called in common
-
-    def additional_configuration(self):
-        self.add_alias("time")
-        self.add_alias("sntp")
-
-    @staticmethod
-    def minimum_instances(site_cfg: dict) -> int:
-        return 0
-
-    @staticmethod
-    def maximum_instances(site_cfg: dict) -> int:
-        return 2 # no need for additional redundancy
-
-    def validate(self):
-        for iface in self._cfg["interfaces"]:
-            if (iface["type"] == "std") and (iface["ipv4_address"] == "dhcp"):
-                raise KeyError(
-                    f"host '{self._cfg['hostname']}' cannot configure aN NTP server with a DHCP address on interface '{iface['name']}'")
-
-        missing_vlans = interfaces.check_accessiblity(self._cfg["interfaces"],
-                                                     self._cfg["vswitches"].values())
-
-        if missing_vlans:
-            _logger.warning("vlans '%s' cannot access time from NTP host '%s'", self._cfg["hostname"], missing_vlans)
-
-    def write_config(self, setup: util.shell.ShellScript, output_dir: str):
-        # create_chrony_conf() will be called by common
-        setup.comment("set in chrony.conf; no additional config needed")
-
-
-def create_chrony_conf(cfg: dict, output_dir: str):
+def create_conf(cfg: dict, output_dir: str):
     buffer = []
 
     # use local NTP server if there is one defined
@@ -117,7 +74,7 @@ def create_chrony_conf(cfg: dict, output_dir: str):
             _configure_server(cfg, buffer)
             break
 
-    util.file.write("chrony.conf", "\n".join(buffer), output_dir)
+    file.write("chrony.conf", "\n".join(buffer), output_dir)
 
 
 def _configure_server(cfg: dict, buffer: list[str]):

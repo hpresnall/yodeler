@@ -1,4 +1,4 @@
-"""Defines the abstract Role class.
+"""Defines the abstract Role class and helper functions for finding & loading implementations.
 A role represents various configurations that can be applied to a host to implement a specific functionality."""
 import os
 import importlib
@@ -7,7 +7,7 @@ import logging
 
 from abc import ABC, abstractmethod
 
-import util.shell as shell
+import script.shell as shell
 
 _logger = logging.getLogger(__name__)
 
@@ -111,11 +111,11 @@ def class_for_name(name: str) -> Role:
     return _role_class_by_name[name]
 
 
-def load_all_roles():
+def load_all():
     """Load all Role subclasses in the 'roles' package.
     This must be called before loading any host configuration."""
     roles_dir = os.path.dirname(__file__)
-    ignored_files = ["__init__.py", "role.py"]
+    ignored_files = ["__init__.py", "roles.py"]
 
     for file in os.listdir(roles_dir):
         if (file[-3:] != '.py') or (file in ignored_files):

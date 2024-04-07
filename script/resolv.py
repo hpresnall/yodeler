@@ -1,4 +1,4 @@
-"""Utility for /etc/resolv.conf configuration."""
+"""Create /etc/resolv.conf based on host domain settings & site DNS configuration."""
 import util.file as file
 
 import config.interfaces as interfaces

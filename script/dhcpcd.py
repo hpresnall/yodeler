@@ -1,11 +1,11 @@
-"""Utility for /etc/dhcpcd.conf configuration."""
-import util.file
+"""Create the /etc/dhcpcd.conf configuration for a host."""
+import util.file as file
 
 
 def create_conf(cfg: dict, output_dir: str):
     """Create dhcpcd.conf and save it to the given directory.
     """
-    conf = [util.file.read_template("common", "dhcpcd.conf")]
+    conf = [file.read_template("common", "dhcpcd.conf")]
 
     interfaces = {}
     dhcp = False
@@ -68,4 +68,4 @@ def create_conf(cfg: dict, output_dir: str):
             conf.append("\n".join(buffer))
             conf.append("")
 
-        util.file.write("dhcpcd.conf", "\n".join(conf), output_dir)
+        file.write("dhcpcd.conf", "\n".join(conf), output_dir)

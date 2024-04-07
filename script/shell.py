@@ -1,4 +1,4 @@
-"""Utility for creating shell scripts."""
+"""Utility class for creating shell scripts."""
 import os
 import stat
 
