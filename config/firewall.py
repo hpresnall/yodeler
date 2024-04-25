@@ -308,12 +308,12 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
                 try:
                     address = ipaddress.ip_address(loc["ipv6_address"])
                 except ValueError as ve:
-                    raise KeyError(f"invalid IPv6 address '{loc['ipv6_address']}' for {loc_name}") from ve
+                    raise KeyError(f"invalid ipv6 address '{loc['ipv6_address']}' for {loc_name}") from ve
                 if not isinstance(address, ipaddress.IPv6Address):
-                    raise ValueError(f"invalid IPv6 address '{loc['ipv6_address']}' for {loc_name}")
+                    raise ValueError(f"invalid ipv6 address '{loc['ipv6_address']}' for {loc_name}")
                 if vlan_obj and vlan_obj["ipv6_subnet"] and (address not in vlan_obj["ipv6_subnet"]):
                     raise ValueError(
-                        f"invalid IPv6 address '{loc['ipv6_address']}' for {loc_name}; it is not in vlan '{vlan}'")
+                        f"invalid ipv6 address '{loc['ipv6_address']}' for {loc_name}; it is not in vlan '{vlan}'")
                 parsed_location6["ipaddress"] = str(address)
 
                 if "ipaddress" not in parsed_location4:

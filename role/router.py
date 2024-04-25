@@ -24,11 +24,6 @@ class Router(Role):
     def configure_interfaces(self):
         uplink = interfaces.configure_uplink(self._cfg)
 
-        # rename router interfaces to avoid issues with startup order
-        # physical servers are only renamed if the config sets a mac address
-        if uplink["mac_address"]:
-            self._cfg["rename_interfaces"].append({"name": uplink["name"], "mac_address": uplink["mac_address"]})
-
         # add an interface for each vswitch that has routable vlans
         iface_counter = 1  # start at eth1
 
