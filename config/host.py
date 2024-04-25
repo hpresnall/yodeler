@@ -6,6 +6,8 @@ import sys
 import re
 import ipaddress
 
+import role.roles as roles
+
 import util.file as file
 import util.parse as parse
 
@@ -15,7 +17,7 @@ import config.interfaces as interfaces
 import config.disks as disks
 import config.metrics as metrics
 
-import role.roles as roles
+import script.disks
 
 _logger = logging.getLogger(__name__)
 
@@ -354,12 +356,8 @@ def _bootstrap_physical(cfg: dict, output_dir: str):
             cfg["system_partition"] = disk["partition"]
 
             # for the actual Alpine install, use the real path of the disk
-            # using by-id will cause that path to end up in fstab which will be unable to boot
             # assume answerfile is sourced by installer and the shell will interperet the value
-            if "/dev/disk/by-id" in disk["path"]:
-                cfg["system_dev_real"] = f"$(cd /dev/disk/by-id/; realpath {disk['path']})"
-            else:
-                cfg["system_dev_real"] = disk["path"]
+            cfg["system_dev_real"] = script.disks.get_real_path(disk)
             break
 
     # boot with install media; run /media/<install_dev>/<site>/<host>/yodel.sh
@@ -489,7 +487,7 @@ DEFAULT_CONFIG = {
     "after_chroot": [],
     "rename_interfaces": [],
     "enable_metrics": True,  # metrics disabled at the host level
-    "metric_interval": 15 # default metrics collection interval, in seconds
+    "metric_interval": 15  # default metrics collection interval, in seconds
 }
 
 _DEFAULT_CONFIG_TYPES = {

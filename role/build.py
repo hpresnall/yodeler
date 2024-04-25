@@ -38,7 +38,6 @@ class Build(Role):
         for disk in self._cfg["disks"]:
             if disk["name"] == "build":
                 build_disk = disk
-                # = parse.set_default_string("mountpoint", disk, "/build")
                 break
 
         if build_disk:
@@ -57,7 +56,7 @@ class Build(Role):
                 build_dir = parse.set_default_string("build_dir", self._cfg, "/build")
                 disk["mountpoint"] = build_dir
         else:
-            # no disk; just use /build on the system disk
+            # no disk; just default to /build on the system disk
             build_dir = parse.set_default_string("build_dir", self._cfg, "/build")
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):

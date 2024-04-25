@@ -27,7 +27,7 @@ def from_config(cfg: dict, setup: shell.ShellScript):
 
             cfg["before_chroot"].append(_add_uuid_to_envvars(cfg['hostname'], disk))
         else:
-            # for physical servers, setup the disk during setup
+            # for physical servers, configure the disk during setup
             if disk["type"] == "img":
                 # TODO config.disks does not actually allow this
                 # would need to set the 'loop' option in create_fstab_entry()
@@ -84,6 +84,8 @@ def _add_uuid_to_envvars(hostname: str, disk: dict) -> str:
 
 
 def _set_uuid_to_local_var(disk: dict) -> str:
+    # note, once partitioned, lsblk returns UUIDs for all partitions, not the top-level partition like blkid
+    # this many be an issue on reinstalls
     return f"{disk['name'].upper()}_UUID=$(lsblk -ln -o UUID {disk['path']})"
 
 
@@ -92,3 +94,12 @@ def create_fstab_entry(disk: dict) -> str:
     return f"# mount '{disk['name']}' disk at boot\n" + \
         f"echo -e \"UUID=${disk['name'].upper()}_UUID\\t{disk['mountpoint']}\\t{disk['fs_type']}\\trw,relatime\\t0\\t2\"" + \
         " >> /etc/fstab"
+
+
+def get_real_path(disk: dict) -> str:
+    """Return the real path of the disk. 
+    Using by-id will cause the path to end up in fstab which will be unable to boot."""
+    if "/dev/disk/by-id" in disk["path"]:
+        return f"$(cd /dev/disk/by-id/; realpath {disk['path']})"
+    else:
+        return disk["path"]

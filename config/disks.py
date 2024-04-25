@@ -11,6 +11,7 @@ def validate(cfg: dict):
 
     names = set()
     paths = set()
+    # TODO check paths across all vmhosts
 
     system_disk = None
     system_disk_idx = -1
