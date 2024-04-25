@@ -11,8 +11,9 @@ import util.parse as parse
 
 import script.shell as shell
 
-import config.interfaces
-import config.disks
+import config.interfaces as interfaces
+import config.disks as disks
+import config.metrics as metrics
 
 import role.roles as roles
 
@@ -70,6 +71,8 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     host_yaml.pop("domain", None)
     host_yaml.pop("external_ntp", None)
     host_yaml.pop("external_dns", None)
+    host_yaml.pop("additional_dns_entries", None)
+    host_yaml.pop("site_enable_metrics", None)
 
     # shallow copy site config; host values overwrite site values
     host_cfg = {**site_cfg, **host_yaml}
@@ -85,9 +88,10 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     # add all interfaces, then validate
     for role in host_cfg["roles"]:
         role.configure_interfaces()
-    config.interfaces.validate(host_cfg)
-    config.interfaces.validate_renaming(host_cfg)
-    config.disks.validate(host_cfg)
+    interfaces.validate(host_cfg)
+    interfaces.validate_renaming(host_cfg)
+    disks.validate(host_cfg)
+    metrics.validate(host_cfg)
 
     # aliases are validated against other hosts, interface vlan DHCP reservations and firewall static hosts
     _configure_aliases(host_cfg)
@@ -96,7 +100,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     for role in host_cfg["roles"]:
         role.additional_configuration()
 
-    # allow role.additional_packages() to use interfaces, aliases and additional config
+    # run after all configuration to allow role.additional_packages() to use interfaces, aliases, etc
     _configure_packages(site_cfg, host_yaml, host_cfg)
 
     # note role.validate() is called _after_ all hosts are loaded in site.py
@@ -252,34 +256,34 @@ def _load_roles(cfg: dict):
         cfg["roles_to_hostnames"][role_name].append(cfg['hostname'])
 
 
-def _configure_aliases(cfg: dict):
-    hostname = cfg["hostname"]
+def _configure_aliases(host_cfg: dict):
+    hostname = host_cfg["hostname"]
     # allow both 'alias' and 'aliases'; only store 'aliases'
     aliases = parse.read_string_list_plurals(
-        {"alias", "aliases"}, cfg, "alias for " + cfg["hostname"])
-    cfg.pop("alias", None)
+        {"alias", "aliases"}, host_cfg, "alias for " + host_cfg["hostname"])
+    host_cfg.pop("alias", None)
 
     # final set of aliases is all defined values plus roles
-    cfg["aliases"] = set()
+    host_cfg["aliases"] = set()
 
     for alias in aliases:
         if not re.match(_valid_hostname, alias):
             raise ValueError(f"invalid alias '{alias}' for host '{hostname}'")
-        cfg["aliases"].add(alias.lower())
+        host_cfg["aliases"].add(alias.lower())
 
-    for role in cfg["roles"]:
+    for role in host_cfg["roles"]:
         if role.name != "common":
             role.add_alias(role.name)  # role names are already lowercase
 
     # ensure hostname is not duplicated by a role
-    cfg["aliases"].discard(cfg["hostname"])
+    host_cfg["aliases"].discard(host_cfg["hostname"])
 
-    for alias in cfg["aliases"]:
-        if alias in cfg["firewall"]["static_hosts"]:
+    for alias in host_cfg["aliases"]:
+        if alias in host_cfg["firewall"]["static_hosts"]:
             raise ValueError(f"alias '{alias}' for host '{hostname}' is already used in firewall.static_hosts")
 
         # ensure no clashes with other hosts; site.py already checked for duplicate hostnames
-        for other_hostname, other_host in cfg["hosts"].items():
+        for other_hostname, other_host in host_cfg["hosts"].items():
             if other_hostname == hostname:
                 continue
             if alias in other_host["aliases"]:
@@ -287,10 +291,10 @@ def _configure_aliases(cfg: dict):
                     f"alias '{alias}' for host '{hostname}' is already used as an alias for '{other_hostname}'")
 
     # ensure no clashes with DHCP reservations
-    aliases = set(cfg["aliases"])
-    aliases.add(cfg["hostname"])
+    aliases = set(host_cfg["aliases"])
+    aliases.add(host_cfg["hostname"])
 
-    for iface in cfg["interfaces"]:
+    for iface in host_cfg["interfaces"]:
         if iface["type"] not in {"std", "vlan"}:
             continue
 
@@ -322,11 +326,10 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
     for role in host_cfg["roles"]:
         host_cfg["packages"] |= role.additional_packages()
 
-    # update packages based on config
-    if host_cfg["metrics"]:
-        host_cfg["packages"].add("prometheus-node-exporter")
+    # update packages required for metrics
+    metrics.add_packages(host_cfg)
 
-     # remove iptables if there is no local firewall
+    # remove iptables if there is no local firewall
     if not host_cfg["local_firewall"]:
         host_cfg["remove_packages"] |= {"iptables"}
         host_cfg["packages"].discard("awall")
@@ -444,12 +447,12 @@ DEFAULT_SITE_CONFIG = {
     "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
     "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
     "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
-    "metrics": True,
     # top-level domain for the site; empty => no local DNS
     "domain": "",
     # if not specified, no SSH access will be possible!
     "user": "nonroot",
-    "password": "apassword"
+    "password": "apassword",
+    "site_enable_metrics": True  # metrics disabled at the site level, regardless of the host's 'enable_metrics' value
 }
 
 _DEFAULT_SITE_CONFIG_TYPES = {
@@ -458,10 +461,10 @@ _DEFAULT_SITE_CONFIG_TYPES = {
     "alpine_repositories": list,
     "external_ntp": list,
     "external_dns": list,
-    "metrics": bool,
     "domain": str,
     "user": str,
-    "password": str
+    "password": str,
+    "site_enable_metrics": bool
 }
 
 # accessible for testing
@@ -473,7 +476,6 @@ DEFAULT_CONFIG = {
     "vcpus": 1,
     "memory_mb": 128,
     "disk_size_mb": 256,
-    "image_format": "raw",
     "vm_images_path": "/vmstorage",
     # configure a local firewall and metrics on all systems
     "local_firewall": True,
@@ -482,11 +484,12 @@ DEFAULT_CONFIG = {
     "install_private_ssh_key": False,
     # domain for the host when it has multiple interfaces; used for DNS search
     "primary_domain": "",
+    "awall_disable": [],
     "before_chroot": [],
     "after_chroot": [],
     "rename_interfaces": [],
-    "prometheus_collectors": ["cpu", "diskstats", "filefd", "filesystem", "meminfo", "netdev", "netstat",
-                              "schedstat", "sockstat", "stat", "udp_queues", "uname", "vmstat"]
+    "enable_metrics": True,  # metrics disabled at the host level
+    "metric_interval": 15 # default metrics collection interval, in seconds
 }
 
 _DEFAULT_CONFIG_TYPES = {
@@ -497,15 +500,15 @@ _DEFAULT_CONFIG_TYPES = {
     "vcpus": int,
     "memory_mb": int,
     "disk_size_mb": int,
-    "image_format": str,
     "vm_images_path": str,
     "local_firewall": bool,
     "motd": str,
     "install_private_ssh_key": bool,
     "primary_domain": str,
-    "install_interfaces": str,
+    "awall_disable": list,
     "before_chroot": list,
     "after_chroot": list,
     "rename_interfaces": list,
-    "prometheus_collectors": list
+    "enable_metrics": bool,
+    "metric_interval": int
 }

@@ -29,8 +29,8 @@ class Build(Role):
         return 0
 
     def validate(self):
-        if self._cfg["is_vm"] and (self._cfg["disk_size_mb"] < 1024):
-            raise ValueError("build server must set 'disk_size_mb' to at least 1,024")
+        if self._cfg["is_vm"] and (self._cfg["disk_size_mb"] < 2048):
+            raise ValueError("build server must set 'disk_size_mb' to at least 2,048")
 
         # optional disk for builds, if defined
         build_disk = None

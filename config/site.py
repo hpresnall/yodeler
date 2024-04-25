@@ -67,8 +67,11 @@ def validate(site_yaml: dict | str | None) -> dict:
 
     # map hostname to host config
     site_cfg["hosts"] = {}
+
     # map roles to fully qualified domain names; shared with host configs
     site_cfg["roles_to_hostnames"] = {}
+    for role in roles.names():
+        site_cfg["roles_to_hostnames"][role] = []
 
     return site_cfg
 
@@ -152,18 +155,17 @@ def _validate_full_site(site_cfg: dict):
     for host_cfg in site_cfg["hosts"].values():
         aliases.update(host_cfg["aliases"])  # this includes role names for the host
 
-        # validate here to avoid an additional all hosts loop
-        for role in host_cfg["roles"]:
-            role.validate()
-
-    _logger.debug("all_aliases=%s", aliases)
-
-    for host_cfg in site_cfg["hosts"].values():
         hostname = host_cfg["hostname"]
 
         if hostname in aliases:
             raise KeyError(f"hostname '{hostname}' cannot be the same as another host's alias")
         aliases.add(host_cfg["hostname"])
+
+        # validate here to avoid an additional all hosts loop
+        for role in host_cfg["roles"]:
+            role.validate()
+
+    _logger.debug("all_aliases=%s", aliases)
 
     # finally, confirm that all the firewall rules point to valid hostnames
     firewall.validate_rule_hostnames(site_cfg)

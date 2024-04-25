@@ -1,8 +1,14 @@
 {
   "service": {
     "ddns": [
-      { "proto": "tcp", "port": 553 },
-      { "proto": "udp", "port": 553 }
+      {
+        "proto": "tcp",
+        "port": 553
+      },
+      {
+        "proto": "udp",
+        "port": 553
+      }
     ]
   }
 }

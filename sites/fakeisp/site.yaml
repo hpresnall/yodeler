@@ -22,6 +22,7 @@ private_ssh_key: |
   ANT2Zx5D3L9juZHW+xjfE5iNX5WtP7PKBBfHM6mZcBTxp+qP3sjX3d7L0a008weIMobaH+
   Rmqhwq/wje7/rGsYUAAAAgaHVudGVyQFB0YWgudXNlci5mb3J0YXdlc29tZS54eXoBAgM=
   -----END OPENSSH PRIVATE KEY-----
+site_enable_metrics: false
 vswitches:
   # for the fakeisp role, these vswitch and vlan names are _required_
   # vswitch only used for connecting the fake ISP to the upstream network / internet

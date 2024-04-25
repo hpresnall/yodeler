@@ -1,0 +1,9 @@
+prometheus_config_file=/etc/prometheus/prometheus.yml
+prometheus_storage_path=/var/lib/prometheus/data
+prometheus_retention_time=32d
+# enable admin api for backups
+prometheus_args="--log.level=info --web.enable-admin-api"
+
+# use the same dir as node-exporter
+output_log=/var/log/prometheus/prometheus.log
+error_log=/var/log/prometheus/prometheus.log

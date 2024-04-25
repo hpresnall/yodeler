@@ -14,9 +14,6 @@ class Storage(Role):
         return {"pciutils", "nvme-cli", "samba", "zfs"}
 
     def additional_configuration(self):
-        if self._cfg["metrics"]:
-            self._cfg["prometheus_collectors"].extend(["nvme", "zfs"])
-
         self.add_alias("storage")
         self.add_alias("nas")
         self.add_alias("samba")
@@ -26,8 +23,8 @@ class Storage(Role):
         parse.set_default_string("storage_user", self._cfg, "storage")
         parse.set_default_string("storage_group", self._cfg, "storage")
 
-        self._cfg["before_chroot"] = ["apk add zfs", "modprobe zfs"]
-        self._cfg["after_chroot"] = ["modprobe -r zfs", "apk del zfs"]
+        self._cfg["before_chroot"].extend(["apk add zfs", "modprobe zfs"])
+        self._cfg["after_chroot"].extend(["modprobe -r zfs", "apk del zfs"])
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

@@ -1,4 +1,4 @@
-"""Create shell script fragments formatting disks and adding /etc/fstab entries in setup scripts."""
+"""Create shell script fragments for formatting disks and adding /etc/fstab entries in setup scripts."""
 import script.shell as shell
 
 

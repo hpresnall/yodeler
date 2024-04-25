@@ -1,13 +1,13 @@
 """Configuration & setup for a PowerDNS server."""
 from role.roles import Role
 
-import config.interfaces as interfaces
-
 import util.file as file
 import util.address as address
 
 import script.shell as shell
 import script.sysctl as sysctl
+
+import config.interfaces as interfaces
 
 
 class Dns(Role):
@@ -42,6 +42,7 @@ class Dns(Role):
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
+        # fake isp runs its own dns
         return 0 if 'fakeisp' in site_cfg["roles_to_hostnames"] else 1
 
     @staticmethod
@@ -49,7 +50,7 @@ class Dns(Role):
         return 2  # no need for additional redundancy
 
     def additional_configuration(self):
-        self._cfg["before_chroot"] = [file.substitute("dns", "before_chroot.sh", self._cfg)]
+        self._cfg["before_chroot"].append(file.substitute("dns", "before_chroot.sh", self._cfg))
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
@@ -146,15 +147,27 @@ class Dns(Role):
 
         setup.append("pdnsutil rectify-all-zones")
 
+        web_allow_from = ["127.0.0.1", "::1"]
+
+        # allow the metrics server to contact PDNS's webserver for metrics
+        if self._cfg["metrics"] and self._cfg["metrics"]["pdns"]["enabled"]:
+            for hostname in self._cfg["roles_to_hostnames"]["metrics"]:
+                host_cfg = self._cfg["hosts"][hostname]
+
+                for match in interfaces.find_ips_to_interfaces(host_cfg, self._cfg["interfaces"], first_match_only=False):
+                    if match["ipv4_address"]:
+                        web_allow_from.append(str(match["ipv4_address"]))
+                    if match["ipv6_address"]:
+                        web_allow_from.append(str(match["ipv6_address"]))
+
         pdns_conf = {
             "dns_server": dns_server,
             "dns_domain": dns_domain,
-            "forward_zones": ",".join(forward_zones),
-            "external_dns": ";".join(self._cfg["external_dns"]),
-            "listen_addresses": ",".join(listen_addresses),
-            "allow_subnets": ",".join(allow_subnets),
-            "web_listen_addresses": "0.0.0.0",
-            "web_allow_subnets": "127.0.0.1,::1"
+            "forward_zones": ", ".join(forward_zones),
+            "external_dns": ";".join(self._cfg["external_dns"]),  # note ; not comma and no spaces
+            "listen_addresses": ", ".join(listen_addresses),
+            "allow_subnets": ", ".join(allow_subnets),
+            "web_allow_from": ", ".join(web_allow_from)
         }
 
         file.write("pdns.conf", file.substitute(self.name, "pdns.conf", pdns_conf), output_dir)
@@ -169,7 +182,7 @@ class Dns(Role):
                 hosts.append(str(additional_dns["ipv4_address"]) + " " + " ".join(additional_dns["hostnames"]))
 
                 if "ipv6_address" in additional_dns:
-                    hosts.append(str(additional_dns["ipv4_address"]) + " " + " ".join(additional_dns["hostnames"]))
+                    hosts.append(str(additional_dns["ipv6_address"]) + " " + " ".join(additional_dns["hostnames"]))
 
             hosts.append("")
             file.write("other_hosts", "\n".join(hosts), output_dir)

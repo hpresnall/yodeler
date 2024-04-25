@@ -108,9 +108,6 @@ class Router(Role):
         self.add_alias("gateway")
         self.add_alias("firewall")
 
-        if self._cfg["metrics"]:
-            self._cfg["prometheus_collectors"].extend(["conntrack", "network_route"])
-
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         # router needed if there are routable vlans

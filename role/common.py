@@ -4,11 +4,12 @@ from role.roles import Role
 import util.file as file
 
 import script.awall as awall
+import script.chrony as chrony
 import script.disks as disks
 import script.dhcpcd as dhcpcd
 import script.interfaces as interfaces
 import script.libvirt as libvirt
-import script.chrony as chrony
+import script.metrics as metrics
 import script.resolv as resolv
 import script.shell as shell
 import script.sysctl as sysctl
@@ -20,7 +21,7 @@ class Common(Role):
     def additional_packages(self):
         # use dhcpcd for dhcp since it can also handle prefix delegation for routers
         # use better ifupdown-ng  and the Linux ip command, instead of Busybox's built-ins
-        packages = {"e2fsprogs", "acpi", "doas", "openssh", "chrony",
+        packages = {"e2fsprogs", "acpi", "doas", "openssh", "chrony", "curl",
                     "logrotate", "awall", "dhcpcd", "ifupdown-ng", "iproute2"}
 
         for iface in self._cfg["interfaces"]:
@@ -44,10 +45,6 @@ class Common(Role):
         self._cfg["fqdn"] = ""
         if self._cfg["primary_domain"]:
             self._cfg["fqdn"] = self._cfg["hostname"] + '.' + self._cfg["primary_domain"]
-
-        if not self._cfg["is_vm"] and self._cfg["metrics"]:
-            # additional metrics for physical hosts
-            self._cfg["prometheus_collectors"].extend(["edac", "hwmon", "nvme", "thermal_zone", "cpufreq"])
 
     def validate(self):
         # ensure each vlan is only used once
@@ -107,25 +104,13 @@ class Common(Role):
         # directly copy /etc/hosts
         file.copy_template(self.name, "hosts", output_dir)
 
-        if self._cfg["metrics"]:
-            setup.log("Configuring Prometheus")
-            setup.service("node-exporter")
-            # awful formatting; put each prometheus arg on a separate line ending with '\'
-            # then, the whole command needs to be echoed to a file as a quoted param
-            collectors = set(self._cfg["prometheus_collectors"])
-            node_exporter_cmd = " \\\n".join(_PROMETHEUS_ARGS) + " "  \
-                + " \\\n".join("--collector.%s" % c for c in collectors)
-            setup.append("echo \"ARGS=\\\"" + node_exporter_cmd + "\\\"\" > /etc/conf.d/node-exporter")
-            setup.blank()
-
-        if self._cfg["local_firewall"]:
-            awall.configure(self._cfg["interfaces"], self._cfg["roles"], setup, output_dir)
-
         interfaces.from_config(self._cfg, output_dir)
+        interfaces.rename_interfaces(self._cfg["rename_interfaces"], setup, output_dir, self._cfg["hostname"])
 
         sysctl.disable_ipv6(self._cfg, setup, output_dir)
 
-        interfaces.rename_interfaces(self._cfg["rename_interfaces"], setup, output_dir, self._cfg["hostname"])
+        awall.configure(self._cfg, setup, output_dir)
+        metrics.configure(self._cfg, setup, output_dir)
 
         # create resolve.conf as needed, based on dhcp and ipv6 configuration
         # this also determines the need for dhcpcd
@@ -183,15 +168,3 @@ def _setup_repos(cfg: dict, setup: shell.ShellScript):
         setup.append(f"echo {repo} >> /etc/apk/repositories")
 
     setup.blank()
-
-
-# ignore all ram, loop, floppy disks and all _partitions_
-# ignore all non-file systems
-_PROMETHEUS_ARGS = [
-    "--log.level=warn",
-    "--collector.diskstats.device-exclude='^(ram|loop|fd[a-z]|((h|s|v|xv)d[a-z]|nbd|sr|nvme\\\\d+n\\\\d+p))\\\\d+$'",
-    "--collector.filesystem.fs-types-exclude='^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs)$'",
-    "--collector.disable-defaults"
-]
-
-# for storage zfs

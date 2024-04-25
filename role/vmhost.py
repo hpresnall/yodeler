@@ -19,9 +19,11 @@ class VmHost(Role):
 
     def additional_packages(self):
         # packages for openvswitch, qemu, libvirt and alpine-make-vm-image
-        return {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
-                "libvirt", "libvirt-daemon", "libvirt-qemu", "ovmf", "dbus", "polkit",
-                "virtiofsd", "e2fsprogs", "rsync", "sfdisk", "git", "xmlstarlet", "ethtool"}
+        packages = {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
+                    "libvirt", "libvirt-daemon", "libvirt-qemu", "virtiofsd",
+                    "ovmf", "dbus", "polkit", "e2fsprogs", "rsync", "sfdisk", "git", "xmlstarlet", "ethtool"}
+
+        return packages
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -73,10 +75,7 @@ class VmHost(Role):
 
         self.add_alias("kvm")
 
-        if self._cfg["metrics"]:
-            self._cfg["prometheus_collectors"].extend(["cgroups"])
-
-        # additional physical server config before running chroot during setup
+        # additional physical server config to load libvirt kernel modules
         self._cfg["before_chroot"].append(file.substitute("vmhost", "before_chroot.sh", self._cfg))
         self._cfg["after_chroot"].append(file.substitute("vmhost", "after_chroot.sh", self._cfg))
 
@@ -340,6 +339,7 @@ def _create_site_build_image(cfg: dict, setup: shell.ShellScript, output_dir: st
     site_build = file.substitute("vmhost", "site_build.sh", cfg)
     setup.append(site_build)
 
+    # helper scripts on the installed vm to setup & mount / unmount the build_image before re-installing a vm
     create_build = shell.ShellScript("create_build_img.sh")
     create_build.append_self_dir()
     create_build.append("""log () {

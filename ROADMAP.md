@@ -46,9 +46,12 @@
 
 ## Metrics
 - [x] Configure Prometheus client on all systems
-- [ ] Configure Prometheus server
-- [ ] Configure Grafana
+- [x] Configure Prometheus server
+- [x] Configure Grafana
 - [ ] Create / generate dashboards for all servers in a site
+- [x] Add libvirt metrics for vmhosts
+- [ ] Add nvme metrics for SSDs
+- [ ] Add IPMI metrics for physical servers
 - [ ] Add OneWire support for sensor metrics
 - [ ] Add SNMP support for network metrics
 

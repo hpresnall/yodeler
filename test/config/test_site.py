@@ -50,13 +50,15 @@ class TestSite(unittest.TestCase):
 
         roles = site_cfg["roles_to_hostnames"]
         self.assertIsNotNone(roles)
-        self.assertEqual(8, len(roles))
+        self.assertEqual(12, len(roles))
         self.assertIn("router", roles)
         self.assertIn("dns", roles)
         self.assertIn("dhcp", roles)
         self.assertIn("ntp", roles)
         self.assertIn("xwindows", roles)
         self.assertIn("build", roles)
+        self.assertIn("storage", roles)
+        self.assertIn("metrics", roles)
         self.assertIn("test", roles)
         self.assertEqual(["router"], roles["router"])
 
@@ -92,7 +94,7 @@ class TestSite(unittest.TestCase):
                     self.assertIn("test2", host_cfg["aliases"])
 
                 if hostname == "server":
-                    required_files.remove("resolv.conf.head") # completely dynamic config => no resolv.conf
+                    required_files.remove("resolv.conf.head")  # completely dynamic config => no resolv.conf
                     self.assertNotIn("test", host_cfg["aliases"])
                     self.assertIn("test1", host_cfg["aliases"])
 

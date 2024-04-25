@@ -75,16 +75,16 @@ class TestHost(base.TestCfgBase):
 
         # has all default config
         for key in host.DEFAULT_SITE_CONFIG:
-            self.assertIsNotNone(cfg.get(key))
-            self.assertEqual(host.DEFAULT_SITE_CONFIG[key], cfg[key])
+            self.assertIsNotNone(cfg.get(key), key)
+            self.assertEqual(host.DEFAULT_SITE_CONFIG[key], cfg[key], key)
         for key in host.DEFAULT_CONFIG:
-            self.assertIsNotNone(cfg.get(key))
-            self.assertEqual(host.DEFAULT_CONFIG[key], cfg[key])
+            self.assertIsNotNone(cfg.get(key), key)
+            self.assertEqual(host.DEFAULT_CONFIG[key], cfg[key], key)
 
         # has all default packages
         packages = cfg["packages"]
-        self.assertIsNotNone(packages)
-        self.assertEqual(11, len(packages))
+        self.assertIsNotNone(packages, packages)
+        self.assertEqual(12, len(packages))
         # common packages + metrics enabled by default
         self.assertEqual(0, len({"e2fsprogs", "acpi", "doas", "openssh", "chrony",
                          "logrotate", "awall", "dhcpcd", "ifupdown-ng", "iproute2", "prometheus-node-exporter"} - packages))

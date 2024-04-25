@@ -3,7 +3,7 @@ Also handles creating a startup script to rename interfaces based on the optiona
 
 Files created by this module are usable by the ifupdown-ng package.
 It _will not_ be usable by the Alpine's default BusyBox ifupdown command or by
-the Debian's version from the ifupdown package."""
+Debian's version from the ifupdown package."""
 import config.interfaces
 
 import util.file as file
