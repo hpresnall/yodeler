@@ -10,12 +10,8 @@ def from_config(cfg: dict, setup: shell.ShellScript):
             continue  # base host setup will handle formatting the OS disk
 
         if (disk["type"] == "passthrough"):
-            # for host passthrough, let other roles format the disk and handle fstab
+            # for host passthrough, let other roles format the disk and set the mountpoint, if needed
             continue
-
-        if not disk.get("mountpoint"):
-            # other roles should have set the mountpoint
-            raise ValueError(f"no mountpoint defined for disk '{disk['name']}'")
 
         if cfg["is_vm"]:
             # for vms, setup the disk before chroot
@@ -38,13 +34,10 @@ def from_config(cfg: dict, setup: shell.ShellScript):
             setup.append(_set_uuid_to_local_var(disk))
             setup.blank()
 
-        setup.append(create_fstab_entry(disk))
-        setup.blank()
-
 
 def _create_image(disk: dict) -> str:
     """Output the commands to create and format a disk image."""
-    path = disk["path"]
+    path = disk["host_path"]
     # assume VM and UUID is written to /tmp/envvars
     return f"""if [ ! -f "{path}" ]; then
   log "Creating & formatting '{disk['name']}' disk image"
@@ -91,6 +84,10 @@ def _set_uuid_to_local_var(disk: dict) -> str:
 
 def create_fstab_entry(disk: dict) -> str:
     """Add an entry to /etc/fstab for the given disk UUID & mount point."""
+    if not disk.get("mountpoint"):
+        # base config or other roles should have set the mountpoint
+        raise ValueError(f"no mountpoint defined for disk '{disk['name']}'")
+
     return f"# mount '{disk['name']}' disk at boot\n" + \
         f"echo -e \"UUID=${disk['name'].upper()}_UUID\\t{disk['mountpoint']}\\t{disk['fs_type']}\\trw,relatime\\t0\\t2\"" + \
         " >> /etc/fstab"

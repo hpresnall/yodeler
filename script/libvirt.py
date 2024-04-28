@@ -14,36 +14,19 @@ def write_vm_xml(cfg: dict, output_dir: str) -> None:
 
     devices = domain.find("devices")
 
+    # assume no disks in the template; this if statement fixes typing errors
     if devices is None:
         devices = xml.SubElement(domain, "devices")
 
-    disk_devs = set()
-    disks = devices.findall("disk")
-
-    # for any existing disks in the template, ensure no duplicate names with disks that are added
-    for disk in disks:
-        target = disk.find("target")
-        if (target is not None) and ("dev" in target.attrib):
-            disk_devs.add(target.attrib["dev"])
-
-    idx = 0
     for disk in cfg["disks"]:
-        if (disk["type"] == "img") or (disk["type"] == "device"):
-            # both need a device id on the vm like vda, vdb etc; make sure it is unique
-            disk_dev = "vd" + chr(ord('a')+idx)
-
-            while disk_dev in disk_devs:
-                idx += 1
-                disk_dev = "vd" + chr(ord('a')+idx)
-            disk_devs.add(disk_dev)
-            idx += 1
-
-            if (disk["type"] == "img"):
-                devices.append(_disk_img(disk["path"], disk_dev))
-            else:
-                devices.append(_disk_device(disk["path"], disk_dev))
+        if disk["type"] == "img":
+            devices.append(_disk_img(disk["host_path"], disk["path"]))
+        elif disk["type"] == "device":
+            devices.append(_disk_device(disk["host_path"], disk["path"]))
         elif disk["type"] == "passthrough":
             devices.append(_disk_passthrough(disk["bus"], disk["slot"], disk["function"]))
+        else:
+            raise ValueError(f"unknown disk type '{disk['type']} in {cfg['hostname']}")
 
     for iface in cfg["interfaces"]:
         if iface["type"] != "std":
@@ -60,36 +43,36 @@ def write_vm_xml(cfg: dict, output_dir: str) -> None:
     template.write(os.path.join(output_dir, cfg["hostname"] + ".xml"))
 
 
-def _disk_img(img_path: str, host_dev: str) -> xml.Element:
+def _disk_img(img_path: str, virtual_dev: str) -> xml.Element:
     """Create a <disk> XML element for the given image path.
 
     <disk type="file" device="disk">
       <driver name="qemu" type="raw" />
       <source file="{img_path}" />
-      <target dev="{host_dev}" bus="virtio" />
+      <target dev="{virtual_dev}" bus="virtio" />
     </disk>
     """
     disk = xml.Element("disk", {"type": "file", "device": "disk"})
     xml.SubElement(disk, "driver", {"name": "qemu", "type": "raw"})
     xml.SubElement(disk, "source", {"file": img_path})
-    xml.SubElement(disk, "target", {"dev": host_dev, "bus": "virtio"})
+    xml.SubElement(disk, "target", {"dev": virtual_dev, "bus": "virtio"})
 
     return disk
 
 
-def _disk_device(dev_path: str, host_dev: str) -> xml.Element:
+def _disk_device(host_dev: str, virtual_dev: str) -> xml.Element:
     """Create a <disk> XML element for the given host path in /dev.
 
     <disk type='block' device='disk'>
       <driver name='qemu' type='raw'/>
-      <source dev='{dev_path}'/>
-      <target dev='{host_dev}' bus='virtio'/>
+      <source dev='{host_dev}'/>
+      <target dev='{virtual_dev}' bus='virtio'/>
     </disk>
     """
     disk = xml.Element("disk", {"type": "block", "device": "disk"})
     xml.SubElement(disk, "driver", {"name": "qemu", "type": "raw"})
-    xml.SubElement(disk, "source", {"dev": dev_path})
-    xml.SubElement(disk, "target", {"dev": host_dev, "bus": "virtio"})
+    xml.SubElement(disk, "source", {"dev": host_dev})
+    xml.SubElement(disk, "target", {"dev": virtual_dev, "bus": "virtio"})
 
     return disk
 

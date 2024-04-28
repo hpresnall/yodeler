@@ -45,7 +45,10 @@ class Storage(Role):
 
         for disk in self._cfg["disks"]:
             if disk["name"].startswith("storage"):
-                zpool += disk["path"] + " "
+                # creating zpool outside of vm, so use vm host's path
+                # TODO verify this works with image files after vm starts and the zpool is imported at boot
+                path = disk["host_path"] if self._cfg["is_vm"] else disk["path"]
+                zpool += path + " "
 
         setup.append("zpool import 2>&1 | grep storage &>/dev/null && ret=$? || ret=$?")
         setup.append("if [ $ret -eq 0 ]; then")

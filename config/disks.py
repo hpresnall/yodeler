@@ -12,10 +12,11 @@ def validate(cfg: dict):
     disks = cfg["disks"] = parse.read_dict_list_plurals({"disk", "disks"}, cfg, "disks")
     cfg.pop("disk", None)
 
-    if cfg["profile"] and ("disks" in cfg["profile"]):
+    if cfg["profile"] and (("disk" in cfg["profile"]) or ("disks" in cfg["profile"])):
         old_disks = disks
         disks = cfg["disks"] = parse.read_dict_list_plurals({"disk", "disks"}, cfg["profile"], "disks")
-        _logger.info(f"profile['{cfg['profile_name']}']['{cfg['hostname']}'].disks overriding base config: {old_disks} -> {disks}")
+        _logger.debug(f"profile['{cfg['profile_name']}']['{cfg['hostname']}'].disks"
+                      f" overriding base config: {old_disks} -> {disks}")
 
     names = set()
     paths = set()
@@ -28,7 +29,7 @@ def validate(cfg: dict):
         location = f"cfg[{cfg['hostname']}].disks[{i}]"
 
         # if only one disk, assume it is the system disk
-        # if no disks, it will be added below
+        # if there are no disks, it will be added below
         if (len(disks) == 1) and ("name" not in disk):
             disk["name"] = "system"
 
@@ -43,7 +44,8 @@ def validate(cfg: dict):
             system_disk = disk
             system_disk_idx = i - 1
 
-        # disks can define a 'mountpoint' but it may be overridden by other config, so do not require it here
+        # disks can define a mountpoint but it may be overridden by other config
+        # do not require it here but make sure it is a string
         if ("mountpoint" in disk) and not isinstance(disk["mountpoint"], str):
             raise ValueError(f"{location}.mountpoint must be a string")
 
@@ -124,3 +126,13 @@ def validate(cfg: dict):
 
         # make it the first disk
         disks.insert(0, disk)
+
+    # now that disk ordering is set, set the vm device as the path
+    if cfg["is_vm"]:
+        for i, disk in enumerate(disks):
+            disk["host_path"] = disk["path"]
+
+            if disk["type"] != "passthrough":
+                # make vda the system disk; subsequent disks are vdb, vdc, etc.
+                disk["path"] = "vd" + chr(ord('a')+i)
+            # else host's path == vm's path for passthrough

@@ -114,7 +114,10 @@ class VmHost(Role):
                         vf_counts[uplink] = 1
 
             for disk in host["disks"]:
-                path = disk["path"]
+                if not host["is_vm"]:
+                    continue
+
+                path = disk["host_path"]
 
                 if path in disks:
                     raise ValueError(f"cannot reuse disk {path} in host {host['hostname']}")

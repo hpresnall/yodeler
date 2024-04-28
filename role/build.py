@@ -5,6 +5,8 @@ import util.parse as parse
 
 import script.shell as shell
 
+import script.disks as disks
+
 
 class Build(Role):
     """Role that adds common build tools and compilers."""
@@ -41,20 +43,20 @@ class Build(Role):
                 break
 
         if build_disk:
-            mountpoint = disk.get("mountpoint", None)
+            mountpoint = build_disk.get("mountpoint", None)
 
             if mountpoint:
                 build_dir = self._cfg.get("build_dir", None)
 
                 # both build and mount point set => override mount point with build_dir
                 if build_dir:
-                    disk["mountpoint"] = build_dir
+                    build_disk["mountpoint"] = build_dir
                 else:  # set the build_dir to the mount point
                     parse.set_default_string("build_dir", self._cfg, mountpoint)
             else:
                 # no mount point, set both to the build_dir
                 build_dir = parse.set_default_string("build_dir", self._cfg, "/build")
-                disk["mountpoint"] = build_dir
+                build_disk["mountpoint"] = build_dir
         else:
             # no disk; just default to /build on the system disk
             build_dir = parse.set_default_string("build_dir", self._cfg, "/build")
@@ -66,3 +68,10 @@ class Build(Role):
         setup.append(f"mkdir -p {build_dir}")
         setup.append(f"chown {user}:{user} {build_dir}")
         setup.append(f"chmod 750 {build_dir}")
+
+        for disk in self._cfg["disks"]:
+            if disk["name"] == "build":
+                setup.blank()
+                setup.append(disks.create_fstab_entry(disk))
+                setup.blank()
+                break
