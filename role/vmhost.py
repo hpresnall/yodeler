@@ -337,22 +337,18 @@ def _setup_libvirt(cfg: dict, setup: shell.ShellScript, output_dir: str):
 
 
 def _create_site_build_image(cfg: dict, setup: shell.ShellScript, output_dir: str):
-    # setup the site build image
-    # also create a stand-along script for bootstrapping a new image if needed
-    site_build = file.substitute("vmhost", "site_build.sh", cfg)
-    setup.append(site_build)
-
-    # helper scripts on the installed vm to setup & mount / unmount the build_image before re-installing a vm
+    # create a stand-alone script for setting up the site build image
     create_build = shell.ShellScript("create_build_img.sh")
     create_build.append_self_dir()
     create_build.append("""log () {
   echo $*
 }
 """)
-    create_build.append(site_build)
+    create_build.append(file.substitute("vmhost", "site_build.sh", cfg))
     create_build.log("Build image mounted at $SITE_BUILD_IMG")
     create_build.write_file(output_dir)
 
+    # helper scripts on the installed vm to unmount the build_image
     unmount_build = shell.ShellScript("unmount_build_img.sh")
     unmount_build.append_self_dir()
     unmount_build.append(f"SITE_BUILD_IMG=\"/media/{cfg['site_name']}_build\"")

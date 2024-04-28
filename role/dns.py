@@ -49,16 +49,28 @@ class Dns(Role):
     def maximum_instances(site_cfg: dict) -> int:
         return 2  # no need for additional redundancy
 
-    def additional_configuration(self):
-        self._cfg["before_chroot"].append(file.substitute("dns", "before_chroot.sh", self._cfg))
-
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
         sysctl.enable_tcp_fastopen(setup, output_dir)
 
+        # scripts for creating the blackhole file
+        file.copy_template("dns", "build_recursor_lua.sh", output_dir)
+        file.copy_template("dns", "create_lua_blackhole.py", output_dir)
+
+        if self._cfg["is_vm"]:
+            # build in vm's build image
+            self._cfg["before_chroot"].append(file.substitute("dns", "before_chroot.sh", self._cfg))
+            setup.comment("blackhole script created before chroot in vmhost's build image")
+        else:
+            # build locally
+            setup.comment("build blackhole script")
+            setup.append("chmod +x $DIR/build_recursor_lua.sh")
+            setup.append("mkdir build")
+            setup.append("$DIR/build_recursor_lua.sh")
+        setup.blank()
+
         setup.append(f"install -o pdns -g pdns -m 600 $DIR/pdns.conf /etc/pdns")
         setup.append(f"install -o recursor -g recursor -m 600 $DIR/recursor.conf /etc/pdns")
-        setup.comment("# blackhole script created before chroot in vmhost's build image")
         setup.append(f"install -o recursor -g recursor -m 600 /tmp/blackhole.lua /etc/pdns")
         setup.blank()
 
@@ -172,9 +184,6 @@ class Dns(Role):
 
         file.write("pdns.conf", file.substitute(self.name, "pdns.conf", pdns_conf), output_dir)
         file.write("recursor.conf", file.substitute(self.name, "recursor.conf", pdns_conf), output_dir)
-
-        file.copy_template("dns", "build_recursor_lua.sh", output_dir)
-        file.copy_template("dns", "create_lua_blackhole.py", output_dir)
 
         if self._cfg["additional_dns_entries"]:
             hosts = [""]

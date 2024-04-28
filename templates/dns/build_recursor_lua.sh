@@ -2,7 +2,7 @@
 # this should be run when chrooted in the shared build image of the vmhost
 set -o errexit
 
-apk add git
+apk -q --no-progress add git
 
 cd build
 
@@ -16,7 +16,7 @@ else
   cd hosts
 fi
 
-apk add python3 py-requests py-flake8 lua
+apk -q --no-progress add python3 py-requests py-flake8 lua
 
 # build hosts file
 python3 updateHostsFile.py --auto --skipstatichosts

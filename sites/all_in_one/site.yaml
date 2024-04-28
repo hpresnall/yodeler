@@ -14,3 +14,4 @@ vswitches:
         ipv6_subnet: fd24:87e8:06c7:00::/64
         # allow unrescricted access to the internet
         allow_internet: true
+site_enable_metrics: false

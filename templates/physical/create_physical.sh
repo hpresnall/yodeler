@@ -75,6 +75,7 @@ echo "export START_TIME=$$START_TIME" >> /tmp/$HOSTNAME/tmp/envvars
 
 $BEFORE_CHROOT
 
+# copy files into the installed system
 cp -r /tmp/$HOSTNAME/tmp/* "$$INSTALLED"/tmp
 
 log "Chrooting to installed system"

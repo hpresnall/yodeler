@@ -179,6 +179,15 @@ def _validate_full_site(site_cfg: dict):
         for role in host_cfg["roles"]:
             role.validate()
 
+            # self reference for use in the vmhost's build image scripts
+            if role.name == "vmhost":
+                host_cfg["vmhost"] = host_cfg["hostname"]
+
+        # set the host's VM host
+        if host_cfg["is_vm"]:
+            # TODO allow setting vmhost in config; will need to validate it
+            host_cfg["vmhost"] = host_cfg["roles_to_hostnames"]["vmhost"][0]
+
     _logger.debug("all_aliases=%s", aliases)
 
     # finally, confirm that all the firewall rules point to valid hostnames

@@ -1,6 +1,7 @@
 """Create shell script fragments for setting up Prometheus metrics."""
 import script.shell as shell
 
+import util.file as file
 
 def configure(cfg: dict, setup: shell.ShellScript, output_dir: str):
     if not cfg["metrics"]:
@@ -35,6 +36,7 @@ def configure(cfg: dict, setup: shell.ShellScript, output_dir: str):
     setup.blank()
 
     _configure_libvirt(cfg, setup)
+    _configure_ipmi(cfg, setup, output_dir)
 
 
 def _configure_libvirt(cfg: dict, setup: shell.ShellScript):
@@ -44,12 +46,29 @@ def _configure_libvirt(cfg: dict, setup: shell.ShellScript):
         setup.service("libvirt-exporter")
         setup.blank()
 
+def _configure_ipmi(cfg: dict, setup: shell.ShellScript, output_dir: str):
+    if cfg["metrics"]["ipmi"]["enabled"]:
+        if cfg["is_vm"]:
+            raise ValueError(f"vm {cfg['hostname']} cannot enable ipmi metrics")
+
+        file.copy_template("metrics/ipmi", "ipmi-exporter", output_dir)
+
+        setup.comment("collect impi metrics")
+        # TODO this only works on a vmhost; need a separate script for this to work without the build image
+        setup.append(file.substitute("metrics/ipmi", "build.sh", cfg))
+        setup.append("install -o root -g root -m 755 $DIR/ipmi-exporter /etc/init.d")
+        setup.append("install -o root -g root -m 755 /tmp/ipmi-exporter /usr/bin")
+        setup.service("ipmi-exporter")
+        setup.blank()
+
 
 _exporter_ports = {
     "node": 9100,
     "pdns": [9101, 9102],
     "libvirt": 9177,
-    "nvme": 9105 # TODO update to actual value
+    "ipmi": 9290,
+    "nvme": 9105, # TODO update to actual value
+    "onewire": 8105
 }
 
 

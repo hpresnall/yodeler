@@ -403,6 +403,9 @@ def _bootstrap_vm(cfg: dict, output_dir: str):
     yodel.blank()
     yodel.append_self_dir()
     yodel.setup_logging(cfg["hostname"])
+    yodel.blank()
+    yodel.append("export VMHOST=" + cfg["vmhost"])
+    yodel.blank()
     yodel.substitute("vm", "create_vm.sh", cfg)
     yodel.write_file(output_dir)
 
