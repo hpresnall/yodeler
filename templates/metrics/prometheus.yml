@@ -6,9 +6,4 @@ scrape_configs:
 - job_name: prometheus
   static_configs:
   - targets: ['localhost:9090']
-# node-exporters from all yodeler configured hosts
-- job_name: node
-  static_configs:
-    - targets: []
-  # hardcode target IPs to hostnames for instances
-  relabel_configs: []
+

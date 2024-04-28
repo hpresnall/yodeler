@@ -8,8 +8,9 @@ import script.shell as shell
 import config.interfaces as interfaces
 import config.vlan as vlan
 
-import util.parse as parse
 import util.file as file
+
+import script.metrics as metrics
 
 _logger = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ class Metrics(Role):
                 raise ValueError(f"invalid preferred vlan '{prefer_vlan}' for '{self._cfg['hostname']}")
 
         # determine which ip address prometheus should use to connect to each host for metrics
+        # prefer ipv4 addresses on the same vlan
         hosts_to_ips = {}
         for host_cfg in self._cfg["hosts"].values():
             if not host_cfg["metrics"]:
@@ -76,7 +78,6 @@ class Metrics(Role):
             preferred = other = None
 
             for match in interfaces.find_ips_to_interfaces(self._cfg, host_cfg["interfaces"], first_match_only=False):
-                # print(host_cfg["hostname"], match.keys())
                 if match["dest_iface"]["vlan"]["name"] == preferred_vlan:
                     preferred = str(match["ipv4_address"])
                 else:
@@ -91,19 +92,37 @@ class Metrics(Role):
                                 " no metrics will be collected")
 
         prometheus = file.load_yaml("templates/metrics/prometheus.yml")
-        node_exporter = prometheus["scrape_configs"][1]
-        node_config = node_exporter["static_configs"][0]
-        node_config["targets"] = [f"{ip}:9100" for ip in hosts_to_ips.values()]
 
-        relabel = node_exporter["relabel_configs"]
+        # for each metric type, add a scrape_config with all the hosts that have that exporter enabled
+        for metric_type, ports in metrics.get_types_and_ports().items():
+            targets = []
+            relabel_configs = []
+            exporter = {"job_name": metric_type,
+                        "static_configs": [{"targets": targets}],
+                        "relabel_configs": relabel_configs}
 
-        for hostname, ip in hosts_to_ips.items():
-            relabel.append({
-                "source_labels": ["__address__"],
-                "regex": ip + ":.*",
-                "target_label": "instance",
-                "replacement": hostname
-            })
+            for hostname, ip in hosts_to_ips.items():
+                if not self._cfg["hosts"][hostname]["metrics"][metric_type]["enabled"]:
+                    continue
+
+                # multiple ports => target each
+                if isinstance(ports, int):
+                    targets.append(f"{ip}:{ports}")
+                elif isinstance(ports, list):
+                    for port in ports:
+                        targets.append(f"{ip}:{port}")
+                else:
+                    raise ValueError(f"ports for {metric_type} was {type(ports)} not int or list")
+
+                # always relabel with the hostname
+                relabel_configs.append({
+                    "source_labels": ["__address__"],
+                    "regex": ip + ":.*",
+                    "target_label": "instance",
+                    "replacement": hostname
+                })
+
+            prometheus["scrape_configs"].append(exporter)
 
         file.write("prometheus.yml", file.output_yaml(prometheus), output_dir)
 

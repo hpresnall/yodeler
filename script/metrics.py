@@ -3,6 +3,7 @@ import script.shell as shell
 
 import util.file as file
 
+
 def configure(cfg: dict, setup: shell.ShellScript, output_dir: str):
     if not cfg["metrics"]:
         return
@@ -46,6 +47,7 @@ def _configure_libvirt(cfg: dict, setup: shell.ShellScript):
         setup.service("libvirt-exporter")
         setup.blank()
 
+
 def _configure_ipmi(cfg: dict, setup: shell.ShellScript, output_dir: str):
     if cfg["metrics"]["ipmi"]["enabled"]:
         if cfg["is_vm"]:
@@ -67,13 +69,17 @@ _exporter_ports = {
     "pdns": [9101, 9102],
     "libvirt": 9177,
     "ipmi": 9290,
-    "nvme": 9105, # TODO update to actual value
+    "nvme": 9105,  # TODO update to actual value
     "onewire": 8105
 }
 
 
 def get_ports(metric_type: str) -> list[int] | int:
     return _exporter_ports[metric_type]
+
+
+def get_types_and_ports() -> dict:
+    return dict(_exporter_ports)
 
 
 # ignore all ram, loop, floppy disks and all _partitions_
