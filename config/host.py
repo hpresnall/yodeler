@@ -65,6 +65,8 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
         raise ValueError(f"duplicate hostname '{hostname}'")
     if hostname in site_cfg["firewall"]["static_hosts"]:
         raise ValueError(f"duplicate hostname '{hostname}' in firewall.static_hosts")
+    if (hostname == "site") or (hostname == "profile"):
+        raise ValueError(f"invalid hostname '{hostname}'")
     host_yaml["hostname"] = hostname
 
     # silently ignore attempts to overwrite site config
@@ -75,6 +77,14 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     host_yaml.pop("external_dns", None)
     host_yaml.pop("additional_dns_entries", None)
     host_yaml.pop("site_enable_metrics", None)
+    host_yaml.pop("profile", None)
+
+    # profile is dict of hostname -> overrides
+    if site_cfg["profile"] and (hostname in site_cfg["profile"]):
+        host_yaml["profile"] = site_cfg["profile"][hostname]
+        host_yaml["profile_name"] = site_cfg["profile"]["name"]
+    else:
+        host_yaml["profile"] = {}
 
     # shallow copy site config; host values overwrite site values
     host_cfg = {**site_cfg, **host_yaml}
@@ -208,7 +218,13 @@ iface lo inet loopback
 auto eth0
 iface eth0 inet dhcp""")
 
-        parse.non_empty_string("install_interfaces", cfg, cfg["hostname"] + " cfg")
+        if "install_interfaces" in cfg["profile"]:
+            cfg["install_interfaces"] = cfg["profile"]["install_interfaces"]
+
+        parse.non_empty_string("install_interfaces", cfg, cfg["hostname"])
+
+    if "rename_interfaces" in cfg["profile"]:
+        cfg["rename_interfaces"] = cfg["profile"]["rename_interfaces"]
 
     # also called in site.py; this call ensures overridden values from the host are also valid
     validate_site_defaults(cfg)
@@ -438,6 +454,7 @@ _REQUIRED_PROPERTIES_TYPES = [str, str]
 # site-level properties defined here since they should be checked when loading the site YAML _and_ for each host YAML
 # accessible for testing
 DEFAULT_SITE_CONFIG = {
+    "profile": {},
     "timezone": "UTC",
     "keymap": "us us",
     # note sets here for comparisions on test, but list type in _TYPES since that is what YAML will load
@@ -454,6 +471,7 @@ DEFAULT_SITE_CONFIG = {
 }
 
 _DEFAULT_SITE_CONFIG_TYPES = {
+    "profile": dict,
     "timezone": str,
     "keymap": str,
     "alpine_repositories": list,

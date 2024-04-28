@@ -13,12 +13,12 @@ def yodel():
                         format="%(asctime)s.%(msecs)03d %(levelname)7s %(message)s", datefmt="%H:%M:%S")
 
     if len(sys.argv) < 2:
-        print("usage: yodeler.py <site_path> <output_dir>")
+        print("usage: yodeler.py <site_path> <output_dir> [profile]")
         sys.exit(1)
 
     roles.load_all()
 
-    site_cfg = site.load(sys.argv[1])
+    site_cfg = site.load(sys.argv[1], sys.argv[3] if len(sys.argv) > 3 else None)
     site.write_host_scripts(site_cfg, sys.argv[2])
 
 

@@ -153,15 +153,6 @@ def _validate_iface(iface: dict, location: str):
 
     address = iface.get("ipv6_address")
     if address is not None:
-        if (iface["type"] == "uplink") and (vlan["id"] == -1):
-            # for uplinks with hardcoded ip addresess, a subnet is required
-            if "ipv6_subnet" not in iface:
-                raise KeyError(f"{location} ipv6_subnet must be set when using static ipv6_address")
-            try:
-                iface["ipv6_subnet"] = ipaddress.ip_network(iface["ipv6_subnet"])
-            except ValueError as ve:
-                raise ValueError(f"{location} invalid ipv6_subnet defined") from ve
-
         _validate_ipaddress(iface, "ipv6")
     else:
         iface["ipv6_address"] = None
@@ -200,6 +191,7 @@ def _validate_iface(iface: dict, location: str):
 def _validate_ipaddress(iface: dict, ip_version: str):
     key = ip_version + "_address"
     value = iface.get(key)
+
     if not value:
         raise ValueError(f"invalid {key} '{value}'")
     try:
@@ -207,10 +199,15 @@ def _validate_ipaddress(iface: dict, ip_version: str):
     except ValueError as ve:
         raise ValueError(f"invalid {key} '{value}'") from ve
 
-    if ip_version + "_subnet" in iface["vlan"]:
-        subnet = iface["vlan"].get(ip_version + "_subnet")
-    else:
-        subnet = iface.get(ip_version + "_subnet")
+    subnet = None
+    key = ip_version + "_subnet"
+    if key in iface["vlan"]:
+        iface[key] = subnet = iface["vlan"][key]
+    elif key in iface:
+        try:
+            subnet = ipaddress.ip_network(iface[key])
+        except ValueError as ve:
+            raise ValueError(f"invalid {key} '{iface['key']}'") from ve
 
     if subnet is None:
         raise ValueError(f"subnet must be defined when setting an IP address")
@@ -424,13 +421,30 @@ def for_port(name: str, comment: str, subtype: str, parent=None, uplink=None, ma
 def configure_uplink(cfg: dict):
     """Configure the interface definition for a router's wan uplink.
     Allows partial configuration of IP addresses, including DHCP.
-    For VMs, requires either a 'macvtap' interface, a 'passthrough' interface + PCI address 
+    For VMs, requires either a 'macvtap' interface, a 'passthrough' interface + PCI address
     or a 'vswitch' + 'vlan' to use for connectivity."""
-    uplink = cfg.get("uplink")
     location = cfg["hostname"]
+    uplink = parse.non_empty_dict(location, cfg.get("uplink"))
 
     if uplink is None:
         raise KeyError(f"{location} must define an uplink")
+
+    if "uplink" in cfg["profile"]:
+        o_loc = f"profile['{cfg['profile_name']}']['{cfg['hostname']}'].uplink"
+        new_uplink = parse.non_empty_dict(o_loc, cfg["profile"]["uplink"])
+        old_uplink = dict(uplink)
+
+        # remove old connection methods
+        # copy other values, overriding original with profile values
+        uplink.pop("passthrough", None)
+        uplink.pop("macvtap", None)
+        uplink.pop("vswtich", None)
+        uplink.pop("vlan", None)
+        uplink.update(new_uplink)
+
+        cfg["uplink"] = uplink
+
+        _logger.debug(f"{o_loc} overriding base config: {old_uplink} -> {uplink}")
 
     location += ".uplink"
 

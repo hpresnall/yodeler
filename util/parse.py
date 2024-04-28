@@ -98,7 +98,7 @@ def _read_list_plurals(keys: set[str], cfg: None | dict, value_name: str, value_
 
     for key in keys:
         if not key:
-            raise ValueError(f"key {key} cannot be empty")
+            raise ValueError(f"{value_name}.{key} cannot be empty")
 
         if key not in cfg:
             continue

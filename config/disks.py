@@ -1,13 +1,21 @@
 """Handles parsing and validating disk configuration from host YAML files."""
+import logging
 
 import util.parse as parse
 import util.pci as pci
+
+_logger = logging.getLogger(__name__)
 
 
 def validate(cfg: dict):
     """Validate all the disks defined on the host."""
     disks = cfg["disks"] = parse.read_dict_list_plurals({"disk", "disks"}, cfg, "disks")
     cfg.pop("disk", None)
+
+    if cfg["profile"] and ("disks" in cfg["profile"]):
+        old_disks = disks
+        disks = cfg["disks"] = parse.read_dict_list_plurals({"disk", "disks"}, cfg["profile"], "disks")
+        _logger.info(f"profile['{cfg['profile_name']}']['{cfg['hostname']}'].disks overriding base config: {old_disks} -> {disks}")
 
     names = set()
     paths = set()

@@ -20,9 +20,10 @@ import util.parse as parse
 _logger = logging.getLogger(__name__)
 
 
-def load(site_dir: str | None) -> dict:
-    """Load 'site.yaml' from the given directory and validate it. This method also loads and validates all the host's
-    configurations for the site.
+def load(site_dir: str | None, profile_name: str | None = None) -> dict:
+    """Load 'site.yaml' from the given directory and validate it. If a profile is specified,
+    first overlay the profile's information. This method also loads and validates all the host's
+    configuration yaml files for the site.
 
     Return the site configuration that can be used in a subsequent call to write_host_scripts().
     """
@@ -36,6 +37,15 @@ def load(site_dir: str | None) -> dict:
     site_yaml = file.load_yaml(os.path.join(site_dir, "site.yaml"))
 
     parse.set_default_string("site_name", site_yaml, os.path.basename(site_dir))
+
+    if profile_name:
+        parse.non_empty_string("name", {"name": profile_name}, "profile")
+        profile_yaml = file.load_yaml(os.path.join(site_dir, f"profile_{profile_name}.yaml"))
+        _logger.info("using profile '%s' to configure %s", profile_name, site_yaml["site_name"])
+        site_yaml["profile"] = profile_yaml
+        site_yaml["profile"]["name"] = profile_name
+    else:
+        site_yaml.pop("profile", None)
 
     site_cfg = validate(site_yaml)
 
@@ -86,7 +96,7 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
     total_disk = 0
 
     for host_path in os.listdir(site_dir):
-        if host_path == "site.yaml":
+        if (host_path == "site.yaml") or (host_path.startswith("profile")):
             continue
         if not host_path.endswith(".yaml"):
             _logger.debug("skipping file %s", host_path)
@@ -113,7 +123,11 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
 
 def write_host_scripts(site_cfg: dict, output_dir: str):
     """Create the configuration scripts and files for the site's hosts and write them to the given directory."""
-    output_dir = os.path.join(output_dir, site_cfg["site_name"])
+    site_dir = site_cfg["site_name"]
+    if site_cfg["profile"]:
+        site_dir += '_' + site_cfg["profile"]["name"]
+
+    output_dir = os.path.join(output_dir, site_dir)
 
     _logger.info("writing setup scripts for site '%s' to '%s'", site_cfg["site_name"], output_dir)
 

@@ -203,9 +203,10 @@ def rename_interfaces(rename_rules: list[dict], script: shell.ShellScript, outpu
 
         rename_cmds.append(f"  rename_iface {mac} {name}")
 
-    file.substitute_and_write("common", "rename-eth", {"rename_cmds": "\n".join(rename_cmds)}, output_dir)
+    if rename_cmds:
+        file.substitute_and_write("common", "rename-eth", {"rename_cmds": "\n".join(rename_cmds)}, output_dir)
 
-    script.comment("rename ethernet devices at boot")
-    script.append("install -m 755 $DIR/rename-eth /etc/init.d")
-    script.service("rename-eth", "sysinit")
-    script.blank()
+        script.comment("rename ethernet devices at boot")
+        script.append("install -m 755 $DIR/rename-eth /etc/init.d")
+        script.service("rename-eth", "sysinit")
+        script.blank()
