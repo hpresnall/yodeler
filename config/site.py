@@ -36,14 +36,15 @@ def load(site_dir: str | None, profile_name: str | None = None) -> dict:
 
     site_yaml = file.load_yaml(os.path.join(site_dir, "site.yaml"))
 
-    parse.set_default_string("site_name", site_yaml, os.path.basename(site_dir))
+    site_yaml["site_name"] = os.path.basename(site_dir)
 
     if profile_name:
         parse.non_empty_string("name", {"name": profile_name}, "profile")
         profile_yaml = file.load_yaml(os.path.join(site_dir, f"profile_{profile_name}.yaml"))
-        _logger.info("using profile '%s' to configure %s", profile_name, site_yaml["site_name"])
+        _logger.info("using profile '%s' to configure site '%s'", profile_name, site_yaml["site_name"])
         site_yaml["profile"] = profile_yaml
         site_yaml["profile"]["name"] = profile_name
+        site_yaml["site_name"] += "-" + profile_name
     else:
         site_yaml.pop("profile", None)
 
@@ -123,11 +124,7 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
 
 def write_host_scripts(site_cfg: dict, output_dir: str):
     """Create the configuration scripts and files for the site's hosts and write them to the given directory."""
-    site_dir = site_cfg["site_name"]
-    if site_cfg["profile"]:
-        site_dir += '_' + site_cfg["profile"]["name"]
-
-    output_dir = os.path.join(output_dir, site_dir)
+    output_dir = os.path.join(output_dir, site_cfg["site_name"])
 
     _logger.info("writing setup scripts for site '%s' to '%s'", site_cfg["site_name"], output_dir)
 
