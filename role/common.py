@@ -34,10 +34,15 @@ class Common(Role):
             if disk["type"] != "img":
                 packages.add("lsblk")
 
-        # add disk utilities for physical servers
+        # remove iptables if there is no local firewall
+        if not self._cfg["local_firewall"]:
+            self._cfg["remove_packages"].update("iptables")
+            self._cfg["packages"].discard("awall")
+
+        # add utilities for physical servers
         if not self._cfg["is_vm"]:
-            packages.add("nvme")
-            packages.add("smartmontools")
+            packages.update(["util-linux", "pciutils", "dmidecode", "cpufrequtils", "nvme-cli", "smartmontools",
+                             "lm-sensors", "ethtool"])
 
         return packages
 

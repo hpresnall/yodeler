@@ -112,7 +112,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     for role in host_cfg["roles"]:
         role.additional_configuration()
 
-    # run after all configuration to allow role.additional_packages() to use interfaces, aliases, etc
+    # run after addtional configuration to allow role.additional_packages() to use interfaces, aliases, etc
     _configure_packages(site_cfg, host_yaml, host_cfg)
 
     # note role.validate() is called _after_ all hosts are loaded in site.py
@@ -327,7 +327,8 @@ def _configure_aliases(host_cfg: dict):
 
 
 def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
-    # manually merge packages use set for uniqueness and union/intersection operations
+    # manually merge packages
+    # use set for uniqueness and union/intersection operations
     for key in ["packages", "remove_packages"]:
         site = site_cfg.get(key)
         host = host_yaml.get(key)
@@ -346,15 +347,6 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
 
     # update packages required for metrics
     metrics.add_packages(host_cfg)
-
-    # remove iptables if there is no local firewall
-    if not host_cfg["local_firewall"]:
-        host_cfg["remove_packages"] |= {"iptables"}
-        host_cfg["packages"].discard("awall")
-
-    if not host_cfg["is_vm"]:
-        # add utils to real hosts
-        host_cfg["packages"] |= {"util-linux", "pciutils", "dmidecode", "cpufrequtils"}
 
     # resolve conflicts in favor of adding the package
     host_cfg["remove_packages"] -= host_cfg["packages"]
