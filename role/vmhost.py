@@ -21,7 +21,7 @@ class VmHost(Role):
         # packages for openvswitch, qemu, libvirt and alpine-make-vm-image
         packages = {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
                     "libvirt", "libvirt-daemon", "libvirt-qemu", "virtiofsd",
-                    "ovmf", "dbus", "polkit", "e2fsprogs", "rsync", "sfdisk", "git", "xmlstarlet", "ethtool"}
+                    "ovmf", "dbus", "polkit", "e2fsprogs", "rsync", "sfdisk", "git", "xmlstarlet"}
 
         return packages
 
@@ -344,8 +344,7 @@ def _create_site_build_image(cfg: dict, setup: shell.ShellScript, output_dir: st
   echo $*
 }
 """)
-    create_build.append(file.substitute("vmhost", "site_build.sh", cfg))
-    create_build.log("Build image mounted at $SITE_BUILD_IMG")
+    create_build.substitute("vmhost", "site_build.sh", cfg)
     create_build.write_file(output_dir)
 
     # helper scripts on the installed vm to unmount the build_image

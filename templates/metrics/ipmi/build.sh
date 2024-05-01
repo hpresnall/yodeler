@@ -13,6 +13,4 @@ else
   cd - > /dev/null 2>&1
 fi
 
-# copy IPMI exporter /tmp for use in setup.sh
-mkdir -p "/tmp/$HOSTNAME/tmp/"
-cp "$$SITE_BUILD_IMG/build/ipmi_exporter-1.8.0.linux-amd64/ipmi_exporter" "/tmp/$HOSTNAME/tmp/ipmi-exporter"
+cp "$$SITE_BUILD_IMG/build/ipmi_exporter-1.8.0.linux-amd64/ipmi_exporter" "/tmp/ipmi-exporter"

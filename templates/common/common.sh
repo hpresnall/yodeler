@@ -8,7 +8,7 @@ setup-keymap $KEYMAP
 mv /etc/profile.d/color_prompt.sh.disabled /etc/profile.d/color_prompt.sh
 rootinstall $$DIR/chrony.conf /etc/chrony
 sed -i -e "s/umask 022/umask 027/g" /etc/profile
-rc-update add chrond default
+rc-update add crond default
 rc-update add chronyd default
 rc-update add acpid boot
 

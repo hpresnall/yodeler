@@ -168,7 +168,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
     else:
         host_cfg["before_chroot"] = "\n".join(host_cfg["before_chroot"])
     if not host_cfg["after_chroot"]:
-        host_cfg["afterchroot"] = "# no configuration needed after chroot"
+        host_cfg["after_chroot"] = "# no configuration needed after chroot"
     else:
         host_cfg["after_chroot"] = "\n".join(host_cfg["after_chroot"])
 

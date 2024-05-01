@@ -91,6 +91,7 @@ class Storage(Role):
         setup.append("chmod 770 " + storage_dir)
         setup.blank()
 
+        # create base samba config, then add all the shares
         smb_conf = [file.substitute(self.name, "smb.conf", {
             "SITE_UPPER": self._cfg["site_name"].upper(),
             "SITE_DESC": self._cfg["site_name"] + " storage",
@@ -103,8 +104,8 @@ class Storage(Role):
             # note zfs syntax uses pool name as base
             # directories and samba use mountpoint
             path = share["path"]
-
             os_path = storage_dir + "/" + path
+
             # if owner of the path is explicitly set use it
             # otherwise, use the only writer or the group's user
             owner = share['owner']

@@ -36,7 +36,7 @@ class Common(Role):
 
         # remove iptables if there is no local firewall
         if not self._cfg["local_firewall"]:
-            self._cfg["remove_packages"].update("iptables")
+            self._cfg["remove_packages"].add("iptables")
             self._cfg["packages"].discard("awall")
 
         # add utilities for physical servers

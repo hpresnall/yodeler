@@ -51,7 +51,7 @@
 - [ ] Create / generate dashboards for all servers in a site
 - [x] Add libvirt metrics for vmhosts
 - [ ] Add nvme metrics for SSDs
-- [ ] Add IPMI metrics for physical servers
+- [x] Add IPMI metrics for physical servers
 - [ ] Add OneWire support for sensor metrics
 - [ ] Add SNMP support for network metrics
 

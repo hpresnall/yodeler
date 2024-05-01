@@ -36,7 +36,8 @@ def validate(cfg: dict):
         vswitch_uplinks = parse.read_string_list_plurals({"uplink", "uplinks"}, vswitch, location + ".uplinks")
         vswitch.pop("uplink", None)
 
-        if (vswitch_name in overrides) and overrides[vswitch_name]["uplinks"]:
+        if (vswitch_name in overrides):
+            # do not check for empty list here to allow overrides to remove all uplinks
             old_uplinks = vswitch_uplinks
             vswitch_uplinks = overrides[vswitch_name]["uplinks"]
             _logger.debug(f"profile['{cfg['profile']['name']}'] overriding uplinks for vswitch "

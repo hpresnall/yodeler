@@ -63,6 +63,7 @@ echo vfio_iommu_type1 > /etc/modules-load.d/iommu.conf
 log "Installing alpine-make-vm-image"
 # add alpine-make-vm-images for creating new VMs
 cd $VM_IMAGES_PATH
+apk -q --no-progress add git
 git clone --depth=1 --single-branch --branch=master https://github.com/alpinelinux/alpine-make-vm-image.git
 chown -R nobody:libvirt alpine-make-vm-image
 cd alpine-make-vm-image

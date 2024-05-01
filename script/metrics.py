@@ -57,7 +57,7 @@ def _configure_ipmi(cfg: dict, setup: shell.ShellScript, output_dir: str):
 
         setup.comment("collect impi metrics")
         # TODO this only works on a vmhost; need a separate script for this to work without the build image
-        setup.append(file.substitute("metrics/ipmi", "build.sh", cfg))
+        setup.substitute("metrics/ipmi", "build.sh", cfg)
         setup.append("install -o root -g root -m 755 $DIR/ipmi-exporter /etc/init.d")
         setup.append("install -o root -g root -m 755 /tmp/ipmi-exporter /usr/bin")
         setup.service("ipmi-exporter")

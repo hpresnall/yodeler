@@ -182,8 +182,8 @@ class Dns(Role):
             "web_allow_from": ", ".join(web_allow_from)
         }
 
-        file.write("pdns.conf", file.substitute(self.name, "pdns.conf", pdns_conf), output_dir)
-        file.write("recursor.conf", file.substitute(self.name, "recursor.conf", pdns_conf), output_dir)
+        file.substitute_and_write(self.name, "pdns.conf", pdns_conf, output_dir)
+        file.substitute_and_write(self.name, "recursor.conf", pdns_conf, output_dir)
 
         if self._cfg["additional_dns_entries"]:
             hosts = [""]

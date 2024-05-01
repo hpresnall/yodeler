@@ -8,6 +8,5 @@ fi
 
 modprobe -r tun
 modprobe -r nbd
-modprobe -r openvswitch
 
 apk -q del openvswitch qemu-system-x86_64

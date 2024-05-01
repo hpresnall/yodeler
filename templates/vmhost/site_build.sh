@@ -38,6 +38,7 @@ if [ ! -L etc/apk/cache ]; then
   ln -s /tmp/apk_cache etc/apk/cache
 fi
 mount --bind "$$(realpath /etc/apk/cache)" tmp/apk_cache
+log "Build image mounted at $$SITE_BUILD_IMG"
 
 cd - > /dev/null 2>&1
 
