@@ -108,6 +108,11 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     # aliases are validated against other hosts, interface vlan DHCP reservations and firewall static hosts
     _configure_aliases(host_cfg)
 
+    # for vms, ensure shared build image is setup first
+    if host_cfg["is_vm"]:
+        host_cfg["before_chroot"].append(file.substitute("common", "setup_site_build.sh", host_cfg))
+    # else physical server will call in setup.sh
+
     # add any additional configuration; this may include aliases
     for role in host_cfg["roles"]:
         role.additional_configuration()
@@ -147,6 +152,12 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.append("source /tmp/envvars")
     setup.blank()
 
+    # for physical hosts, configure shared build image as early as possible
+    if not host_cfg["is_vm"]:
+        _setup_site_build_image(host_cfg, setup, output_dir)
+
+    # else vms already configured in before_chroot
+
     # add all scripts from each role
     for role in host_cfg["roles"]:
         name = role.name.upper()
@@ -163,14 +174,14 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.write_file(host_dir)
 
     # convert array into string for substitution in bootstrap script
-    if not host_cfg["before_chroot"]:
-        host_cfg["before_chroot"] = "# no configuration needed before chroot"
-    else:
+    if host_cfg["before_chroot"]:
         host_cfg["before_chroot"] = "\n".join(host_cfg["before_chroot"])
-    if not host_cfg["after_chroot"]:
-        host_cfg["after_chroot"] = "# no configuration needed after chroot"
     else:
+        host_cfg["before_chroot"] = "# no configuration needed before chroot"
+    if host_cfg["after_chroot"]:
         host_cfg["after_chroot"] = "\n".join(host_cfg["after_chroot"])
+    else:
+        host_cfg["after_chroot"] = "# no configuration needed after chroot"
 
     if host_cfg["is_vm"]:
         _bootstrap_vm(host_cfg, host_dir)
@@ -410,6 +421,37 @@ def _bootstrap_vm(cfg: dict, output_dir: str):
     start_vm = shell.ShellScript("start_vm.sh", errexit=False)
     start_vm.substitute("vm", "start_vm.sh", cfg)
     start_vm.write_file(output_dir)
+
+
+def _setup_site_build_image(cfg: dict, setup: shell.ShellScript, output_dir: str):
+    setup.substitute("common", "setup_site_build.sh", cfg)
+
+    # patch for alpine-make-vm-image if it exists
+    # vms do not need this since they will use an already configured build image
+    if os.path.isfile("templates/physical/make-vm-image-patch"):
+        file.copy_template("physical", "make-vm-image-patch", os.path.join(output_dir, cfg["hostname"]))
+
+    # create a stand-alone script for setting up the site build image
+    # this is useful for testing
+    create_build = shell.ShellScript("mount_site_build.sh")
+    create_build.append_self_dir()
+    create_build.append("""log () {
+  echo $*
+}
+""")
+    create_build.substitute("common", "setup_site_build.sh", cfg)
+    create_build.write_file(output_dir)
+
+    # helper scripts to unmount the build_image
+    unmount_build = shell.ShellScript("unmount_site_build.sh")
+    unmount_build.append_self_dir()
+    unmount_build.append(f"SITE_BUILD_IMG=\"/media/{cfg['site_name']}_build\"")
+    unmount_build.blank()
+    unmount_build.append("umount $SITE_BUILD_IMG/tmp/apk_cache")
+    unmount_build.append("umount $SITE_BUILD_IMG")
+    unmount_build.blank()
+    unmount_build.append("echo \"Unmounted $SITE_BUILD_IMG\"")
+    unmount_build.write_file(output_dir)
 
 
 def _preview_dir(output_dir: str, line_count: int = sys.maxsize):
