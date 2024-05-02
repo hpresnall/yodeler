@@ -1,5 +1,4 @@
-# using the site build image, download the IPMI exporter, if needed
-$$SITE_DIR/$VMHOST/create_build_image.sh
+IS_VM=$IS_VM
 
 if [ -d "$$SITE_BUILD_MOUNT/build/ipmi_exporter-1.8.0.linux-amd64" ]; then
   log "Using already downloaded Prometheus IMPI collector"
@@ -13,4 +12,10 @@ else
   cd - > /dev/null 2>&1
 fi
 
-cp "$$SITE_BUILD_MOUNT/build/ipmi_exporter-1.8.0.linux-amd64/ipmi_exporter" "/tmp/ipmi-exporter"
+if [ "$$IS_VM" = "True" ]; then
+  OUTPUT_DIR=/tmp/$HOSTNAME/tmp
+else
+  OUTPUT_DIR=/tmp
+fi
+
+cp "$$SITE_BUILD_MOUNT/build/ipmi_exporter-1.8.0.linux-amd64/ipmi_exporter" "$$OUTPUT_DIR/ipmi-exporter"

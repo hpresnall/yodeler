@@ -53,12 +53,14 @@ def _configure_ipmi(cfg: dict, setup: shell.ShellScript, output_dir: str):
         if cfg["is_vm"]:
             raise ValueError(f"vm {cfg['hostname']} cannot enable ipmi metrics")
 
-        file.copy_template("metrics/ipmi", "ipmi-exporter", output_dir)
+        file.copy_template("metrics/ipmi", "ipmi-exporter_initd", output_dir)
 
-        setup.comment("collect impi metrics")
-        # TODO this only works on a vmhost; need a separate script for this to work without the build image
-        setup.substitute("metrics/ipmi", "build.sh", cfg)
-        setup.append("install -o root -g root -m 755 $DIR/ipmi-exporter /etc/init.d")
+        if (cfg["is_vm"]):
+            cfg["before_chroot"].append(file.substitute("metrics/ipmi", "build.sh", cfg))
+        else:
+            setup.substitute("metrics/ipmi", "build.sh", cfg)
+
+        setup.append("install -o root -g root -m 755 $DIR/ipmi-exporter_initd /etc/init.d/ipmi-exporter")
         setup.append("install -o root -g root -m 755 /tmp/ipmi-exporter /usr/bin")
         setup.service("ipmi-exporter")
         setup.blank()

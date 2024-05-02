@@ -108,7 +108,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     # aliases are validated against other hosts, interface vlan DHCP reservations and firewall static hosts
     _configure_aliases(host_cfg)
 
-    # for vms, ensure shared build image is setup first
+    # for vms, ensure shared build image is setup before roles add before_chroot config
     if host_cfg["is_vm"]:
         host_cfg["before_chroot"].append(file.substitute("common", "setup_site_build.sh", host_cfg))
     # else physical server will call in setup.sh
