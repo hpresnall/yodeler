@@ -61,13 +61,13 @@
 - [x] Configure ZFS
 - [x] Support for image, device and PCI passthrough disks on VMs
 - [x] Add backup and / or shared mount support for durable VM configuration data
-- [] Add backup scripts for each server role & configure nightly backups
+- [ ] Add backup scripts for each server role & configure nightly backups
 
 ## Build Server
 - [x] Configure basic build tools
 - [x] Create process for building executables and sharing with other VMs
 - [x] Create durable build partition for builds without network access
-- [] Allow custom scripts to run as part of server builds
+- [ ] Allow custom scripts to run as part of server builds
 
 ## XWindows
 - [x] Configure basic XFCE GUI
