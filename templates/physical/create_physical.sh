@@ -70,10 +70,9 @@ ln -s /root/$SITE_NAME/apk_cache "$$INSTALLED/etc/apk/cache"
 # setup /tmp/envvars that will be copied into the installed system
 SETUP_TMP=/tmp/$HOSTNAME/tmp
 mkdir -p $$SETUP_TMP
-rm -f $$SETUP_TMP/tmp/envvars
-touch $$SETUP_TMP/envvars
+rm -f $$SETUP_TMP/envvars
 # export START_TIME in chroot to use the same LOG_DIR this script is already using
-echo "export START_TIME=$$START_TIME" >> $$SETUP_TMP/envvars
+echo "export START_TIME=$$START_TIME" > $$SETUP_TMP/envvars
 
 $BEFORE_CHROOT
 
@@ -105,6 +104,8 @@ set -o errexit
 mount -o remount,rw $$YODELER_DEV
 
 $AFTER_CHROOT
+
+rm -rf $$SETUP_TMP
 
 log "Copying APK cache, site build image and logs out of chroot"
 

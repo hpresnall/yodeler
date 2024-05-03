@@ -6,10 +6,9 @@ log "Setting up environment to build VM '$HOSTNAME'"
 # copy files in /tmp/$HOSTNAME into /tmp on the VM using --fs-skel-dir param
 SETUP_TMP=/tmp/$HOSTNAME/tmp
 mkdir -p $$SETUP_TMP
-rm -f $$SETUP_TMP/tmp/envvars
-touch $$SETUP_TMP/envvars
+rm -f $$SETUP_TMP/envvars
 # export START_TIME in chroot to use the same LOG_DIR this script is already using
-echo "export START_TIME=$$START_TIME" >> $$SETUP_TMP/envvars
+echo "export START_TIME=$$START_TIME" > $$SETUP_TMP/envvars
 
 $BEFORE_CHROOT
 
@@ -31,7 +30,7 @@ $$SITE_DIR/build/alpine-make-vm-image/alpine-make-vm-image \
   --image-size ${DISK_SIZE_MB}M \
   --repositories-file /etc/apk/repositories \
   --packages "$$(cat $$DIR/packages)" \
-  --fs-skel-dir "/tmp/$HOSTNAME" \
+  --fs-skel-dir "$$SETUP_TMP/.." \
   --script-chroot \
   $VM_IMAGES_PATH/$HOSTNAME.img \
   $$DIR/setup.sh
@@ -46,6 +45,8 @@ trap error ERR
 set -o errexit
 
 $AFTER_CHROOT
+
+rm -rf $$SETUP_TMP
 
 # define the VM
 log "Creating VM definition"

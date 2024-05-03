@@ -152,7 +152,7 @@ class Metrics(Role):
 
         setup.comment("provision grafana")
         setup.append(
-            f"echo {self._cfg["grafana_password"]} > grafana-cli -config /etc/grafana.ini -homepath /usr/share/grafana admin reset-admin-password --password-from-stdin")
+            f"echo \"{self._cfg['grafana_password']}\" > grafana-cli -config /etc/grafana.ini -homepath /usr/share/grafana admin reset-admin-password --password-from-stdin")
         setup.blank()
 
         setup.service("grafana")

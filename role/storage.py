@@ -23,8 +23,8 @@ class Storage(Role):
         parse.set_default_string("storage_user", self._cfg, "storage")
         parse.set_default_string("storage_group", self._cfg, "storage")
 
-        self._cfg["before_chroot"].extend(["apk add zfs", "modprobe zfs"])
-        self._cfg["after_chroot"].extend(["modprobe -r zfs", "apk del zfs"])
+        self._cfg["before_chroot"].extend(["apk add zfs", "modprobe zfs\n"])
+        self._cfg["after_chroot"].extend(["modprobe -r zfs", "apk del zfs\n"])
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -47,7 +47,7 @@ class Storage(Role):
             if disk["name"].startswith("storage"):
                 # creating zpool outside of vm, so use vm host's path
                 # TODO verify this works with image files after vm starts and the zpool is imported at boot
-                path = disk["host_path"] if self._cfg["is_vm"] else disk["path"]
+                path = "/dev/" + disk["path"] if self._cfg["is_vm"] else disk["host_path"]
                 zpool += path + " "
 
         setup.append("zpool import 2>&1 | grep storage &>/dev/null && ret=$? || ret=$?")
@@ -55,7 +55,7 @@ class Storage(Role):
         setup.log(f"Importing existing ZFS storage pool to {storage_dir}", indent="  ")
         setup.append("  zpool import storage")
         setup.append("else")
-        setup.log(f"Creating ZFS storage pool at {storage_dir}", indent="  ")
+        setup.log(f"Creating ZFS storage pool at '{storage_dir}'", indent="  ")
         setup.append(zpool)
         setup.append("fi")
         setup.blank()

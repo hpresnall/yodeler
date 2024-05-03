@@ -169,6 +169,10 @@ def write_scripts(host_cfg: dict, output_dir: str):
             raise
         setup.blank()
 
+    # not removing host's /tmp, just its contents
+    setup.append("rm -rf $SETUP_TMP/*")
+    setup.blank()
+
     setup.write_file(host_dir)
 
     # convert array into string for substitution in bootstrap script

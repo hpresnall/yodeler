@@ -38,7 +38,7 @@ def from_config(cfg: dict, setup: shell.ShellScript):
 def _create_image(disk: dict) -> str:
     """Output the commands to create and format a disk image."""
     path = disk["host_path"]
-    # assume VM and UUID is written to /tmp/envvars
+    # assume VM and UUID is written to $SETUP_TMP/envvars
     return f"""if [ ! -f "{path}" ]; then
   log "Creating & formatting '{disk['name']}' disk image"
   truncate -s {disk['size_mb']}M {path}
@@ -73,7 +73,7 @@ fi
 def _add_uuid_to_envvars(hostname: str, disk: dict) -> str:
     # for vms, write the UUID to envvars so it can be passed from yodel.sh to setup.sh
     # use blkid because lsblk does not work on disk images
-    return f"echo \"{disk['name'].upper()}_UUID=$(blkid {disk['path']} | cut -d\\\" -f2)\" >> /tmp/{hostname}/tmp/envvars"
+    return f"echo \"{disk['name'].upper()}_UUID=$(blkid {disk['path']} | cut -d\\\" -f2)\" >> $SETUP_TMP/envvars\n"
 
 
 def _set_uuid_to_local_var(disk: dict) -> str:
