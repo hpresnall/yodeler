@@ -31,7 +31,7 @@ fi
 # install Alpine with answerfile
 log -e "\nInstalling Alpine for '$HOSTNAME' to $SYSTEM_DEV"
 setup-alpine -e -f $$DIR/answerfile > $$LOG 2>&1
-log -e "Alpine install complete; starting yodeler configuration\n"
+log -e "Alpine install complete; starting Yodeler configuration\n"
 
 # copy back original world
 cp /tmp/world /etc/apk
@@ -42,14 +42,15 @@ log "Mounting installed system at $$INSTALLED"
 mkdir -p "$$INSTALLED"
 mount ${SYSTEM_DEV}${SYSTEM_PARTITION} "$$INSTALLED"
 
-log "Copying yodeler scripts & apk_cache for site '$SITE_NAME' to $$INSTALLED/root/" 
+log "Copying Yodeler site '$SITE_NAME' to $$INSTALLED/root/" 
 # do not include logs dir as that will stop output for this script
 # includes existing build image
 rsync -r --exclude logs "$$SITE_DIR" "$$INSTALLED/root"
+INSTALLED_SITE_DIR=$$INSTALLED/root/$SITE_NAME
 
 # still using Alpine installer's network configuration in chroot
 # backup the installed resolv.conf, if any, and use the installer's instead
-RESOLV_CONF_PATH="$$INSTALLED/root/$SITE_NAME/$HOSTNAME"
+RESOLV_CONF_PATH="$$INSTALLED_SITE_DIR/$HOSTNAME"
 RESOLV_CONF=""
 if [ -f "$$RESOLV_CONF_PATH/resolv.conf" ]; then
   RESOLV_CONF=resolv.conf
@@ -67,16 +68,17 @@ rm -f "$$INSTALLED/etc/apk/cache"
 ln -s /root/$SITE_NAME/apk_cache "$$INSTALLED/etc/apk/cache"
 
 # setup /tmp/envvars that will be copied into the installed system
-mkdir -p /tmp/$HOSTNAME/tmp
-rm -f /tmp/$HOSTNAME/tmp/envvars
-touch /tmp/$HOSTNAME/tmp/envvars
+SETUP_TMP=/tmp/$HOSTNAME/tmp
+mkdir -p $$SETUP_TMP
+rm -f $$SETUP_TMP/tmp/envvars
+touch $$SETUP_TMP/envvars
 # export START_TIME in chroot to use the same LOG_DIR this script is already using
-echo "export START_TIME=$$START_TIME" >> /tmp/$HOSTNAME/tmp/envvars
+echo "export START_TIME=$$START_TIME" >> $$SETUP_TMP/envvars
 
 $BEFORE_CHROOT
 
 # copy files into the installed system
-cp -r /tmp/$HOSTNAME/tmp/* "$$INSTALLED"/tmp
+cp -r $$SETUP_TMP/* "$$INSTALLED"/tmp
 
 log "Chrooting to installed system"
 mkdir -p "$$INSTALLED"/proc "$$INSTALLED"/dev "$$INSTALLED"/sys
@@ -102,18 +104,19 @@ set -o errexit
 # mount status gets reset sometimes; ensure still writable
 mount -o remount,rw $$YODELER_DEV
 
-log "Copying APK cache, logs, and build image out of chroot"
-# copy any new APKS back to the site APK cache, deleting old versions
-rsync -r --delete "$$INSTALLED/root/$SITE_NAME/apk_cache" "$$SITE_DIR"
+$AFTER_CHROOT
 
-if [ -d "$$INSTALLED/root/$SITE_NAME/logs" ]; then
-  log "Copying logs from chroot to '$$LOG_DIR'"
-  rsync -r "$$INSTALLED/root/$SITE_NAME/logs" "$$SITE_DIR"
+log "Copying APK cache, site build image and logs out of chroot"
+
+# copy any new APKS back to the site APK cache, deleting old versions
+rsync -r --delete "$$INSTALLED_SITE_DIR/apk_cache" "$$SITE_DIR"
+
+if [ -d "$$INSTALLED_SITE_DIR/logs" ]; then
+  rsync -r "$$INSTALLED_SITE_DIR/logs" "$$SITE_DIR"
 fi
 
-if [ -f "$$INSTALLED/root/$SITE_NAME/build.img" ]; then
-  rm -f "$$SITE_DIR/build.img"
-  cp "$$INSTALLED/root/$SITE_NAME/build.img" "$$SITE_DIR/build.img"
+if [ -d "$$INSTALLED_SITE_DIR/build" ]; then
+  rsync -r "$$INSTALLED_SITE_DIR/build" "$$SITE_DIR"
 fi
 
 # copy back final resolv.conf
@@ -122,8 +125,6 @@ if [ -f "$$RESOLV_CONF_PATH/resolv.orig" ]; then
   rm "$$INSTALLED/etc/resolv.conf"
   install -o root -g root -m 644 "$$RESOLV_CONF_PATH/$$RESOLV_CONF" "$$INSTALLED/etc"
 fi
-
-$AFTER_CHROOT
 
 if [ "$$RESULT" == 0 ]; then
   log -e "\nSuccessful Yodel for '$HOSTNAME'!\nThe system will now reboot\n"

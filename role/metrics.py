@@ -127,7 +127,7 @@ class Metrics(Role):
         file.write("prometheus.yml", file.output_yaml(prometheus), output_dir)
 
         setup.append(
-            "install -o grafana -g grafana -m 600 $DIR/prometheus_datasrc /var/lib/grafana/provisioning/datasources/prometheus.yaml")
+            "install -o grafana -g grafana -m 600 $DIR/prometheus_datasrc /var/lib/grafana/provisioning/datasources/prometheus.yml")
         setup.append("root install $DIR/grafana.ini /etc")
         setup.append("root install $DIR/prometheus.yml /etc/prometheus")
         setup.append("root install $DIR/grafana_confd /etc/conf.d/grafana")

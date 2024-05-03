@@ -31,6 +31,11 @@ class Role(ABC):
         Interface validation will be run afer all roles have this function called."""
         pass
 
+    def needs_build_image(self) -> bool:
+        """Does this role need to build additional artifacts?
+        If so, the site level build image will be mounted for use in write_config()."""
+        return False
+
     def additional_configuration(self):
         """Add any additional default configuration specific to this role.
         This is run after configure_interfaces()."""

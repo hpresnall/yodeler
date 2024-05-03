@@ -49,6 +49,9 @@ class Dns(Role):
     def maximum_instances(site_cfg: dict) -> int:
         return 2  # no need for additional redundancy
 
+    def needs_build_image(self) -> bool:
+        return True
+
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
         sysctl.enable_tcp_fastopen(setup, output_dir)
@@ -57,16 +60,12 @@ class Dns(Role):
         file.copy_template("dns", "build_recursor_lua.sh", output_dir)
         file.copy_template("dns", "create_lua_blackhole.py", output_dir)
 
+        build_blackhole = file.substitute("dns", "build_blackhole.sh", self._cfg)
         if self._cfg["is_vm"]:
-            # build in vm's build image
-            self._cfg["before_chroot"].append(file.substitute("dns", "before_chroot.sh", self._cfg))
+            self._cfg["before_chroot"].append(build_blackhole)
             setup.comment("blackhole script created before chroot in vmhost's build image")
         else:
-            # build locally
-            setup.comment("build blackhole script")
-            setup.append("chmod +x $DIR/build_recursor_lua.sh")
-            setup.append("mkdir build")
-            setup.append("$DIR/build_recursor_lua.sh")
+            setup.append(build_blackhole)
         setup.blank()
 
         setup.append(f"install -o pdns -g pdns -m 600 $DIR/pdns.conf /etc/pdns")
@@ -198,7 +197,6 @@ class Dns(Role):
             setup.blank()
             setup.comment("assemble complete hosts file")
             setup.append("cat $DIR/other_hosts >> /etc/hosts")
-            setup.append("cat /tmp/hosts >> /etc/hosts")
 
 
 def _add_zone(setup: shell.ShellScript, vlan: dict, dns_domain: str, dns_server: str):

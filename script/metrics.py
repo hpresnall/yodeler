@@ -55,10 +55,11 @@ def _configure_ipmi(cfg: dict, setup: shell.ShellScript, output_dir: str):
 
         file.copy_template("metrics/ipmi", "ipmi-exporter_initd", output_dir)
 
+        build = file.read_template("metrics/ipmi", "build.sh")
         if (cfg["is_vm"]):
-            cfg["before_chroot"].append(file.substitute("metrics/ipmi", "build.sh", cfg))
+            cfg["before_chroot"].append(build)
         else:
-            setup.substitute("metrics/ipmi", "build.sh", cfg)
+            setup.append(build)
 
         setup.append("install -o root -g root -m 755 $DIR/ipmi-exporter_initd /etc/init.d/ipmi-exporter")
         setup.append("install -o root -g root -m 755 /tmp/ipmi-exporter /usr/bin")

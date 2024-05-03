@@ -69,6 +69,10 @@ class VmHost(Role):
 
         self._cfg["interfaces"] = vswitch_interfaces + self._cfg["interfaces"]
 
+    def needs_build_image(self) -> bool:
+        # always needs site build in case vms do
+        return True
+
     def additional_configuration(self):
         # do not support nested vms
         self._cfg["is_vm"] = False

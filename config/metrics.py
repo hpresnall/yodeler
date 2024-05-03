@@ -43,6 +43,10 @@ def validate(cfg: dict):
     metrics.setdefault("libvirt", {"enabled": False})
     metrics.setdefault("pdns", {"enabled": False})
 
+    # ipmi needs to build the collector see script/metrics.py
+    if metrics["ipmi"]["enabled"]:
+        cfg["needs_site_build"] = True
+
 
 def _validate_type(hostname: str, metrics: dict, type: str, interval: int, enabled: bool):
     if type in metrics:

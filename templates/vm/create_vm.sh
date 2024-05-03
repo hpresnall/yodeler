@@ -4,11 +4,12 @@ AUTOSTART=$AUTOSTART
 log "Creating VM for '$HOSTNAME'"
 
 # copy files in /tmp/$HOSTNAME into /tmp on the VM using --fs-skel-dir param
-mkdir -p /tmp/$HOSTNAME/tmp
-rm -f /tmp/$HOSTNAME/tmp/envvars
-touch /tmp/$HOSTNAME/tmp/envvars
+SETUP_TMP=/tmp/$HOSTNAME/tmp
+mkdir -p $$SETUP_TMP
+rm -f $$SETUP_TMP/tmp/envvars
+touch $$SETUP_TMP/envvars
 # export START_TIME in chroot to use the same LOG_DIR this script is already using
-echo "export START_TIME=$$START_TIME" >> /tmp/$HOSTNAME/tmp/envvars
+echo "export START_TIME=$$START_TIME" >> $$SETUP_TMP/envvars
 
 $BEFORE_CHROOT
 
