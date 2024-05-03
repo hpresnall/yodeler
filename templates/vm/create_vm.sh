@@ -1,14 +1,15 @@
 HOST_BACKUP=$HOST_BACKUP
 AUTOSTART=$AUTOSTART
 
-log "Creating VM for '$HOSTNAME'"
+log "Setting up environment to build VM '$HOSTNAME'"
 
 # copy files in /tmp/$HOSTNAME into /tmp on the VM using --fs-skel-dir param
-mkdir -p /tmp/$HOSTNAME/tmp
-rm -f /tmp/$HOSTNAME/tmp/envvars
-touch /tmp/$HOSTNAME/tmp/envvars
+SETUP_TMP=/tmp/$HOSTNAME/tmp
+mkdir -p $$SETUP_TMP
+rm -f $$SETUP_TMP/tmp/envvars
+touch $$SETUP_TMP/envvars
 # export START_TIME in chroot to use the same LOG_DIR this script is already using
-echo "export START_TIME=$$START_TIME" >> /tmp/$HOSTNAME/tmp/envvars
+echo "export START_TIME=$$START_TIME" >> $$SETUP_TMP/envvars
 
 $BEFORE_CHROOT
 
@@ -24,7 +25,7 @@ set +o errexit
 log "Building VM image"
 # create the virtual machine
 # run setup.sh inside a chroot of the VM's filesystem
-$VM_IMAGES_PATH/alpine-make-vm-image/alpine-make-vm-image \
+$$SITE_DIR/build/alpine-make-vm-image/alpine-make-vm-image \
   --image-format raw \
   --serial-console \
   --image-size ${DISK_SIZE_MB}M \

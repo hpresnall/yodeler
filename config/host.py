@@ -108,9 +108,15 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     # aliases are validated against other hosts, interface vlan DHCP reservations and firewall static hosts
     _configure_aliases(host_cfg)
 
-    # add any additional configuration; this may include aliases
+    needs_site_build = False
+
     for role in host_cfg["roles"]:
+        needs_site_build |= role.needs_build_image()
+
+        # add any additional configuration; this may include aliases
         role.additional_configuration()
+
+    host_cfg["needs_site_build"] = needs_site_build
 
     # run after addtional configuration to allow role.additional_packages() to use interfaces, aliases, etc
     _configure_packages(site_cfg, host_yaml, host_cfg)
@@ -143,8 +149,11 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.add_log_function()
     setup.append_rootinstall()
 
+    setup.comment("map SETUP_TMP from yodel.sh into this chroot")
+    setup.append("SETUP_TMP=/tmp")
+    setup.blank()
     setup.comment("load any envvars passed in from yodeler.sh")
-    setup.append("source /tmp/envvars")
+    setup.append("source $SETUP_TMP/envvars")
     setup.blank()
 
     # add all scripts from each role
@@ -163,14 +172,14 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.write_file(host_dir)
 
     # convert array into string for substitution in bootstrap script
-    if not host_cfg["before_chroot"]:
-        host_cfg["before_chroot"] = "# no configuration needed before chroot"
-    else:
+    if host_cfg["before_chroot"]:
         host_cfg["before_chroot"] = "\n".join(host_cfg["before_chroot"])
-    if not host_cfg["after_chroot"]:
-        host_cfg["after_chroot"] = "# no configuration needed after chroot"
     else:
+        host_cfg["before_chroot"] = "# no configuration needed before chroot"
+    if host_cfg["after_chroot"]:
         host_cfg["after_chroot"] = "\n".join(host_cfg["after_chroot"])
+    else:
+        host_cfg["after_chroot"] = "# no configuration needed after chroot"
 
     if host_cfg["is_vm"]:
         _bootstrap_vm(host_cfg, host_dir)
@@ -395,9 +404,6 @@ def _bootstrap_vm(cfg: dict, output_dir: str):
     yodel.blank()
     yodel.append_self_dir()
     yodel.setup_logging(cfg["hostname"])
-    yodel.blank()
-    yodel.append("export VMHOST=" + cfg["vmhost"])
-    yodel.blank()
     yodel.substitute("vm", "create_vm.sh", cfg)
     yodel.write_file(output_dir)
 

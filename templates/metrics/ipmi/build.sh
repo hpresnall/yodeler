@@ -1,11 +1,9 @@
-# using the site build image, download the IPMI exporter, if needed
-$$SITE_DIR/$VMHOST/create_build_image.sh
-
-if [ -d "$$SITE_BUILD_IMG/build/ipmi_exporter-1.8.0.linux-amd64" ]; then
-  log "Using already downloaded Prometheus IMPI collector"
+if [ -d "$SITE_BUILD_MOUNT/build/ipmi_exporter-1.8.0.linux-amd64" ]; then
+  log "Using already downloaded Prometheus IPMI collector"
 else
+  # no need to chroot into build image since this only downloads a file
   log "Downloading the Prometheus IPMI collector"
-  cd $$SITE_BUILD_IMG/build
+  cd $SITE_BUILD_MOUNT/build
   apk -q --no-progress add wget
   wget -q https://github.com/prometheus-community/ipmi_exporter/releases/download/v1.8.0/ipmi_exporter-1.8.0.linux-amd64.tar.gz
   tar zxf ipmi_exporter-1.8.0.linux-amd64.tar.gz
@@ -13,4 +11,4 @@ else
   cd - > /dev/null 2>&1
 fi
 
-cp "$$SITE_BUILD_IMG/build/ipmi_exporter-1.8.0.linux-amd64/ipmi_exporter" "/tmp/ipmi-exporter"
+cp "$SITE_BUILD_MOUNT/build/ipmi_exporter-1.8.0.linux-amd64/ipmi_exporter" "$SETUP_TMP/ipmi-exporter"

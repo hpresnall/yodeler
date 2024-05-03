@@ -16,6 +16,8 @@ import config.host as host
 import util.file as file
 import util.parse as parse
 
+import script.shell as shell
+
 
 _logger = logging.getLogger(__name__)
 
@@ -136,8 +138,14 @@ def write_host_scripts(site_cfg: dict, output_dir: str):
         else:
             raise ose
 
+    needs_site_build = False
+
     for host_cfg in site_cfg["hosts"].values():
         host.write_scripts(host_cfg, output_dir)
+        needs_site_build |= host_cfg["needs_site_build"]
+
+    if needs_site_build:
+        _setup_site_build_scripts(site_cfg, output_dir)
 
 
 def _validate_full_site(site_cfg: dict):
@@ -175,10 +183,6 @@ def _validate_full_site(site_cfg: dict):
         # validate here to avoid an additional all hosts loop
         for role in host_cfg["roles"]:
             role.validate()
-
-            # self reference for use in the vmhost's build image scripts
-            if role.name == "vmhost":
-                host_cfg["vmhost"] = host_cfg["hostname"]
 
         # set the host's VM host
         if host_cfg["is_vm"]:
@@ -221,3 +225,24 @@ def _validate_additional_dns_entries(cfg: dict):
                 entry["ipv6_address"] = ipaddress.ip_address(entry["ipv6_address"])
             except ValueError as ve:
                 raise KeyError(f"invalid ipv6_address for {location}") from ve
+
+
+def _setup_site_build_scripts(cfg: dict, output_dir: str):
+    build_dir = os.path.join(output_dir, "build")
+    os.makedirs(build_dir, exist_ok=True)
+    # patch for alpine-make-vm-image if it exists
+    # vms do not need this since they will use an already configured build image
+    if os.path.isfile("templates/physical/make-vm-image-patch"):
+        file.copy_template("physical", "make-vm-image-patch", build_dir)
+
+    file.substitute_and_write("common", "setup_site_build.sh", cfg, build_dir)
+
+    # helper script to unmount the build_image
+    unmount_build = shell.ShellScript("unmount_site_build.sh")
+    unmount_build.append(f"SITE_BUILD_MOUNT=\"/media/{cfg['site_name']}_build\"")
+    unmount_build.blank()
+    unmount_build.append("umount $SITE_BUILD_MOUNT/tmp/apk_cache")
+    unmount_build.append("umount $SITE_BUILD_MOUNT")
+    unmount_build.blank()
+    unmount_build.append("echo \"Unmounted $SITE_BUILD_MOUNT\"")
+    unmount_build.write_file(build_dir)

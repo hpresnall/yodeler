@@ -1,10 +1,10 @@
 #!/bin/sh
-# this should be run when chrooted in the shared build image of the vmhost
+# this should be run when chrooted in the shared build image
 set -o errexit
 
 apk -q --no-progress add git
 
-cd build
+cd /build
 
 if [ -d hosts ]; then
   cd hosts

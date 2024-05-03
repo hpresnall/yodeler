@@ -69,6 +69,10 @@ class VmHost(Role):
 
         self._cfg["interfaces"] = vswitch_interfaces + self._cfg["interfaces"]
 
+    def needs_build_image(self) -> bool:
+        # always needs site build in case vms do
+        return True
+
     def additional_configuration(self):
         # do not support nested vms
         self._cfg["is_vm"] = False
@@ -174,10 +178,6 @@ fi
 sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
 """)
 
-        # patch for alpine-make-vm-image if it exists
-        if os.path.isfile("templates/vmhost/patch"):
-            file.copy_template(self.name, "patch", output_dir)
-
         # libvirt hook scripts for network
         file.copy_template(self.name, "network_hook", output_dir)
         file.copy_template(self.name, "qemu_hook", output_dir)
@@ -208,8 +208,6 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
         file.copy_template(self.name, "logrotate-openvswitch", output_dir)
         setup.append("rootinstall $DIR/logrotate-openvswitch /etc/logrotate.d/openvswitch")
         setup.blank()
-
-        _create_site_build_image(self._cfg, setup, output_dir)
 
         # call yodel.sh for each VM
         setup.comment("run yodel.sh for each VM for this site")
@@ -334,26 +332,3 @@ def _setup_libvirt(cfg: dict, setup: shell.ShellScript, output_dir: str):
         setup.append(f"virsh net-start {vswitch['name']}")
         setup.append(f"virsh net-autostart {vswitch['name']}")
         setup.blank()
-
-
-def _create_site_build_image(cfg: dict, setup: shell.ShellScript, output_dir: str):
-    # create a stand-alone script for setting up the site build image
-    create_build = shell.ShellScript("create_build_img.sh")
-    create_build.append_self_dir()
-    create_build.append("""log () {
-  echo $*
-}
-""")
-    create_build.substitute("vmhost", "site_build.sh", cfg)
-    create_build.write_file(output_dir)
-
-    # helper scripts on the installed vm to unmount the build_image
-    unmount_build = shell.ShellScript("unmount_build_img.sh")
-    unmount_build.append_self_dir()
-    unmount_build.append(f"SITE_BUILD_IMG=\"/media/{cfg['site_name']}_build\"")
-    unmount_build.blank()
-    unmount_build.append("umount $SITE_BUILD_IMG/tmp/apk_cache")
-    unmount_build.append("umount $SITE_BUILD_IMG")
-    unmount_build.blank()
-    unmount_build.append("echo \"Unmounted $SITE_BUILD_IMG\"")
-    unmount_build.write_file(output_dir)
