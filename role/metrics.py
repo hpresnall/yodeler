@@ -43,6 +43,8 @@ class Metrics(Role):
         if not self._cfg["metrics"]:
             raise ValueError("metrics server must have metrics enabled")
 
+        self._cfg.setdefault("grafana_password", "m3trics!")
+
     def validate(self):
         if self._cfg["is_vm"] and (self._cfg["disk_size_mb"] < 1024):
             raise ValueError("metrics server must set 'disk_size_mb' to at least 1,024")
@@ -126,25 +128,35 @@ class Metrics(Role):
 
         file.write("prometheus.yml", file.output_yaml(prometheus), output_dir)
 
-        setup.append(
-            "install -o grafana -g grafana -m 600 $DIR/prometheus_datasrc /var/lib/grafana/provisioning/datasources/prometheus.yml")
-        setup.append("root install $DIR/grafana.ini /etc")
-        setup.append("root install $DIR/prometheus.yml /etc/prometheus")
-        setup.append("root install $DIR/grafana_confd /etc/conf.d/grafana")
-        setup.append("root install $DIR/prometheus_confd /etc/conf.d/prometheus")
+        # order matters; properf configuration is needed to provision grafana and create /var/lib/grafana
+        setup.comment("add grafana and prometheus config")
+        setup.append("rootinstall $DIR/grafana.ini /etc")
+        setup.append("rootinstall $DIR/prometheus.yml /etc/prometheus")
+        setup.append("rootinstall $DIR/grafana_confd /etc/conf.d")
+        setup.append("rootinstall $DIR/prometheus_confd /etc/conf.d")
+        setup.append("mv /etc/conf.d/grafana_confd /etc/conf.d/grafana")
+        setup.append("mv /etc/conf.d/prometheus_confd /etc/conf.d/prometheus")
         setup.blank()
 
-        setup.comment("remove warning in log output")
-        setup.append("mkdir /var/lib/grafana/plugins")
-        setup.append("chown grafana:grafana /var/lib/grafana/plugins")
+        setup.comment("create grafana config with a prometheus datasource")
+        setup.append("mkdir -p /var/lib/grafana/data /var/lib/grafana/plugins /var/lib/grafana/provisioning /var/log/grafana")
+        setup.append("cd /var/lib/grafana/provisioning")
+        setup.append("mkdir alerting dashboards datasources notifiers plugins")
+        setup.append("cd -")
+        setup.append(
+            "install -o grafana -g grafana -m 600 $DIR/prometheus_datasrc /var/lib/grafana/provisioning/datasources")
+        setup.append(
+            "mv /var/lib/grafana/provisioning/datasources/prometheus_datasrc /var/lib/grafana/provisioning/datasources/prometheus.yaml")
+        setup.append("chown -R grafana:grafana /var/lib/grafana")
+        setup.blank()
+
+        setup.comment("provision grafana")
+        setup.append(
+            f"echo {self._cfg["grafana_password"]} > grafana-cli -config /etc/grafana.ini -homepath /usr/share/grafana admin reset-admin-password --password-from-stdin")
         setup.blank()
 
         setup.service("grafana")
         setup.service("prometheus")
-
-        setup.append(
-            "echo m3trics! > grafana-cli -config /etc/grafana.ini -homepath /usr/share/grafana admin reset-admin-password --password-from-stdin")
-
 
 # mkdir /var/log/grafana
 # chown grafana:grafana /var/log/grafana
