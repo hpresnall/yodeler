@@ -1,4 +1,6 @@
 """Create shell script fragments for formatting disks and adding /etc/fstab entries in setup scripts."""
+import os.path
+
 import script.shell as shell
 
 
@@ -16,12 +18,15 @@ def from_config(cfg: dict, setup: shell.ShellScript):
         if cfg["is_vm"]:
             # for vms, setup the disk before chroot
             if disk["type"] == "img":
-                cfg["before_chroot"].append(_create_image(disk))
+                # create the image in the outermost script
+                # other config will need to move the image to correct location _inside_ the VM host
+                # split for better formatting in output
+                cfg["unnested_before_chroot"].extend(_create_image(disk).split("\n"))
             elif disk["type"] == "device":
                 # note formatting with the host's disk path; it will be a different dev (e.g. vda) in a running vm
-                cfg["before_chroot"].append(format(disk))
+                cfg["before_chroot"].append(format(disk, "host_path"))
 
-            cfg["before_chroot"].append(_add_uuid_to_envvars(cfg['hostname'], disk))
+            cfg["before_chroot"].append(_add_uuid_to_envvars(disk))
         else:
             # for physical servers, configure the disk during setup
             if disk["type"] == "img":
@@ -29,7 +34,7 @@ def from_config(cfg: dict, setup: shell.ShellScript):
                 # would need to set the 'loop' option in create_fstab_entry()
                 setup.append(_create_image(disk))
             elif disk["type"] == "device":
-                setup.append(format(disk))
+                setup.append(format(disk, "path"))
 
             setup.append(_set_uuid_to_local_var(disk))
             setup.blank()
@@ -38,20 +43,23 @@ def from_config(cfg: dict, setup: shell.ShellScript):
 def _create_image(disk: dict) -> str:
     """Output the commands to create and format a disk image."""
     path = disk["host_path"]
+    dir = os.path.dirname(path)
+    format = f"\n  mkfs.{disk['fs_type']} \"{path}\"" if disk["format"] else ""
+
     # assume VM and UUID is written to $SETUP_TMP/envvars
     return f"""if [ ! -f "{path}" ]; then
   log "Creating & formatting '{disk['name']}' disk image"
+  mkdir -p {dir}
   truncate -s {disk['size_mb']}M {path}
-  sync
-  mkfs.{disk['fs_type']} {path}
+  sync{format}
 else
   log "Reusing existing '{disk['name']}' disk image"
 fi
 """
 
 
-def format(disk: dict) -> str:
-    path = disk['path']
+def format(disk: dict, path_key: str) -> str:
+    path = disk[path_key]
     # for loop checks partitions if disk path is a full disk
     return f"""# only format the '{disk['name']}' disk if there are no existing, formatted partitions
 has_fs=false
@@ -70,10 +78,10 @@ fi
 """
 
 
-def _add_uuid_to_envvars(hostname: str, disk: dict) -> str:
+def _add_uuid_to_envvars(disk: dict) -> str:
     # for vms, write the UUID to envvars so it can be passed from yodel.sh to setup.sh
     # use blkid because lsblk does not work on disk images
-    return f"echo \"{disk['name'].upper()}_UUID=$(blkid {disk['path']} | cut -d\\\" -f2)\" >> $SETUP_TMP/envvars\n"
+    return f"echo \"{disk['name'].upper()}_UUID=$(blkid {disk['host_path']} | cut -d\\\" -f2)\" >> $SETUP_TMP/envvars\n"
 
 
 def _set_uuid_to_local_var(disk: dict) -> str:

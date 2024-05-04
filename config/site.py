@@ -139,8 +139,18 @@ def write_host_scripts(site_cfg: dict, output_dir: str):
             raise ose
 
     needs_site_build = False
+    vmhosts = []
 
     for host_cfg in site_cfg["hosts"].values():
+        # configure vmhosts last so they have access to all their vm's chroot scripts
+        if (host_cfg["hostname"] in site_cfg["roles_to_hostnames"]["vmhost"]):
+            vmhosts.append(host_cfg)
+            continue
+
+        host.write_scripts(host_cfg, output_dir)
+        needs_site_build |= host_cfg["needs_site_build"]
+
+    for host_cfg in vmhosts:
         host.write_scripts(host_cfg, output_dir)
         needs_site_build |= host_cfg["needs_site_build"]
 

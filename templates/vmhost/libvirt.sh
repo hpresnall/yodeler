@@ -53,6 +53,8 @@ mkdir -p $VM_IMAGES_PATH/backup
 mkdir -p $VM_IMAGES_PATH/shared
 chown -R nobody:libvirt $VM_IMAGES_PATH
 chmod 755 -R $VM_IMAGES_PATH
+chown qemu:kvm /vmstorage/*.img
+chmod 660 /vmstorage/*.img
 virsh pool-define-as --name vmstorage --type dir --target $VM_IMAGES_PATH
 virsh pool-autostart vmstorage
 virsh pool-start vmstorage

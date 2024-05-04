@@ -23,8 +23,10 @@ class Storage(Role):
         parse.set_default_string("storage_user", self._cfg, "storage")
         parse.set_default_string("storage_group", self._cfg, "storage")
 
-        self._cfg["before_chroot"].extend(["apk add zfs", "modprobe zfs\n"])
-        self._cfg["after_chroot"].extend(["modprobe -r zfs", "apk del zfs\n"])
+        # zfs setup does not run in chroot; do all the setup in the top-level chroot
+        self._cfg["unnested_before_chroot"].extend(
+            ["log \"Installing & starting ZFS kernel module\"", "apk -q --no-progress add zfs", "modprobe zfs\n"])
+        self._cfg["unnested_after_chroot"].extend(["zpool export storage", "modprobe -r zfs", "apk -q del zfs\n"])
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -37,6 +39,7 @@ class Storage(Role):
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         storage_cfg = self._cfg["storage"]
         storage_dir = storage_cfg["base_dir"]
+        before_chroot = self._cfg["unnested_before_chroot"]
 
         zpool = "  zpool create -o ashift=12 -O normalization=formD -O atime=off -o autotrim=on"
         zpool += " -O mountpoint=" + storage_dir
@@ -47,21 +50,23 @@ class Storage(Role):
             if disk["name"].startswith("storage"):
                 # creating zpool outside of vm, so use vm host's path
                 # TODO verify this works with image files after vm starts and the zpool is imported at boot
-                path = "/dev/" + disk["path"] if self._cfg["is_vm"] else disk["host_path"]
+                path = disk["host_path"]
                 zpool += path + " "
 
-        setup.append("zpool import 2>&1 | grep storage &>/dev/null && ret=$? || ret=$?")
-        setup.append("if [ $ret -eq 0 ]; then")
-        setup.log(f"Importing existing ZFS storage pool to {storage_dir}", indent="  ")
-        setup.append("  zpool import storage")
-        setup.append("else")
-        setup.log(f"Creating ZFS storage pool at '{storage_dir}'", indent="  ")
-        setup.append(zpool)
-        setup.append("fi")
-        setup.blank()
+        # zpools cannot be created inside chroot
+        before_chroot.append("zpool import 2>&1 | grep storage &>/dev/null && ret=$? || ret=$?")
+        before_chroot.append("if [ $ret -eq 0 ]; then")
+        before_chroot.append(f"  log \"Importing existing ZFS storage pool to {storage_dir}\"")
+        before_chroot.append("  zpool import storage")
+        before_chroot.append("else")
+        before_chroot.append(f"  log \"Creating ZFS storage pool at '{storage_dir}'\"")
+        before_chroot.append(zpool)
+        before_chroot.append("fi\n")
 
         group = storage_cfg["group"]
         setup.log(f"Creating group '{group}' & all share users")
+        # inside chroot, mimic the directories zpool / zfs commands create so permissions can be applied
+        setup.append("mkdir -p " + storage_dir)
         setup.blank()
 
         setup.comment("change file permissions even if group or user already existed")
@@ -119,16 +124,20 @@ class Storage(Role):
                         perm = 770
                     # otherwise, only readers; leave at 750
 
-            setup.append(f"if [ ! -e \"{os_path}\" ]; then")
-            setup.log(f"Creating share '{path}'", indent="  ")
-            setup.append(f"  zfs create storage/{path}")  # also creates directory
-            setup.append("else")
-            setup.log(f"Using existing share '{path}'", indent="  ")
-            setup.append("fi")
+            before_chroot.append(f"if [ ! -e \"{os_path}\" ]; then")
+            before_chroot.append(f"  log \"Creating share '{path}'\"")
+            before_chroot.append(f"  zfs create storage/{path}")  # also creates directory
+            before_chroot.append("else")
+            before_chroot.append(f"  log \"Using existing share '{path}'\"")
+            before_chroot.append("fi")
+            if share["quota"] == "infinite":
+                before_chroot.append("")
+            else:
+                before_chroot.append(f"zfs set quota={share['quota']} storage/{path}\n")
+
+            setup.append("mkdir -p " + os_path)
             setup.blank()
 
-            if share["quota"] != "infinite":
-                setup.append(f"zfs set quota={share['quota']} storage/{path}")
             setup.append(f"chown {owner}:{group} {os_path}")
             setup.append(f"chmod {perm} {os_path}")
             setup.blank()
@@ -295,6 +304,7 @@ def _configure_zfs(cfg: dict):
     for disk in cfg["disks"]:
         if disk["name"].startswith("storage"):
             storage_disks.append(disk)
+            disk["format"] = False  # zfs will format
 
     zpool_vdev_type = cfg.get("zpool_vdev_type", None)
 

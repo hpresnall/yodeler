@@ -67,6 +67,7 @@ def validate(cfg: dict):
 
             disk["partition"] = ""
             parse.set_default_string("fs_type", disk, "ext4")
+            disk["format"] = bool(disk.get("format", True))
         elif "device" == type:
             # require /dev/ path; optional partition
             path = parse.non_empty_string("path", disk, location)
@@ -76,6 +77,7 @@ def validate(cfg: dict):
 
             disk["partition"] = str(disk.setdefault("partition", ""))
             parse.set_default_string("fs_type", disk, "ext4")
+            disk["format"] = bool(disk.get("format", True))
         elif "passthrough" == type:
             if not cfg["is_vm"]:
                 # possible, but no use case now

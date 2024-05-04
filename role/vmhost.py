@@ -212,7 +212,13 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
         # call yodel.sh for each VM
         setup.comment("run yodel.sh for each VM for this site")
         setup.append("cd $SITE_DIR")
+        setup.comment("let VM's yodel.sh know that it is running inside another yodel")
+        setup.append("export NESTED_YODEL=True")
+        setup.blank()
         setup.append("log -e \"\\nCreating VMs\\n\"")
+
+        disk_paths = set()
+        disks = []
 
         for _, host in self._cfg["hosts"].items():
             hostname = host["hostname"]
@@ -220,8 +226,43 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
             if not host["is_vm"] or hostname == self._cfg["hostname"]:
                 continue
 
+            # create all non-system disk images before chroot
             setup.append(hostname + "/yodel.sh")
             setup.log("")
+
+            for disk in host["disks"]:
+                if (disk["name"] != "system") and (disk["type"] == "img"):
+                    path = os.path.dirname(disk["host_path"])
+                    disk_paths.add(path)
+                    disks.append(disk)
+                    if len(disks) == 1:
+                        self._cfg["before_chroot"].append(
+                            "#\n for setting up VM disk images\napk -q --no-progress add e2fsprogs")
+
+            # unnest the VM's chroot scripts
+            if host["unnested_before_chroot"]:
+                if (not self._cfg["before_chroot"][-1].endswith("\n")) and (self._cfg["before_chroot"][-1]):
+                    self._cfg["before_chroot"].append("")
+                self._cfg["before_chroot"].extend(host["unnested_before_chroot"])
+            if host["unnested_after_chroot"]:
+                if self._cfg["after_chroot"][-1] or not self._cfg["after_chroot"][-1].endswith("\n"):
+                    self._cfg["after_chroot"].append("")
+                self._cfg["after_chroot"].extend(host["unnested_after_chroot"])
+
+        if disks:
+            self._cfg["before_chroot"].append("log \"Moving VM disk images into installed system\"")
+
+        for path in disk_paths:
+            # create the base dir in the installed vmhost
+            self._cfg["before_chroot"].append("mkdir -p $INSTALLED" + path)  # $INSTALLED set in create_physical.sh
+            # clean up the installer dir created by script.disks._create_image()
+            self._cfg["after_chroot"].append("rm -rf " + path)
+        for disk in disks:
+            # move disks created before chroot into the installed vmhost
+            # setup.sh will set the correct permissions
+            installer_path = disk["host_path"]
+            path = os.path.dirname(installer_path)
+            self._cfg["before_chroot"].append(f"mv {installer_path} $INSTALLED{path}")
 
         setup.blank()
         setup.comment("add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity")

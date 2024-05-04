@@ -2,7 +2,7 @@
 # however, the installer's kernel version could be different than the installed system
 # so, modprobe in chroot will not work; do it here instead
 log "Installing & starting kernel modules for vmhost"
-apk -q add openvswitch qemu-system-x86_64
+apk -q --no-progress add openvswitch qemu-system-x86_64
 
 modprobe openvswitch
 modprobe nbd

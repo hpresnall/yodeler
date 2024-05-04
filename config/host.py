@@ -175,15 +175,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
     setup.write_file(host_dir)
 
-    # convert array into string for substitution in bootstrap script
-    if host_cfg["before_chroot"]:
-        host_cfg["before_chroot"] = "\n".join(host_cfg["before_chroot"])
-    else:
-        host_cfg["before_chroot"] = "# no configuration needed before chroot"
-    if host_cfg["after_chroot"]:
-        host_cfg["after_chroot"] = "\n".join(host_cfg["after_chroot"])
-    else:
-        host_cfg["after_chroot"] = "# no configuration needed after chroot"
+    _configure_before_and_after_chroot(host_cfg)
 
     if host_cfg["is_vm"]:
         _bootstrap_vm(host_cfg, host_dir)
@@ -369,6 +361,48 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
         _logger.debug("removing packages %s", host_cfg["remove_packages"])
 
 
+def _configure_before_and_after_chroot(cfg: dict):
+    # convert before & after chroot arrays into string for substitution in bootstrap script
+    # handle top-level, unnested before & after chroot scripts differently for vms
+    before = ""
+    if cfg["before_chroot"]:
+        before = "\n".join(cfg["before_chroot"])
+    if cfg["unnested_before_chroot"]:
+        if cfg["is_vm"]:
+            # only run if VM's yodel.sh is running unnested (i.e. reinstalling the vm from a running vm host)
+            before += "\nif [ -z \"$NESTED_YODEL\"]; then\n"
+            before += "  " + "\n  ".join(cfg["unnested_before_chroot"])  # spaces for indenting
+            before += "fi"
+        else:
+            # for physical servers, yodel.sh will always be unnested, so always run
+            before += "\n".join(cfg["unnested_before_chroot"])
+    if before:
+        if before.endswith("\n"):  # assume spacing already exists on script this will be substituted into
+            before = before[:-1]
+        cfg["before_chroot"] = before
+    else:
+        cfg["before_chroot"] = "# no configuration needed before chroot"
+
+    after = ""
+    if cfg["unnested_after_chroot"]:
+        if cfg["is_vm"]:
+            # only run if VM's yodel.sh is running unnested (i.e. reinstalling the vm from a running vm host)
+            after += "if [ -z \"$NESTED_YODEL\"]; then\n"
+            after += "  " + "\n  ".join(cfg["unnested_after_chroot"])  # spaces for indenting
+            after += "fi"
+        else:
+            # for physical servers, yodel.sh will always be unnested, so always run
+            after += "\n".join(cfg["unnested_after_chroot"])
+    if cfg["after_chroot"]:
+        after = "\n".join(cfg["after_chroot"])
+    if after:
+        if after.endswith("\n"):
+            after = after[:-1]  # assume spacing already exists on script this will be substituted into
+        cfg["after_chroot"] = after
+    else:
+        cfg["after_chroot"] = "# no configuration needed after chroot"
+
+
 def _bootstrap_physical(cfg: dict, output_dir: str):
     for disk in cfg["disks"]:
         if disk["name"] == "system":
@@ -508,6 +542,8 @@ DEFAULT_CONFIG = {
     "awall_disable": [],
     "before_chroot": [],
     "after_chroot": [],
+    "unnested_before_chroot": [],
+    "unnested_after_chroot": [],
     "rename_interfaces": [],
     "enable_metrics": True,  # metrics disabled at the host level
     "metric_interval": 15  # default metrics collection interval, in seconds
@@ -529,6 +565,8 @@ _DEFAULT_CONFIG_TYPES = {
     "awall_disable": list,
     "before_chroot": list,
     "after_chroot": list,
+    "unnested_before_chroot": list,
+    "unnested_after_chroot": list,
     "rename_interfaces": list,
     "enable_metrics": bool,
     "metric_interval": int
