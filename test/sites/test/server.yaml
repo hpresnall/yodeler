@@ -20,3 +20,6 @@ storage:
   shares:
     - name: test
       writer: test
+disks:
+  - name: storage1
+    type: img

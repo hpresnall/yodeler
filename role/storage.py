@@ -39,8 +39,23 @@ class Storage(Role):
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         storage_cfg = self._cfg["storage"]
         storage_dir = storage_cfg["base_dir"]
-        before_chroot = self._cfg["unnested_before_chroot"]
 
+        # zpools cannot be created inside chroot; do everything before the top-level chroot
+        before_chroot = self._cfg["unnested_before_chroot"]
+        before_chroot.append("log \"Loop mounting storage disks for zpool configuration\"")
+        image_disks_count = 1
+
+        # creating zfs outside the VM which also creates all the share dirs
+        # instead of setting perms during setup, create a script that runs on first boot using the 'local' service
+        local = shell.ShellScript("storage_perms.start", False)
+        local.comment("ensure pool is imported")
+        local.append("zpool import storage")
+        local.blank()
+        local.comment("update storage & share permissions")
+        local.comment("change file permissions even if group or user already existed")
+        local.blank()
+
+        # build zpool command with all the storage disks
         zpool = "  zpool create -o ashift=12 -O normalization=formD -O atime=off -o autotrim=on"
         zpool += " -O mountpoint=" + storage_dir
         zpool += " storage "
@@ -49,11 +64,24 @@ class Storage(Role):
         for disk in self._cfg["disks"]:
             if disk["name"].startswith("storage"):
                 # creating zpool outside of vm, so use vm host's path
-                # TODO verify this works with image files after vm starts and the zpool is imported at boot
                 path = disk["host_path"]
                 zpool += path + " "
 
-        # zpools cannot be created inside chroot
+                if disk["type"] == "img":
+                    # mount / unmount image disks
+                    # use loop mount rather than the raw disk image; set envvar on mount, use that for unmount
+                    # zfs treats images different and importing them into the vm does not work
+                    # separate items rather than \n so script is indented correctly
+                    before_chroot.append(f"STORAGE{image_disks_count}=$(losetup  --find --show {path})")
+                    self._cfg["unnested_after_chroot"].append(f"losetup --detach $STORAGE{image_disks_count}")
+                    image_disks_count += 1
+
+        if image_disks_count > 1:
+            before_chroot.append("")
+            before_chroot.append("#output for logs")
+            before_chroot.append("losetup --all --list")
+            before_chroot.append("")
+
         before_chroot.append("zpool import 2>&1 | grep storage &>/dev/null && ret=$? || ret=$?")
         before_chroot.append("if [ $ret -eq 0 ]; then")
         before_chroot.append(f"  log \"Importing existing ZFS storage pool to {storage_dir}\"")
@@ -65,15 +93,11 @@ class Storage(Role):
 
         group = storage_cfg["group"]
         setup.log(f"Creating group '{group}' & all share users")
-        # inside chroot, mimic the directories zpool / zfs commands create so permissions can be applied
-        setup.append("mkdir -p " + storage_dir)
-        setup.blank()
 
-        setup.comment("change file permissions even if group or user already existed")
         setup.append(f"id \"{group}\" &>/dev/null && ret=$? || ret=$?")
         setup.append(f"if [ $ret -ne 0 ]; then")
         setup.append("  addgroup -g 1024 " + group)
-        setup.append(f"  adduser -D -s /sbin/nologin -h {storage_dir}  -g storage -G {group} -u 1024 {group}")
+        setup.append(f"  adduser -D -s /sbin/nologin -h {storage_dir} -g storage -G {group} -u 1024 {group}")
         setup.append("fi")
         setup.blank()
 
@@ -91,10 +115,9 @@ class Storage(Role):
             setup.blank()
             uid += 1
 
-        setup.comment("update base storage dir after users since users share that home dir and adduser updates the perms")
-        setup.append(f"chown {group}:{group} {storage_dir}")
-        setup.append("chmod 770 " + storage_dir)
-        setup.blank()
+        local.append(f"chown {group}:{group} {storage_dir}")
+        local.append("chmod 770 " + storage_dir)
+        local.blank()
 
         # create base samba config, then add all the shares
         smb_conf = [file.substitute(self.name, "smb.conf", {
@@ -130,17 +153,13 @@ class Storage(Role):
             before_chroot.append("else")
             before_chroot.append(f"  log \"Using existing share '{path}'\"")
             before_chroot.append("fi")
-            if share["quota"] == "infinite":
-                before_chroot.append("")
-            else:
-                before_chroot.append(f"zfs set quota={share['quota']} storage/{path}\n")
+            if share["quota"] != "infinite":
+                before_chroot.append(f"zfs set quota={share['quota']} storage/{path}")
+            before_chroot.append("")
 
-            setup.append("mkdir -p " + os_path)
-            setup.blank()
-
-            setup.append(f"chown {owner}:{group} {os_path}")
-            setup.append(f"chmod {perm} {os_path}")
-            setup.blank()
+            local.append(f"chown {owner}:{group} {os_path}")
+            local.append(f"chmod {perm} {os_path}")
+            local.blank()
 
             smb_conf.append(f"[{share['name']}]")
             smb_conf.append("  path = " + os_path)
@@ -180,11 +199,21 @@ class Storage(Role):
         setup.service("zfs-import", "boot")
         setup.service("zfs-mount", "boot")
         setup.service("samba")
+        setup.service("local")
         setup.blank()
 
+        setup.comment("scrub the storage pool once a week")
         setup.append("echo -e \"#!/bin/sh\nzpool scrub storage\n\" > /etc/periodic/weekly/zfs_scrub")
         setup.append("chmod 755 /etc/periodic/weekly/zfs_scrub")
         setup.blank()
+
+        setup.comment("configure storage permissions on first boot")
+        setup.append("install -o root -g root -m 750 storage_perms.start /etc/local.d")
+
+        local.comment("only run once")
+        local.append("mv /etc/local.d/storage_perms.start /etc/local.d/storage_perms.done")
+        local.blank()
+        local.write_file(output_dir)
 
 
 def _validate_storage(cfg: dict):
@@ -306,21 +335,24 @@ def _configure_zfs(cfg: dict):
             storage_disks.append(disk)
             disk["format"] = False  # zfs will format
 
+    num_disks = len(storage_disks)
+
+    if num_disks == 0:
+        raise ValueError("no 'disks' named 'storage*' defined for " + cfg["hostname"])
+
+    # if set, ensure valid zpool type
     zpool_vdev_type = cfg.get("zpool_vdev_type", None)
 
     if zpool_vdev_type:
         valid_types = ["mirror", "raidz", "raidz1", "raidz2", "raidz3", "draid", "draid1", "draid2", "draid3"]
         if zpool_vdev_type not in valid_types:
             raise ValueError(f"invalid zpool_vdev_type, must be one of {valid_types}")
-        return  # no validation, assume user knows what they are doing
-
-    num_disks = len(storage_disks)
-
-    if num_disks == 1:
-        zpool_vdev_type = ""  # just the plain disk
-    elif num_disks == 2:
-        zpool_vdev_type = "mirror"
-    else:
-        zpool_vdev_type = "raidz"
+    else:  # set default values based on the number of disks
+        if num_disks == 1:
+            zpool_vdev_type = ""  # just the plain disk
+        elif num_disks == 2:
+            zpool_vdev_type = "mirror"
+        else:
+            zpool_vdev_type = "raidz"
 
     cfg["zpool_vdev_type"] = zpool_vdev_type

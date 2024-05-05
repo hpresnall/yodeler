@@ -35,10 +35,7 @@ $$SITE_DIR/site_build/alpine-make-vm-image/alpine-make-vm-image \
   $VM_IMAGES_PATH/$HOSTNAME.img \
   $$DIR/setup.sh
 
-if [ "$$?" != 0 ]; then
-  log "Unsuccessful Yodel for vm '$HOSTNAME'; see $$LOG for full details"
-  exit 1
-fi
+RESULT=$$?
 
 # restore original logging on error
 trap error ERR
@@ -47,6 +44,11 @@ set -o errexit
 $AFTER_CHROOT
 
 rm -rf $$SETUP_TMP
+
+if [ "$$RESULT" != 0 ]; then
+  log "Unsuccessful Yodel for vm '$HOSTNAME'; see $$LOG for full details"
+  exit 1
+fi
 
 # define the VM
 log "Creating VM definition"

@@ -63,7 +63,7 @@ def validate(cfg: dict):
             postfix = "" if name == "system" else "_" + name
             path = disk.setdefault("path", f"{cfg['vm_images_path']}/{cfg['hostname']}{postfix}.img")
 
-            int(disk.setdefault("size_mb", "1024"))
+            int(disk.setdefault("size_mb", 1024))
 
             disk["partition"] = ""
             parse.set_default_string("fs_type", disk, "ext4")
