@@ -25,58 +25,66 @@ class Router(Role):
         uplink = interfaces.configure_uplink(self._cfg)
 
         # add an interface for each vswitch that has routable vlans
-        iface_counter = 1  # start at eth1
-
         vswitch_interfaces = []
 
         for vswitch in self._cfg["vswitches"].values():
             mac_address = None
 
-            # create a unique interface for each vswitch
             if self._cfg["is_vm"]:
+                # create an interface for each vswitch
+                # note that it will only be used if the vswitch has routable vlans
+                # routers must explicitly add interfaces for non-routable vlans
                 iface_name = vswitch["name"]
-                iface_counter += 1
                 mac_address = interfaces.random_mac_address()
             elif vswitch["uplinks"]:
                 # TODO handle multiple uplinks; maybe just error instead of creating physical bond ifaces
                 # TODO if site also has a separate, physical vmhost, then need a way to
                 # differentiate uplinks for vmhost vs router; maybe router_iface in vswitch config?
                 iface_name = vswitch["uplinks"][0]
-                # vswitch validation already confirmed uplink uniqueness
-            else:
-                # note that this assumes ethernet layout of non-vm hosts
-                iface_name = vswitch["name"]
-                iface_counter += 1
 
-            vswitch["router_iface"] = iface_name
+                # vswitch validation already confirmed uplink uniqueness among all vswitches
+                if iface_name == uplink["name"]:
+                    raise ValueError("router uplink cannot use the same interface as vswitch"
+                                     f"{vswitch['name']}: {iface_name}")
+            else:
+                # physical server with no uplink; will error if this vswitch has routable vlans
+                iface_name = "missing"
+
             vlan_interfaces = []
             untagged = False
+            untagged_iface = None
 
             for vlan in vswitch["vlans"]:
                 if not vlan["routable"]:
                     continue
 
-                if vlan["id"] is None:
-                    untagged = True
-
                 vlan_iface = interfaces.for_vlan(iface_name, vswitch, vlan, mac_address)
                 vlan["router_iface"] = vlan_iface
                 vlan_interfaces.append(vlan_iface)
+
+                if vlan["id"] is None:
+                    untagged = True
+                    untagged_iface = vlan_iface
 
                 # will add a prefix delegation stanza to dhcpcd.conf for the vlan; see dhcpcd.py
                 pd_network = vlan["ipv6_pd_network"]
                 _validate_vlan_pd_network(uplink["ipv6_pd_prefixlen"], pd_network)
                 uplink["ipv6_delegated_prefixes"].append(f"{vlan_iface['name']}/{pd_network}")
 
-            if vlan_interfaces:
+            if vlan_interfaces:  # i.e. any routable vlans
+                if iface_name == "missing":
+                    raise ValueError(f"vswitch {vswitch['name']} has routable vlans, but does not define an uplink")
                 # create the parent interface for the vlan interfaces
                 comment = f"vlans on '{vswitch['name']}' vswitch"
 
                 if untagged:  # interface with no vlan tag already created; add the comment on the first interface
                     vlan_interfaces[0]["comment"] = comment
+                    vswitch["router_iface"] = untagged_iface
                 else:  # add the base interface as a port
                     # append to vswitch_interfaces to ensure it is defined before the sub-interfaces for the vlans
-                    vswitch_interfaces.append(interfaces.for_port(iface_name, comment, "vlan", mac_address=mac_address))
+                    iface = interfaces.for_port(iface_name, comment, "vlan", mac_address=mac_address)
+                    vswitch["router_iface"] = iface
+                    vswitch_interfaces.append(iface)
 
                 vswitch_interfaces.extend(vlan_interfaces)
         # end for all vswitches
@@ -196,15 +204,14 @@ class Router(Role):
                     shorewall["params6"].append("\n# parent interface for vswitch " + vswitch["name"])
                     comment = True
                 # shorewall param to associate vswitch with interface
-                param = vswitch["name"].upper() + "=" + vswitch["router_iface"]
+                param = vswitch["name"].upper() + "=" + vswitch["router_iface"]["name"]
                 shorewall["params"].append(param)
                 shorewall["params6"].append(param)
 
                 if self._cfg["is_vm"]:
-                    mac_address = interfaces.random_mac_address()
                     # new libvirt interface to trunk the vlans
                     libvirt_interfaces.append(libvirt.router_interface(
-                        self._cfg['hostname'], vswitch, mac_address))
+                        self._cfg['hostname'], vswitch, vswitch["router_iface"]["mac_address"]))
 
         # blank line after ping rules from vlan to firewall
         shorewall["rules"].append("")
