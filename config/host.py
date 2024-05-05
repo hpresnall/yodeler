@@ -65,7 +65,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
         raise ValueError(f"duplicate hostname '{hostname}'")
     if hostname in site_cfg["firewall"]["static_hosts"]:
         raise ValueError(f"duplicate hostname '{hostname}' in firewall.static_hosts")
-    if (hostname == "site") or (hostname == "profile"):
+    if (hostname == "site") or (hostname == "profile") or (hostname == "site_build"):
         raise ValueError(f"invalid hostname '{hostname}'")
     host_yaml["hostname"] = hostname
 

@@ -238,7 +238,7 @@ def _validate_additional_dns_entries(cfg: dict):
 
 
 def _setup_site_build_scripts(cfg: dict, output_dir: str):
-    build_dir = os.path.join(output_dir, "build")
+    build_dir = os.path.join(output_dir, "site_build")
     os.makedirs(build_dir, exist_ok=True)
     # patch for alpine-make-vm-image if it exists
     # vms do not need this since they will use an already configured build image

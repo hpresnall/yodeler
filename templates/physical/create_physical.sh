@@ -116,8 +116,8 @@ if [ -d "$$INSTALLED_SITE_DIR/logs" ]; then
   rsync -r "$$INSTALLED_SITE_DIR/logs" "$$SITE_DIR"
 fi
 
-if [ -d "$$INSTALLED_SITE_DIR/build" ]; then
-  rsync -r "$$INSTALLED_SITE_DIR/build" "$$SITE_DIR"
+if [ -d "$$INSTALLED_SITE_DIR/site_build" ]; then
+  rsync -r "$$INSTALLED_SITE_DIR/site_build" "$$SITE_DIR"
 fi
 
 # copy back final resolv.conf

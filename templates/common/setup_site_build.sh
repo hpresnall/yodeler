@@ -16,7 +16,7 @@ fi;
 # configure build environment for any setup that requires non-apk packages or additional work to configure
 # this images file will be will be shared at the site level
 # it will be mounted so that setup can copy files and chroot into it, if needed
-SITE_BUILD_DIR=$$SITE_DIR/build
+SITE_BUILD_DIR=$$SITE_DIR/site_build
 mkdir -p $$SITE_BUILD_DIR
 
 if [ ! -d "$$SITE_BUILD_DIR/alpine-make-vm-image" ]; then
@@ -35,7 +35,7 @@ fi
 # build scripts should check for existing builds and handle as needed
 if [ ! -f "$$SITE_BUILD_DIR/build.img" ]; then
   # create a build image just like a VM
-  log "Creating shared build image $$SITE_DIR/build.img"
+  log "Creating shared build image '$$SITE_DIR/site_build.img'"
   $$SITE_BUILD_DIR/alpine-make-vm-image/alpine-make-vm-image \
   --image-format raw \
   --serial-console \

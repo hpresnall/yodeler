@@ -24,7 +24,7 @@ set +o errexit
 log "Building VM image"
 # create the virtual machine
 # run setup.sh inside a chroot of the VM's filesystem
-$$SITE_DIR/build/alpine-make-vm-image/alpine-make-vm-image \
+$$SITE_DIR/site_build/alpine-make-vm-image/alpine-make-vm-image \
   --image-format raw \
   --serial-console \
   --image-size ${DISK_SIZE_MB}M \
