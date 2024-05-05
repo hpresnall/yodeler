@@ -362,22 +362,23 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
 
 
 def _configure_before_and_after_chroot(cfg: dict):
-    # convert before & after chroot arrays into string for substitution in bootstrap script
+    # convert before & after chroot arrays into string for substitution in bootstrap scripts
     # handle top-level, unnested before & after chroot scripts differently for vms
     before = ""
     if cfg["before_chroot"]:
-        before = "\n".join(cfg["before_chroot"])
+        before = _concat_and_indent(cfg["before_chroot"])
     if cfg["unnested_before_chroot"]:
         if cfg["is_vm"]:
             # only run if VM's yodel.sh is running unnested (i.e. reinstalling the vm from a running vm host)
-            before += "\nif [ -z \"$NESTED_YODEL\"]; then\n"
-            before += "  " + "\n  ".join(cfg["unnested_before_chroot"])  # spaces for indenting
+            before += "if [ -z \"$NESTED_YODEL\" ]; then\n"
+            before += _concat_and_indent(cfg["unnested_before_chroot"], indent="  ", extra_blank=False)
             before += "fi"
         else:
             # for physical servers, yodel.sh will always be unnested, so always run
-            before += "\n".join(cfg["unnested_before_chroot"])
+            before += _concat_and_indent(cfg["unnested_before_chroot"])
     if before:
-        if before.endswith("\n"):  # assume spacing already exists on script this will be substituted into
+        # no ending blank lines
+        while before.endswith("\n"):
             before = before[:-1]
         cfg["before_chroot"] = before
     else:
@@ -387,17 +388,18 @@ def _configure_before_and_after_chroot(cfg: dict):
     if cfg["unnested_after_chroot"]:
         if cfg["is_vm"]:
             # only run if VM's yodel.sh is running unnested (i.e. reinstalling the vm from a running vm host)
-            after += "if [ -z \"$NESTED_YODEL\"]; then\n"
-            after += "  " + "\n  ".join(cfg["unnested_after_chroot"])  # spaces for indenting
+            after += "if [ -z \"$NESTED_YODEL\" ]; then\n"
+            after += _concat_and_indent(cfg["unnested_after_chroot"], indent="  ", extra_blank=False)
             after += "fi"
         else:
             # for physical servers, yodel.sh will always be unnested, so always run
-            after += "\n".join(cfg["unnested_after_chroot"])
+            after += _concat_and_indent(cfg["unnested_after_chroot"])
     if cfg["after_chroot"]:
-        after = "\n".join(cfg["after_chroot"])
+        after += _concat_and_indent(cfg["after_chroot"])
     if after:
-        if after.endswith("\n"):
-            after = after[:-1]  # assume spacing already exists on script this will be substituted into
+        # no ending blank lines
+        while after.endswith("\n"):
+            after = before[:-1]
         cfg["after_chroot"] = after
     else:
         cfg["after_chroot"] = "# no configuration needed after chroot"
@@ -454,6 +456,35 @@ def _bootstrap_vm(cfg: dict, output_dir: str):
     start_vm = shell.ShellScript("start_vm.sh", errexit=False)
     start_vm.substitute("vm", "start_vm.sh", cfg)
     start_vm.write_file(output_dir)
+
+
+def _concat_and_indent(data: list[str], indent="", extra_blank=True) -> str:
+    concat = ""
+    last_line_blank = False
+    # loop rather than use join so empty lines are not indented
+    for line in data:
+        if line:
+            if line == "\n":
+                if not last_line_blank:
+                    concat += line
+                last_line_blank = True
+            else:
+                if line.endswith("\n"):
+                    concat += indent + line
+                else:
+                    concat += indent + line + "\n"
+                last_line_blank = False
+        else:
+            # only allow a single blank line
+            if not last_line_blank:
+                concat += "\n"
+            last_line_blank = True
+
+    # ensure extra blank line after each call
+    if extra_blank and not concat.endswith("\n\n"):
+        concat += "\n"
+
+    return concat
 
 
 def _preview_dir(output_dir: str, line_count: int = sys.maxsize):

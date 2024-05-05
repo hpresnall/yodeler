@@ -236,18 +236,26 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
                     disk_paths.add(path)
                     disks.append(disk)
                     if len(disks) == 1:
-                        self._cfg["before_chroot"].append(
-                            "#\n for setting up VM disk images\napk -q --no-progress add e2fsprogs")
+                        self._cfg["before_chroot"].append("")
+                        self._cfg["before_chroot"].append("# for setting up VM disk images")
+                        self._cfg["before_chroot"].append("apk -q --no-progress add e2fsprogs")
+                        self._cfg["before_chroot"].append("")
 
             # unnest the VM's chroot scripts
             if host["unnested_before_chroot"]:
-                if (not self._cfg["before_chroot"][-1].endswith("\n")) and (self._cfg["before_chroot"][-1]):
-                    self._cfg["before_chroot"].append("")
+                self._cfg["before_chroot"].append(f"# before chroot from {hostname}")
                 self._cfg["before_chroot"].extend(host["unnested_before_chroot"])
+                if not self._cfg["before_chroot"][-1]:
+                    self._cfg["before_chroot"] = self._cfg["before_chroot"][:-1]
+                self._cfg["before_chroot"].append(f"# end before chroot from {hostname}")
+                self._cfg["before_chroot"].append("")
             if host["unnested_after_chroot"]:
-                if self._cfg["after_chroot"][-1] or not self._cfg["after_chroot"][-1].endswith("\n"):
-                    self._cfg["after_chroot"].append("")
+                self._cfg["after_chroot"].append(f"# after chroot from {hostname}")
                 self._cfg["after_chroot"].extend(host["unnested_after_chroot"])
+                if not self._cfg["after_chroot"][-1]:
+                    self._cfg["after_chroot"] = self._cfg["after_chroot"][:-1]
+                self._cfg["after_chroot"].append(f"# end after chroot from {hostname}")
+                self._cfg["after_chroot"].append("")
 
         if disks:
             self._cfg["before_chroot"].append("log \"Moving VM disk images into installed system\"")
@@ -263,6 +271,10 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
             installer_path = disk["host_path"]
             path = os.path.dirname(installer_path)
             self._cfg["before_chroot"].append(f"mv {installer_path} $INSTALLED{path}")
+
+        if disks:
+            self._cfg["before_chroot"].append("")
+            self._cfg["after_chroot"].append("")
 
         setup.blank()
         setup.comment("add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity")
@@ -359,7 +371,7 @@ def _create_vswitch_uplink(vswitch: dict, setup: shell.ShellScript):
         vlan_mode = "native_untagged" if None in vlans_by_id else "trunk"
         setup.append(f"ovs-vsctl set port {uplink_name} trunks={trunks} vlan_mode={vlan_mode}")
 
-    setup.blank()
+    # last output in setup; no need for setup.blank()
 
 
 def _setup_libvirt(cfg: dict, setup: shell.ShellScript, output_dir: str):
