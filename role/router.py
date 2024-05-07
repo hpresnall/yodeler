@@ -21,6 +21,9 @@ class Router(Role):
     def additional_packages(self):
         return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "ndisc6", "tcpdump", "ethtool"}
 
+    def additional_aliases(self) -> list[str]:
+        return ["gateway", "firewall"]
+
     def configure_interfaces(self):
         uplink = interfaces.configure_uplink(self._cfg)
 
@@ -107,9 +110,6 @@ class Router(Role):
     def additional_configuration(self):
         # router will use Shorewall instead
         self._cfg["local_firewall"] = False
-
-        self.add_alias("gateway")
-        self.add_alias("firewall")
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

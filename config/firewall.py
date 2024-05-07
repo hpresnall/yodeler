@@ -2,8 +2,9 @@
 import logging
 import ipaddress
 
-import util.parse as parse
 import util.address as address
+import util.dns as dns
+import util.parse as parse
 
 import role.roles as roles
 
@@ -60,7 +61,8 @@ def _parse_static_hosts(cfg: dict, firewall: dict):
         hostname = host["hostname"].lower()
 
         # cannot validate against cfg["hosts"] here since hosts have not yet been defined
-
+        if dns.invalid_hostname(hostname):
+            raise ValueError(f"invalid hostname '{hostname}' for {location}")
         if hostname in static_hosts:
             raise ValueError(f"duplicate hostname '{hostname}' for {location}")
         if hostname in role_names:

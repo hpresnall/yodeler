@@ -46,11 +46,6 @@ class Common(Role):
 
         return packages
 
-    def additional_configuration(self):
-        self._cfg["fqdn"] = ""
-        if self._cfg["primary_domain"]:
-            self._cfg["fqdn"] = self._cfg["hostname"] + '.' + self._cfg["primary_domain"]
-
     def validate(self):
         # ensure each vlan is only used once
         # do not allow multiple interfaces with routable vlans on the same switch

@@ -26,19 +26,26 @@ class Role(ABC):
         """The packages needed to implement this role.
         This will be called after configure_interfaces() and additional_configuration()."""
 
-    def configure_interfaces(self):
-        """Add any additional interfaces for the role.
-        Interface validation will be run afer all roles have this function called."""
-        pass
+    def additional_aliases(self) -> list[str]:
+        """Add any additional aliases for the role.
+        Host configuration will ensure unique values for the site will be added to cfg['aliases'] if more than one host
+        has this role."""
+        return []
 
     def needs_build_image(self) -> bool:
         """Does this role need to build additional artifacts?
         If so, the site level build image will be mounted for use in write_config()."""
         return False
 
+    def configure_interfaces(self):
+        """Add any additional interfaces for the role.
+        Interface validation will be run afer all roles have this function called."""
+        pass
+
     def additional_configuration(self):
         """Add any additional default configuration specific to this role.
-        This is run after configure_interfaces()."""
+        This is run after configure_interfaces() and basic host level validation (but before validate()).
+        The configuration will be in its final object format for this call."""
         pass
 
     @staticmethod
@@ -57,7 +64,7 @@ class Role(ABC):
     def validate(self):
         """Run any additional validation needed for this role.
 
-        This will called after all hosts for the site are loaded so the total site layout can be checked, if needed."""
+        This will called _after_ all hosts for the site are loaded so the total site layout can be checked, if needed."""
         pass
 
     @abstractmethod
@@ -65,25 +72,6 @@ class Role(ABC):
         """Write any necessary shell script commands to setup.
         Create the configuration files that implement this role.
         """
-
-    def add_alias(self, alias: str):
-        """Add an alias to the host.
-
-        The alias will be numbered if other hosts in the site have the same role"""
-        self._cfg["aliases"].add(alias)  # add to this host's config
-
-        # assume this is called _after_ load_all_roles() and will not raise KeyError
-        existing_hosts = self._cfg["roles_to_hostnames"][self.name]
-
-        # only instance of the role, do not rename
-        if len(existing_hosts) == 1:
-            return
-
-        # rename all aliases by renumbering
-        for i, host in enumerate(existing_hosts, start=1):
-            aliases = self._cfg["hosts"][host]["aliases"]
-            aliases.discard(alias)
-            aliases.add(alias + str(i))
 
 
 def load(role_name: str, host_cfg: dict) -> Role:

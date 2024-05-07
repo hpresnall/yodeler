@@ -21,6 +21,9 @@ class Metrics(Role):
     def additional_packages(self) -> set[str]:
         return {"grafana", "prometheus"}
 
+    def additional_aliases(self) -> list[str]:
+        return ["metrics", "prometheus", "grafana"]
+
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         if site_cfg["site_enable_metrics"]:
@@ -36,10 +39,6 @@ class Metrics(Role):
             return 0
 
     def additional_configuration(self):
-        self.add_alias("metrics")
-        self.add_alias("prometheus")
-        self.add_alias("grafana")
-
         if not self._cfg["metrics"]:
             raise ValueError("metrics server must have metrics enabled")
 

@@ -13,12 +13,10 @@ class Storage(Role):
     def additional_packages(self) -> set[str]:
         return {"pciutils", "nvme-cli", "samba", "zfs"}
 
-    def additional_configuration(self):
-        self.add_alias("storage")
-        self.add_alias("nas")
-        self.add_alias("samba")
-        self.add_alias("smb")
+    def additional_aliases(self) -> list[str]:
+        return ["storage", "nas", "samba", "smb"]
 
+    def additional_configuration(self):
         parse.set_default_string("storage_dir", self._cfg, "/storage")
         parse.set_default_string("storage_user", self._cfg, "storage")
         parse.set_default_string("storage_group", self._cfg, "storage")

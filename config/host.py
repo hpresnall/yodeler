@@ -3,16 +3,16 @@ import logging
 import os
 import shutil
 import sys
-import re
-import ipaddress
 
 import role.roles as roles
 
 import util.file as file
 import util.parse as parse
+import util.dns as dns
 
 import script.shell as shell
 
+import config.aliases as aliases
 import config.interfaces as interfaces
 import config.disks as disks
 import config.metrics as metrics
@@ -20,8 +20,6 @@ import config.metrics as metrics
 import script.disks
 
 _logger = logging.getLogger(__name__)
-
-_valid_hostname = "^[A-Za-z0–9][A-Za-z0–9\\-]{1,63}[A-Za-z0–9]$"
 
 
 def load(site_cfg: dict, host_path: str | None) -> dict:
@@ -59,7 +57,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
 
     hostname = parse.non_empty_string("hostname", host_yaml, "host_yaml").lower()  # lowercase for consistency
 
-    if not re.match(_valid_hostname, hostname):
+    if dns.invalid_hostname(hostname):
         raise ValueError(f"invalid hostname '{hostname}'")
     if hostname in site_cfg["hosts"]:
         raise ValueError(f"duplicate hostname '{hostname}'")
@@ -93,22 +91,27 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     site_cfg["hosts"][hostname] = host_cfg
 
     _set_defaults(host_cfg)
+    aliases.configure(host_cfg)
 
     _load_roles(host_cfg)
 
     # order matters here
-    # add all interfaces, then validate
+    # add all interfaces & validate, then validate
     for role in host_cfg["roles"]:
         role.configure_interfaces()
+
+        if role.name != "common":
+            # uniquify all role names and role aliases
+            aliases.make_unique(host_cfg, role)
+
     interfaces.validate(host_cfg)
     interfaces.validate_renaming(host_cfg)
     disks.validate(host_cfg)
     metrics.validate(host_cfg)
-
-    # aliases are validated against other hosts, interface vlan DHCP reservations and firewall static hosts
-    _configure_aliases(host_cfg)
+    aliases.validate(host_cfg)
 
     needs_site_build = False
+    # aliases are validated against other hosts, interface vlan DHCP reservations and firewall static hosts
 
     for role in host_cfg["roles"]:
         needs_site_build |= role.needs_build_image()
@@ -145,6 +148,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.comment("DO NOT run this script directly! It will be run in a chrooted environment _after_ installing Alpine.")
     setup.comment("Run yodel.sh instead!")
     setup.blank()
+
     setup.append_self_dir()
     setup.add_log_function()
     setup.append_rootinstall()
@@ -152,6 +156,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.comment("map SETUP_TMP from yodel.sh into this chroot")
     setup.append("SETUP_TMP=/tmp")
     setup.blank()
+
     setup.comment("load any envvars passed in from yodeler.sh")
     setup.append("source $SETUP_TMP/envvars")
     setup.blank()
@@ -159,14 +164,17 @@ def write_scripts(host_cfg: dict, output_dir: str):
     # add all scripts from each role
     for role in host_cfg["roles"]:
         name = role.name.upper()
+
         setup.append(f"echo \"########## {name} ##########\"")
         setup.append(f"log Configuring role {name}")
         setup.blank()
+
         try:
             role.write_config(setup, host_dir)
         except:
             _logger.fatal(("cannot run write_config for role '%s'"), role.name)
             raise
+
         setup.blank()
 
     # not removing host's /tmp, just its contents
@@ -185,18 +193,12 @@ def write_scripts(host_cfg: dict, output_dir: str):
     _preview_dir(host_dir)
 
 
-def validate_site_defaults(site_cfg: dict):
+def validate_overridable_site_defaults(site_cfg: dict):
     # ensure overridden default values are the correct type and arrays only contain strings
     parse.configure_defaults("site_yaml", DEFAULT_SITE_CONFIG, _DEFAULT_SITE_CONFIG_TYPES, site_cfg)
 
-    for key in ("alpine_repositories", "external_ntp", "external_dns"):
-        site_cfg[key] = parse.read_string_list(key, site_cfg, f"site '{site_cfg['site_name']}'")
-
-    for dns in site_cfg["external_dns"]:
-        try:
-            ipaddress.ip_address(dns)
-        except ValueError as ve:
-            raise KeyError(f"invalid 'external_dns' IP address {dns}") from ve
+    site_cfg["alpine_repositories"] = parse.read_string_list(
+        "alpine_repositories", site_cfg, f"site '{site_cfg['site_name']}'")
 
 
 def _set_defaults(cfg: dict):
@@ -211,6 +213,8 @@ def _set_defaults(cfg: dict):
             raise KeyError(f"{key} value '{value}' in '{cfg['hostname']}' is {type(value)} not {kind}")
 
     parse.configure_defaults(cfg["hostname"], DEFAULT_CONFIG, _DEFAULT_CONFIG_TYPES, cfg)
+
+    cfg["awall_disable"] = parse.read_string_list("awall_disable", cfg, f"'{cfg['hostname']}'")
 
     # remove from script output if not needed
     if not cfg["install_private_ssh_key"]:
@@ -232,7 +236,7 @@ iface eth0 inet dhcp""")
         cfg["rename_interfaces"] = cfg["profile"]["rename_interfaces"]
 
     # also called in site.py; this call ensures overridden values from the host are also valid
-    validate_site_defaults(cfg)
+    validate_overridable_site_defaults(cfg)
 
 
 def _load_roles(cfg: dict):
@@ -277,58 +281,6 @@ def _load_roles(cfg: dict):
             cfg["roles_to_hostnames"][role_name] = []
 
         cfg["roles_to_hostnames"][role_name].append(cfg['hostname'])
-
-
-def _configure_aliases(host_cfg: dict):
-    hostname = host_cfg["hostname"]
-    # allow both 'alias' and 'aliases'; only store 'aliases'
-    aliases = parse.read_string_list_plurals(
-        {"alias", "aliases"}, host_cfg, "alias for " + host_cfg["hostname"])
-    host_cfg.pop("alias", None)
-
-    # final set of aliases is all defined values plus roles
-    host_cfg["aliases"] = set()
-
-    for alias in aliases:
-        if not re.match(_valid_hostname, alias):
-            raise ValueError(f"invalid alias '{alias}' for host '{hostname}'")
-        host_cfg["aliases"].add(alias.lower())
-
-    for role in host_cfg["roles"]:
-        if role.name != "common":
-            role.add_alias(role.name)  # role names are already lowercase
-
-    # ensure hostname is not duplicated by a role
-    host_cfg["aliases"].discard(host_cfg["hostname"])
-
-    for alias in host_cfg["aliases"]:
-        if alias in host_cfg["firewall"]["static_hosts"]:
-            raise ValueError(f"alias '{alias}' for host '{hostname}' is already used in firewall.static_hosts")
-
-        # ensure no clashes with other hosts; site.py already checked for duplicate hostnames
-        for other_hostname, other_host in host_cfg["hosts"].items():
-            if other_hostname == hostname:
-                continue
-            if alias in other_host["aliases"]:
-                raise ValueError(
-                    f"alias '{alias}' for host '{hostname}' is already used as an alias for '{other_hostname}'")
-
-    # ensure no clashes with DHCP reservations
-    aliases = set(host_cfg["aliases"])
-    aliases.add(host_cfg["hostname"])
-
-    for iface in host_cfg["interfaces"]:
-        if iface["type"] not in {"std", "vlan"}:
-            continue
-
-        vlan = iface["vlan"]["name"]
-        vlan_aliases = iface["vlan"]["known_aliases"]
-
-        if not aliases.isdisjoint(vlan_aliases):
-            raise ValueError(
-                f"vlan '{vlan}' contains DHCP reservations {aliases.intersection(vlan_aliases)} that conflict with a global hostname or alias")
-
-    # cannot check against all aliases in the site here since all hosts may not have been defined
 
 
 def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
@@ -461,6 +413,7 @@ def _bootstrap_vm(cfg: dict, output_dir: str):
 def _concat_and_indent(data: list[str], indent="", extra_blank=True) -> str:
     concat = ""
     last_line_blank = False
+
     # loop rather than use join so empty lines are not indented
     for line in data:
         if line:
@@ -527,17 +480,15 @@ DEFAULT_SITE_CONFIG = {
     "profile": {},
     "timezone": "UTC",
     "keymap": "us us",
-    # note sets here for comparisions on test, but list type in _TYPES since that is what YAML will load
-    # running type will also be parsed as sets
     "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
     "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
     "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
-    # top-level domain for the site; empty => no local DNS
+    # top-level domain for the site; empty => no local DNS unless DNS server sets 'primary_domain'
     "domain": "",
     # if not specified, no SSH access will be possible!
     "user": "nonroot",
     "password": "apassword",
-    "site_enable_metrics": True  # metrics disabled at the site level, regardless of the host's 'enable_metrics' value
+    "site_enable_metrics": True  # disable metrics at the site level, regardless of the host's 'enable_metrics' value
 }
 
 _DEFAULT_SITE_CONFIG_TYPES = {

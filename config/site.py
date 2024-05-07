@@ -13,6 +13,7 @@ import config.vswitch as vswitch
 import config.firewall as firewall
 import config.host as host
 
+import util.dns as dns
 import util.file as file
 import util.parse as parse
 
@@ -71,7 +72,19 @@ def validate(site_yaml: dict | str | None) -> dict:
 
     site_cfg = copy.deepcopy(site_yaml)
 
-    host.validate_site_defaults(site_cfg)
+    host.validate_overridable_site_defaults(site_cfg)
+
+    # validate values that hosts cannot override
+    for key in ("alpine_repositories", "external_ntp", "external_dns"):
+        site_cfg[key] = parse.read_string_list(key, site_cfg, f"site '{site_cfg['site_name']}'")
+
+    for dns in site_cfg["external_dns"]:
+        try:
+            ipaddress.ip_address(dns)
+        except ValueError as ve:
+            raise KeyError(f"invalid 'external_dns' IP address {dns}") from ve
+
+    site_cfg["external_ntp"] = parse.read_string_list("external_ntp", site_cfg, f"site '{site_cfg['site_name']}'")
 
     # order matters here; vswitch / vlans first since the firewall config needs that information
     vswitch.validate(site_cfg)
@@ -81,7 +94,7 @@ def validate(site_yaml: dict | str | None) -> dict:
     # map hostname to host config
     site_cfg["hosts"] = {}
 
-    # map roles to fully qualified domain names; shared with host configs
+    # map roles to hostnames; this dict will be shared with host configs
     site_cfg["roles_to_hostnames"] = {}
     for role in roles.names():
         site_cfg["roles_to_hostnames"][role] = []
@@ -182,13 +195,13 @@ def _validate_full_site(site_cfg: dict):
     aliases = set()
 
     for host_cfg in site_cfg["hosts"].values():
-        aliases.update(host_cfg["aliases"])  # this includes role names for the host
-
         hostname = host_cfg["hostname"]
 
         if hostname in aliases:
             raise KeyError(f"hostname '{hostname}' cannot be the same as another host's alias")
-        aliases.add(host_cfg["hostname"])
+
+        aliases.add(hostname)
+        aliases.update(host_cfg["aliases"])  # this includes role names for the host
 
         # validate here to avoid an additional all hosts loop
         for role in host_cfg["roles"]:
@@ -223,23 +236,28 @@ def _validate_additional_dns_entries(cfg: dict):
         entry["hostnames"] = parse.read_string_list_plurals({"hostname", "hostnames"}, entry, location)
         entry.pop("hostname", None)
 
+        for hostname in entry["hostnames"]:
+            if dns.invalid_hostname(hostname):
+                ValueError(f"invalid hostname {hostname} for {location}[{i}]")
+
         if "ipv4_address" not in entry:
-            raise KeyError(f"{location} must specify an ipv4_address")
+            raise KeyError(f"{location}[{i}] must specify an ipv4_address")
         try:
             entry["ipv4_address"] = ipaddress.ip_address(entry["ipv4_address"])
         except ValueError as ve:
-            raise KeyError(f"invalid ipv4_address for {location}") from ve
+            raise ValueError(f"invalid ipv4_address for {location}[{i}]") from ve
 
         if "ipv6_address" in entry:
             try:
                 entry["ipv6_address"] = ipaddress.ip_address(entry["ipv6_address"])
             except ValueError as ve:
-                raise KeyError(f"invalid ipv6_address for {location}") from ve
+                raise ValueError(f"invalid ipv6_address for {location}[{i}]") from ve
 
 
 def _setup_site_build_scripts(cfg: dict, output_dir: str):
     build_dir = os.path.join(output_dir, "site_build")
     os.makedirs(build_dir, exist_ok=True)
+
     # patch for alpine-make-vm-image if it exists
     # vms do not need this since they will use an already configured build image
     if os.path.isfile("templates/physical/make-vm-image-patch"):

@@ -271,46 +271,46 @@ class TestVlan(base.TestCfgBase):
 
     def test_vlan_dhcpres_invalid_ip(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
-            {"hostname": "pub_test", "mac_address": "00:11:22:33:44:55", "ipv4_address": "invalid"}]
+            {"hostname": "pub-test", "mac_address": "00:11:22:33:44:55", "ipv4_address": "invalid"}]
         self.build_error()
 
     def test_vlan_dhcpres_invalid_subnet(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
-            {"hostname": "pub_test", "mac_address": "00:11:22:33:44:55", "ipv4_address": "192.168.2.5"}]
+            {"hostname": "pub-test", "mac_address": "00:11:22:33:44:55", "ipv4_address": "192.168.2.5"}]
         self.build_error()
 
     def test_vlan_dhcpres_disabled_ivp6(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["ipv6_disabled"] = True
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
-            {"hostname": "pub_test", "mac_address": "00:11:22:33:44:55", "ipv6_address": "2001:db8:0:1::5"}]
+            {"hostname": "pub-test", "mac_address": "00:11:22:33:44:55", "ipv6_address": "2001:db8:0:1::5"}]
         self.build_cfg()  # should build with warning logged
 
     def test_vlan_dhcpres_nonstring_mac(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
-            {"hostname": "pub_test", "ipv4_address": "192.168.1.5", "mac_address": 123}]
+            {"hostname": "pub-test", "ipv4_address": "192.168.1.5", "mac_address": 123}]
         self.build_error()
 
     def test_vlan_dhcpres_no_mac(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
-            {"hostname": "pub_test", "ipv4_address": "192.168.1.5"}]
+            {"hostname": "pub-test", "ipv4_address": "192.168.1.5"}]
         self.build_error()
 
     def test_vlan_dhcpres_invalid_mac(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
-            {"hostname": "pub_test", "ipv4_address": "192.168.1.5", "mac_address": "invalid"}]
+            {"hostname": "pub-test", "ipv4_address": "192.168.1.5", "mac_address": "invalid"}]
         self.build_error()
 
     def test_vlan_dhcpres_nonlist_aliases(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
-            {"hostname": "pub_test", "ipv4_address": "192.168.1.5", "mac_address": "00:11:22:33:44:55", "aliases": "single_string"}]
+            {"hostname": "pub-test", "ipv4_address": "192.168.1.5", "mac_address": "00:11:22:33:44:55", "aliases": "single_string"}]
         self.build_cfg()
 
     def test_vlan_dhcpres_nonstring_alias(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
-            {"hostname": "pub_test", "ipv4_address": "192.168.1.5", "mac_address": "00:11:22:33:44:55", "aliases": [123]}]
+            {"hostname": "pub-test", "ipv4_address": "192.168.1.5", "mac_address": "00:11:22:33:44:55", "aliases": [123]}]
         self.build_error()
 
     def test_vlan_dhcpres(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
-            {"hostname": "pub_test", "mac_address": "00:11:22:33:44:55", "ipv4_address": "192.168.1.5"}]
+            {"hostname": "pub-test", "mac_address": "00:11:22:33:44:55", "ipv4_address": "192.168.1.5"}]
         self.build_cfg()

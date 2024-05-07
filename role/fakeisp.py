@@ -108,8 +108,6 @@ class FakeISP(Role):
         # configure iptables manually; no need for awall
         self._cfg["local_firewall"] = False
 
-        self.add_alias("fakeisp")
-
     def validate(self):
         pass
 

@@ -16,9 +16,8 @@ class NTP(Role):
     def additional_packages(self):
         return set()  # create_chrony_conf() already called in common
 
-    def additional_configuration(self):
-        self.add_alias("time")
-        self.add_alias("sntp")
+    def additional_aliases(self) -> list[str]:
+        return ["time", "sntp"]
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

@@ -2,6 +2,7 @@
 import logging
 import ipaddress
 
+import util.dns as dns
 import util.parse as parse
 
 import role.roles as roles
@@ -152,6 +153,9 @@ def _validate_vlan_dhcp_reservations(vswitch_name: str, vlan: dict):
             raise ValueError(f"duplicate hostname or alias '{hostname}' in {cfg_name}")
         known_aliases.add(hostname)
 
+        if dns.invalid_hostname(hostname):
+            raise ValueError(f"invalid hostname '{hostname}' defined for {location}")
+
         # cannot check for duplicate cfg[hosts] / aliases here since hosts have not yet been defined
         res["hostname"] = hostname
 
@@ -161,7 +165,7 @@ def _validate_vlan_dhcp_reservations(vswitch_name: str, vlan: dict):
         if "mac_address" in res:
             parse.validate_mac_address(res["mac_address"], location)
         else:
-            raise ValueError(f"no 'mac_address' defined for {location}")
+            raise ValueError(f"no mac_address defined for {location}")
 
         aliases = parse.read_string_list_plurals({"alias", "aliases"}, res, location)
         res.pop("alias", None)

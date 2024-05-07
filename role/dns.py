@@ -276,7 +276,7 @@ def _add_entry(setup: shell.ShellScript, host: dict, add_ptr: bool = True) -> bo
     return output
 
 
-def _add_alias(setup: shell.ShellScript,  alias: str, host: dict):
+def _add_cname(setup: shell.ShellScript,  alias: str, host: dict):
     # create CNAMEs for aliases
     domain = host['domain']
     setup.append(f"pdnsutil add-record {domain} {alias} CNAME {host['name']}.{domain}")
@@ -339,7 +339,7 @@ def _create_host_entries(setup: shell.ShellScript, cfg: dict, dns_domain: str):
                 if (alias == "dns") and (vlan["domain"] == dns_domain):
                     # 'dns' entry already covered by glue record
                     continue
-                _add_alias(setup, alias, host)
+                _add_cname(setup, alias, host)
                 output |= True
 
             # blank after each interface
@@ -370,7 +370,7 @@ def _create_reservation_entries(setup: shell.ShellScript, cfg: dict):
                     output = _add_entry(setup, host)
 
                     for alias in res["aliases"]:
-                        _add_alias(setup, alias, host)
+                        _add_cname(setup, alias, host)
                         output |= True
 
                     if output:

@@ -25,6 +25,9 @@ class VmHost(Role):
 
         return packages
 
+    def additional_aliases(self) -> list[str]:
+        return ["kvm"]
+
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         # vm host needed if any other systems are vms
@@ -76,8 +79,6 @@ class VmHost(Role):
     def additional_configuration(self):
         # do not support nested vms
         self._cfg["is_vm"] = False
-
-        self.add_alias("kvm")
 
         # additional physical server config to load libvirt kernel modules
         self._cfg["before_chroot"].append(file.substitute("vmhost", "before_chroot.sh", self._cfg))
