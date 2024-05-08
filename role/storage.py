@@ -21,11 +21,6 @@ class Storage(Role):
         parse.set_default_string("storage_user", self._cfg, "storage")
         parse.set_default_string("storage_group", self._cfg, "storage")
 
-        # zfs setup does not run in chroot; do all the setup in the top-level chroot
-        self._cfg["unnested_before_chroot"].extend(
-            ["log \"Installing & starting ZFS kernel module\"", "apk -q --no-progress add zfs", "modprobe zfs\n"])
-        self._cfg["unnested_after_chroot"].extend(["zpool export storage", "modprobe -r zfs", "apk -q del zfs\n"])
-
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         return 0
@@ -38,9 +33,14 @@ class Storage(Role):
         storage_cfg = self._cfg["storage"]
         storage_dir = storage_cfg["base_dir"]
 
-        # zpools cannot be created inside chroot; do everything before the top-level chroot
+        # zpools cannot be created inside chroot; do everything in the top-level yodel.sh
         before_chroot = self._cfg["unnested_before_chroot"]
+        before_chroot.append("log \"Installing & starting ZFS kernel module\"")
+        before_chroot.append("apk -q --no-progress add zfs losetup")
+        before_chroot.append("modprobe zfs")
+        before_chroot.append("")
         before_chroot.append("log \"Loop mounting storage disks for zpool configuration\"")
+
         image_disks_count = 1
 
         # creating zfs outside the VM which also creates all the share dirs
@@ -63,20 +63,21 @@ class Storage(Role):
             if disk["name"].startswith("storage"):
                 # creating zpool outside of vm, so use vm host's path
                 path = disk["host_path"]
-                zpool += path + " "
-
+    
                 if disk["type"] == "img":
                     # mount / unmount image disks
                     # use loop mount rather than the raw disk image; set envvar on mount, use that for unmount
-                    # zfs treats images different and importing them into the vm does not work
-                    # separate items rather than \n so script is indented correctly
+                    # zfs treats images differently and importing them into the vm does not work
                     before_chroot.append(f"STORAGE{image_disks_count}=$(losetup  --find --show {path})")
                     self._cfg["unnested_after_chroot"].append(f"losetup --detach $STORAGE{image_disks_count}")
+                    zpool += "$STORAGE" + str(image_disks_count) + " "
                     image_disks_count += 1
+                else:
+                    zpool += path + " "
 
         if image_disks_count > 1:
             before_chroot.append("")
-            before_chroot.append("#output for logs")
+            before_chroot.append("# output for logs")
             before_chroot.append("losetup --all --list")
             before_chroot.append("")
 
@@ -86,8 +87,8 @@ class Storage(Role):
         before_chroot.append("  zpool import storage")
         before_chroot.append("else")
         before_chroot.append(f"  log \"Creating ZFS storage pool at '{storage_dir}'\"")
-        before_chroot.append(zpool)
-        before_chroot.append("fi\n")
+        before_chroot.append(zpool.strip())
+        before_chroot.append("fi")
 
         group = storage_cfg["group"]
         setup.log(f"Creating group '{group}' & all share users")
@@ -190,6 +191,10 @@ class Storage(Role):
 
         smb_conf.append("")
         file.write("smb.conf", "\n".join(smb_conf), output_dir)
+
+        self._cfg["unnested_after_chroot"].append("zpool export storage")
+        self._cfg["unnested_after_chroot"].append("modprobe -r zfs")
+        self._cfg["unnested_after_chroot"].append("apk -q del zfs losetup")
 
         setup.append("rootinstall smb.conf /etc/samba")
         setup.blank()

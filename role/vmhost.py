@@ -218,8 +218,8 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
         setup.blank()
         setup.append("log -e \"\\nCreating VMs\\n\"")
 
-        disk_paths = set()
-        disks = []
+        disk_image_paths = set()
+        last_size = 0
 
         for _, host in self._cfg["hosts"].items():
             hostname = host["hostname"]
@@ -231,16 +231,39 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
             setup.append(hostname + "/yodel.sh")
             setup.log("")
 
+            new_disk_image_paths = set()
+
             for disk in host["disks"]:
                 if (disk["name"] != "system") and (disk["type"] == "img"):
                     path = os.path.dirname(disk["host_path"])
-                    disk_paths.add(path)
-                    disks.append(disk)
-                    if len(disks) == 1:
-                        self._cfg["before_chroot"].append("")
-                        self._cfg["before_chroot"].append("# for setting up VM disk images")
-                        self._cfg["before_chroot"].append("apk -q --no-progress add e2fsprogs")
-                        self._cfg["before_chroot"].append("")
+
+                    if path not in disk_image_paths:
+                        disk_image_paths.add(path)
+                        # only setup paths once, even if shared by more than one host
+                        new_disk_image_paths.add(path)
+
+            # only output once
+            if len(disk_image_paths) != last_size:
+                last_size = len(disk_image_paths)
+
+                self._cfg["before_chroot"].append("")
+                self._cfg["before_chroot"].append("# for setting up VM disk images")
+                self._cfg["before_chroot"].append("apk -q --no-progress add e2fsprogs")
+                self._cfg["before_chroot"].append("")
+
+            for path in new_disk_image_paths:
+                # create the base dir in the installed vmhost
+                # link to a local installer dir that the disk image creation script will use
+                self._cfg["before_chroot"].append(
+                    "# create links so disk images are created in the installed disk image")
+                self._cfg["before_chroot"].append("mkdir -p $INSTALLED" + path)
+                self._cfg["before_chroot"].append(f"ln -s $INSTALLED{path} {path}")
+                self._cfg["before_chroot"].append("")
+
+                # clean up the installer link
+                self._cfg["after_chroot"].append("")
+                self._cfg["after_chroot"].append("rm -rf " + path)
+                self._cfg["after_chroot"].append("")
 
             # unnest the VM's chroot scripts
             if host["unnested_before_chroot"]:
@@ -257,25 +280,6 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
                     self._cfg["after_chroot"] = self._cfg["after_chroot"][:-1]
                 self._cfg["after_chroot"].append(f"# end after chroot from {hostname}")
                 self._cfg["after_chroot"].append("")
-
-        if disks:
-            self._cfg["before_chroot"].append("log \"Moving VM disk images into installed system\"")
-
-        for path in disk_paths:
-            # create the base dir in the installed vmhost
-            self._cfg["before_chroot"].append("mkdir -p $INSTALLED" + path)  # $INSTALLED set in create_physical.sh
-            # clean up the installer dir created by script.disks._create_image()
-            self._cfg["after_chroot"].append("rm -rf " + path)
-        for disk in disks:
-            # move disks created before chroot into the installed vmhost
-            # setup.sh will set the correct permissions
-            installer_path = disk["host_path"]
-            path = os.path.dirname(installer_path)
-            self._cfg["before_chroot"].append(f"mv {installer_path} $INSTALLED{path}")
-
-        if disks:
-            self._cfg["before_chroot"].append("")
-            self._cfg["after_chroot"].append("")
 
         setup.blank()
         setup.comment("add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity")

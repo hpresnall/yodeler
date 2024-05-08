@@ -89,7 +89,7 @@ class Common(Role):
             # for physical servers, add packages manually
             _setup_repos(self._cfg, setup)
             setup.append("apk -q update")
-            setup.append("apk cache sync")
+            setup.append("apk -q cache sync")
             setup.blank()
             setup.log("Installing required packages")
             setup.comment("this server could be using a repo with newer package versions")

@@ -351,7 +351,7 @@ def _configure_before_and_after_chroot(cfg: dict):
     if after:
         # no ending blank lines
         while after.endswith("\n"):
-            after = before[:-1]
+            after = after[:-1]
         cfg["after_chroot"] = after
     else:
         cfg["after_chroot"] = "# no configuration needed after chroot"
@@ -433,8 +433,12 @@ def _concat_and_indent(data: list[str], indent="", extra_blank=True) -> str:
                 concat += "\n"
             last_line_blank = True
 
-    # ensure extra blank line after each call
-    if extra_blank and not concat.endswith("\n\n"):
+    # remove extra blank lines
+    while concat.endswith("\n\n"):
+        concat = concat[:-1]
+
+    # add back if needed
+    if extra_blank:
         concat += "\n"
 
     return concat

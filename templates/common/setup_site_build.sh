@@ -33,17 +33,17 @@ fi
 
 # reuse existing image
 # build scripts should check for existing builds and handle as needed
-if [ ! -f "$$SITE_BUILD_DIR/build.img" ]; then
+if [ ! -f "$$SITE_BUILD_DIR/site_build.img" ]; then
   # create a build image just like a VM
   log "Creating shared build image '$$SITE_DIR/site_build.img'"
   $$SITE_BUILD_DIR/alpine-make-vm-image/alpine-make-vm-image \
   --image-format raw \
   --serial-console \
-  --image-size 4096M \
+  --image-size 2048M \
   --repositories-file /etc/apk/repositories \
-  "$$SITE_BUILD_DIR/build.img"
+  "$$SITE_BUILD_DIR/site_build.img"
 else
-  log "Using existing build image $$SITE_BUILD_DIR/build.img"
+  log "Using existing build image $$SITE_BUILD_DIR/site_build.img"
 fi
 
 SITE_BUILD_MOUNT="/media/${SITE_NAME}_build"
@@ -53,7 +53,7 @@ if [ -n "$$(mount | grep $$SITE_BUILD_MOUNT)" ]; then
   log "Build image already mounted at $$SITE_BUILD_MOUNT"
 else
   mkdir -p $$SITE_BUILD_MOUNT
-  mount -o loop "$$SITE_BUILD_DIR/build.img" "$$SITE_BUILD_MOUNT"
+  mount -o loop "$$SITE_BUILD_DIR/site_build.img" "$$SITE_BUILD_MOUNT"
 
   # all scripts should put work into /build
   cd "$$SITE_BUILD_MOUNT"
