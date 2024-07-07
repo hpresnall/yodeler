@@ -12,6 +12,11 @@ rc-update add crond default
 rc-update add chronyd default
 rc-update add acpid boot
 
+# allow larger syslog files and keep 5 copies
+sed -i -e "s/-t/-t -s 1024 -b 5/g" /etc/conf.d/syslog
+# route all auth logs to /var/log/auth
+echo -e "auth,authpriv.* /var/log/auth\n*.*;auth,authpriv.none /var/log/messages\n" > /etc/syslog.conf
+
 # colorize ls and ip commands
 echo 'export COLORFGBG=";0"' > /etc/profile.d/aliases.sh
 echo 'alias la="ls --color -la"' >> /etc/profile.d/aliases.sh
@@ -51,7 +56,7 @@ else
   echo "START_OPTS=\"--governor powersave\"" >> /etc/conf.d/cpufrequtils
 fi
 
-# remove root password; only allow access via doas su -
+# remove root password; only allow access via 'doas su -'
 passwd -l root
 echo "doas su -" > /home/$USER/.ash_history
 chown "$USER:$USER" /home/$USER/.ash_history
@@ -98,5 +103,5 @@ sed -i -e "s#/sbin/dhcpcd \$$optargs#/sbin/dhcpcd -q -n \$$optargs#g" /usr/libex
 
 # reduce crond logging level so info messages are not printed to syslog on every execution
 echo "CRON_OPTS=\"$$CRON_OPTS -l 5\"" >> /etc/conf.d/crond
-# disable every execution every 15 minutes
+# disable execution every 15 minutes
 sed -i "s:\*/15:#\*/15:g" /etc/crontabs/root

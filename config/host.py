@@ -525,7 +525,13 @@ DEFAULT_CONFIG = {
     "install_private_ssh_key": False,
     # domain for the host when it has multiple interfaces; used for DNS search
     "primary_domain": "",
-    "awall_disable": [],
+    # by default, enable the watchdog service
+    "enable_watchdog": True,
+    "watchdog_dev": "/dev/watchdog",
+    # list of service names to disable in awall firewall config
+    "awall_disable": [], # list of service names to disable in awall firewall config
+    # scripts to run before chrooting into the host's install image
+    # unnested will run outside the _vm host's_ install image when running setup for afull site
     "before_chroot": [],
     "after_chroot": [],
     "unnested_before_chroot": [],
@@ -548,6 +554,8 @@ _DEFAULT_CONFIG_TYPES = {
     "motd": str,
     "install_private_ssh_key": bool,
     "primary_domain": str,
+    "enable_watchdog": bool,
+    "watchdog_dev": str,
     "awall_disable": list,
     "before_chroot": list,
     "after_chroot": list,

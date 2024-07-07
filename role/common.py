@@ -161,6 +161,12 @@ class Common(Role):
 
         disks.from_config(self._cfg, setup)
 
+        if self._cfg["enable_watchdog"]:
+            setup.comment("enable the BusyBox watchdog service")
+            setup.service("watchdog")
+            setup.append(f"echo \"WATCHDOG_DEV={self._cfg['watchdog_dev']}\" >> /etc/conf.d/watchdog")
+            setup.blank()
+
         if self._cfg["is_vm"]:
             libvirt.write_vm_xml(self._cfg, output_dir)
 
