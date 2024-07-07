@@ -537,8 +537,7 @@ DEFAULT_CONFIG = {
     "unnested_before_chroot": [],
     "unnested_after_chroot": [],
     "rename_interfaces": [],
-    "enable_metrics": True,  # metrics disabled at the host level
-    "metric_interval": 15  # default metrics collection interval, in seconds
+    "enable_metrics": True  # allow metrics for this host?; separate from the metrics _role_ which is for collection
 }
 
 _DEFAULT_CONFIG_TYPES = {
@@ -562,6 +561,5 @@ _DEFAULT_CONFIG_TYPES = {
     "unnested_before_chroot": list,
     "unnested_after_chroot": list,
     "rename_interfaces": list,
-    "enable_metrics": bool,
-    "metric_interval": int
+    "enable_metrics": bool
 }

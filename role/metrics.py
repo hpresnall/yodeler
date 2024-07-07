@@ -1,4 +1,4 @@
-"""Configuration for server that gathers metrics from other servers in the site."""
+"""Configuration for server that gathers Prometheus metrics from other hosts in the site."""
 from role.roles import Role
 
 import logging
@@ -44,9 +44,22 @@ class Metrics(Role):
 
         self._cfg.setdefault("grafana_password", "m3trics!")
 
+        # slower default times in seconds for scraping some metric types
+        metric_intervals = self._cfg.get("metric_intervals", {})
+        metric_intervals.setdefault("default", 15)
+        metric_intervals.setdefault("nvme", 60)
+        metric_intervals.setdefault("onewire", 60)
+        metric_intervals.setdefault("ipmi", 30)
+
+        self._cfg["metric_intervals"] = metric_intervals
+
     def validate(self):
         if self._cfg["is_vm"] and (self._cfg["disk_size_mb"] < 1024):
             raise ValueError("metrics server must set 'disk_size_mb' to at least 1,024")
+
+        for metric, interval in self._cfg["metric_intervals"].items():
+            if not isinstance(interval, int):
+                raise ValueError(f"{self._cfg['hostname']}.metric_intervals['{metric}']={interval} must be an integer")
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         file.copy_template(self.name, "grafana.ini", output_dir)
@@ -92,7 +105,14 @@ class Metrics(Role):
                 _logger.warning(f"no matching ip address found to '{host_cfg['hostname']}';"
                                 " no metrics will be collected")
 
-        prometheus = file.load_yaml("templates/metrics/prometheus.yml")
+        # base prometheus config; scrape configs will be added for each metric collector
+        prometheus = {
+            "global": {"scrape_interval": self._cfg["metric_intervals"]["default"]},
+            "scrape_configs": [
+                # Prometheus itself
+                {"job_name": "prometheus", "static_configs": [{"targets": ["localhost:9090"]}]}
+            ]
+        }
 
         # for each metric type, add a scrape_config with all the hosts that have that exporter enabled
         for metric_type, ports in metrics.get_types_and_ports().items():
@@ -101,6 +121,10 @@ class Metrics(Role):
             exporter = {"job_name": metric_type,
                         "static_configs": [{"targets": targets}],
                         "relabel_configs": relabel_configs}
+
+            interval = self._cfg["metric_intervals"].get(metric_type)
+            if interval:
+                exporter["scrape_interval"] = interval
 
             for hostname, ip in hosts_to_ips.items():
                 if not self._cfg["hosts"][hostname]["metrics"][metric_type]["enabled"]:
