@@ -96,7 +96,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     _load_roles(host_cfg)
 
     # order matters here
-    # add all interfaces & validate, then validate
+    # add all interfaces then validate the configuration
     for role in host_cfg["roles"]:
         role.configure_interfaces()
 
@@ -105,13 +105,14 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
             aliases.make_unique(host_cfg, role)
 
     interfaces.validate(host_cfg)
+
+    # validate other configs
     interfaces.validate_renaming(host_cfg)
     disks.validate(host_cfg)
     metrics.validate(host_cfg)
     aliases.validate(host_cfg)
 
     needs_site_build = False
-    # aliases are validated against other hosts, interface vlan DHCP reservations and firewall static hosts
 
     for role in host_cfg["roles"]:
         needs_site_build |= role.needs_build_image()

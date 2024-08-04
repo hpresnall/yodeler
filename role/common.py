@@ -80,7 +80,8 @@ class Common(Role):
             # packages will be installed as part of image creation
 
             if self._cfg["needs_site_build"]:
-                # vms run before chroot; insert to ensure before any other roles run builds, assume common runs first
+                # vms need site build setup before chroot
+                # insert to ensure before any other roles run builds, assume common runs first
                 # source so SITE_BUILD_MOUNT is exposed to the rest of setup
                 self._cfg["before_chroot"].insert(0, "# create & mount the site build image\n"
                                                   "source $SITE_DIR/site_build/setup_site_build.sh\n")

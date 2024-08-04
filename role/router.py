@@ -244,6 +244,9 @@ class Router(Role):
         if dhrelay6_ifaces:  # at least one interface needs dhcp6
             sysctl.enable_ipv6_forwarding(setup, output_dir)
 
+        # add sysctl params for performance
+        setup.append("echo \"net.ipv6.route.max_size = 16384\" >> /etc/sysctl.conf")
+
 
 def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
     if ipv6_pd_network is not None:

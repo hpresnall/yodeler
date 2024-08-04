@@ -133,7 +133,7 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
 
     if total_vms > 0:
         _logger.info("loaded %d hosts for site '%s'", len(site_cfg["hosts"]), site_cfg["site_name"])
-        _logger.info("total VM resources used: %d vcpus, %d GB memory & %d GB disk",
+        _logger.info("total VM resources used: %d vCPUs, %d GB memory & %d GB disk",
                      total_vcpus, round(total_mem / 1024), round(total_disk / 1024))
 
 

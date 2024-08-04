@@ -51,18 +51,14 @@ def _configure_libvirt(cfg: dict, setup: shell.ShellScript):
 def _configure_ipmi(cfg: dict, setup: shell.ShellScript, output_dir: str):
     if cfg["metrics"]["ipmi"]["enabled"]:
         if cfg["is_vm"]:
-            raise ValueError(f"vm {cfg['hostname']} cannot enable ipmi metrics")
+            raise ValueError(f"{cfg['hostname']}: cannot enable IPMI metrics on VMs")
 
         file.copy_template("metrics/ipmi", "ipmi-exporter_initd", output_dir)
 
         build = file.read_template("metrics/ipmi", "build.sh")
-        if (cfg["is_vm"]):
-            cfg["before_chroot"].append(build)
-        else:
-            setup.append(build)
-
+        setup.append(build)
         setup.append("install -o root -g root -m 755 $DIR/ipmi-exporter_initd /etc/init.d/ipmi-exporter")
-        setup.append("install -o root -g root -m 755 /tmp/ipmi-exporter /usr/bin")
+        setup.append("install -o root -g root -m 755 $SETUP_TMP/ipmi-exporter /usr/bin")
         setup.service("ipmi-exporter")
         setup.blank()
 
