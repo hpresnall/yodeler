@@ -197,24 +197,32 @@ def _validate_full_site(site_cfg: dict):
     for host_cfg in site_cfg["hosts"].values():
         hostname = host_cfg["hostname"]
 
+        _logger.debug("validating aliases for host '%s'; %s", hostname, host_cfg["aliases"])
+
         if hostname in aliases:
             raise KeyError(f"hostname '{hostname}' cannot be the same as another host's alias")
 
         aliases.add(hostname)
-        aliases.update(host_cfg["aliases"])  # this includes role names for the host
 
-        # validate here to avoid an additional all hosts loop
+        # includes role names for the host which should be unique; see aliases.make_unique()
+        for alias in host_cfg["aliases"]:
+            if alias in aliases:
+                raise KeyError(f"hostname '{hostname}' cannot reuse alias '{alias}'")
+
+            aliases.add(alias)
+
+        # validate here to avoid an additional all hosts loop ...
         for role in host_cfg["roles"]:
             role.validate()
 
-        # set the host's VM host
+        # and set the host's VM host
         if host_cfg["is_vm"]:
             # TODO allow setting vmhost in config; will need to validate it
             host_cfg["vmhost"] = host_cfg["roles_to_hostnames"]["vmhost"][0]
 
     _logger.debug("all_aliases=%s", aliases)
 
-    # finally, confirm that all the firewall rules point to valid hostnames
+    # finally, confirm that all the firewall rules point to valid hostnames / aliases
     firewall.validate_rule_hostnames(site_cfg)
 
 

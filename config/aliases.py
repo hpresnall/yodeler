@@ -19,7 +19,7 @@ def configure(cfg: dict):
             raise ValueError(f"invalid alias '{alias}' for host '{hostname}'")
         cfg["aliases"].add(alias.lower())
 
-    # ensure hostname is not duplicated by a role's alias
+    # ensure hostname is not duplicated by an alias
     cfg["aliases"].discard(cfg["hostname"])
 
 
@@ -34,6 +34,11 @@ def make_unique(cfg: dict, role: roles.Role):
 
 
 def _make_unique(cfg: dict, role: str, alias: str):
+    # allow hostname to be the same, but do not add as an alias
+    # site-level validation will ensure uniqueness of all hosts / aliases
+    if cfg["hostname"] == alias:
+        return
+
     # add to this host's config; may be replaced below
     cfg["aliases"].add(alias)
 

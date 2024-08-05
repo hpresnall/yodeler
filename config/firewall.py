@@ -416,6 +416,8 @@ def validate_rule_hostnames(cfg: dict):
 
 
 def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str, src_or_dest: str):
+    # allow 'hostname' in firewall rules to be an alias, static hostname mapping or DHCP reservations
+    # determine the real value and map the rule to an actual hostname
     locations_to_remove = []
 
     # rule deleted by previous call
@@ -448,7 +450,7 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
         if host:
             _validate_host_vlan(cfg, hostname, vlan, loc_name)
             continue
-        # else not an aliases, check static_hosts
+        # else not an alias, check static_hosts
 
         if hostname in cfg["firewall"]["static_hosts"]:
             address = cfg["firewall"]["static_hosts"][hostname][ip_version + "_address"]

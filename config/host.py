@@ -91,7 +91,6 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     site_cfg["hosts"][hostname] = host_cfg
 
     _set_defaults(host_cfg)
-    aliases.configure(host_cfg)
 
     _load_roles(host_cfg)
 
@@ -238,6 +237,8 @@ iface eth0 inet dhcp""")
 
     # also called in site.py; this call ensures overridden values from the host are also valid
     validate_overridable_site_defaults(cfg)
+
+    aliases.configure(cfg)
 
 
 def _load_roles(cfg: dict):
@@ -530,7 +531,7 @@ DEFAULT_CONFIG = {
     "enable_watchdog": True,
     "watchdog_dev": "/dev/watchdog",
     # list of service names to disable in awall firewall config
-    "awall_disable": [], # list of service names to disable in awall firewall config
+    "awall_disable": [],  # list of service names to disable in awall firewall config
     # scripts to run before chrooting into the host's install image
     # unnested will run outside the _vm host's_ install image when running setup for afull site
     "before_chroot": [],
