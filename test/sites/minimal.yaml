@@ -21,3 +21,4 @@ interfaces:
     ipv6_address: 2001:db8:0:1::1
     vswitch: public
     vlan: 10
+profile: {}

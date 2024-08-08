@@ -44,12 +44,19 @@ def load(site_dir: str | None, profile_name: str | None = None) -> dict:
     if profile_name:
         parse.non_empty_string("name", {"name": profile_name}, "profile")
         profile_yaml = file.load_yaml(os.path.join(site_dir, f"profile_{profile_name}.yaml"))
+
         _logger.info("using profile '%s' to configure site '%s'", profile_name, site_yaml["site_name"])
+
         site_yaml["profile"] = profile_yaml
         site_yaml["profile"]["name"] = profile_name
+
+        profile_yaml.pop("site_name", None)  # do not allow overwriting the site name
         site_yaml["site_name"] += "-" + profile_name
+
+        # profiles are not meant to upate network topology; changing the domain would invalidate vlan domains
+        profile_yaml.pop("domain", None)
     else:
-        site_yaml.pop("profile", None)
+        site_yaml["profile"] = {}
 
     site_cfg = validate(site_yaml)
 

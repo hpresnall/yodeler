@@ -194,6 +194,11 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
 
 def validate_overridable_site_defaults(site_cfg: dict):
+    # overlay the profile values into the site config, if any
+    for key in DEFAULT_SITE_CONFIG.keys():
+        if key in site_cfg["profile"]:
+            site_cfg[key] = site_cfg["profile"][key]
+
     # ensure overridden default values are the correct type and arrays only contain strings
     parse.configure_defaults("site_yaml", DEFAULT_SITE_CONFIG, _DEFAULT_SITE_CONFIG_TYPES, site_cfg)
 
@@ -203,6 +208,10 @@ def validate_overridable_site_defaults(site_cfg: dict):
 
 def _set_defaults(cfg: dict):
     for i, key in enumerate(_REQUIRED_PROPERTIES):
+        # overlay the profile values into the site config, if any
+        if key in cfg["profile"]:
+            cfg[key] = cfg["profile"][key]
+
         if key not in cfg:
             raise KeyError(f"{key} not defined in '{cfg['hostname']}'")
 
@@ -211,6 +220,11 @@ def _set_defaults(cfg: dict):
 
         if not isinstance(value, kind):
             raise KeyError(f"{key} value '{value}' in '{cfg['hostname']}' is {type(value)} not {kind}")
+
+    # overlay the profile values into the site config, if any
+    for key in DEFAULT_CONFIG.keys():
+        if key in cfg["profile"]:
+            cfg[key] = cfg["profile"][key]
 
     parse.configure_defaults(cfg["hostname"], DEFAULT_CONFIG, _DEFAULT_CONFIG_TYPES, cfg)
 
@@ -232,7 +246,7 @@ def _set_defaults(cfg: dict):
     else:
         cfg["vmhost"] = None
 
-        # physical installs need a interface configure to download APKs and a disk to install the OS
+        # physical installs need an interface configure to download APKs and a disk to install the OS
         cfg.setdefault("install_interfaces", """auto lo
 iface lo inet loopback
 auto eth0
