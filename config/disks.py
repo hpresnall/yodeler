@@ -121,7 +121,7 @@ def validate(cfg: dict):
         if cfg["is_vm"]:
             # this image file will be created and formatted in yodel.sh by alpine-make-vm-image
             disk = {"name": "system", "type": "img", "size_mb": cfg["disk_size_mb"],
-                    "path": f"{cfg['vm_images_path']}/{cfg['hostname']}.img"}
+                    "path": f"{cfg['vm_images_path']}/{cfg['hostname']}.img", "partition": ""}
         else:
             disk = {"name": "system", "type": "device",
                     "path": "/dev/sda", "partition": "3"}

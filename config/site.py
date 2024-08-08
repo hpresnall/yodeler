@@ -215,10 +215,25 @@ def _validate_full_site(site_cfg: dict):
         for role in host_cfg["roles"]:
             role.validate()
 
-        # and set the host's VM host
+        # and validate the VM host
         if host_cfg["is_vm"]:
-            # TODO allow setting vmhost in config; will need to validate it
-            host_cfg["vmhost"] = host_cfg["roles_to_hostnames"]["vmhost"][0]
+            vmhosts = site_cfg["roles_to_hostnames"]["vmhost"]
+            to_match = host_cfg["vmhost"]
+
+            if not to_match:
+                # not set, default to first vm host
+                host_cfg["vmhost"] = host_cfg["roles_to_hostnames"]["vmhost"][0]
+            elif to_match not in vmhosts:
+                # not a hostname, check aliases
+                found = False
+                for vmhost in vmhosts:
+                    if to_match in site_cfg["hosts"][vmhost]["aliases"]:
+                        host_cfg["vmhost"] = vmhost  # set to real hostname
+                        found = True
+                        break
+                if not found:
+                    raise ValueError(f"'{hostname}' vmhost value '{to_match}' does not match a known VM host or alias")
+            # else vmhost is a known hostname
 
     _logger.debug("all_aliases=%s", aliases)
 

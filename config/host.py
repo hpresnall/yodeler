@@ -204,7 +204,7 @@ def validate_overridable_site_defaults(site_cfg: dict):
 def _set_defaults(cfg: dict):
     for i, key in enumerate(_REQUIRED_PROPERTIES):
         if key not in cfg:
-            raise KeyError(f"{key} not defined")
+            raise KeyError(f"{key} not defined in '{cfg['hostname']}'")
 
         value = cfg[key]
         kind = _REQUIRED_PROPERTIES_TYPES[i]
@@ -220,7 +220,18 @@ def _set_defaults(cfg: dict):
     if not cfg["install_private_ssh_key"]:
         cfg["private_ssh_key"] = ""
 
-    if not cfg["is_vm"]:
+    if cfg["is_vm"]:
+        vmhost = cfg.get("vmhost")
+
+        # ensure non-empty string, but allow None
+        # will validate that vmhost is valid in site.py after all hosts are loaded
+        if isinstance(vmhost, str) and not vmhost:
+            raise ValueError(f"'{cfg['hostname']}' vmhost value cannot be an empty string")
+
+        cfg["vmhost"] = vmhost
+    else:
+        cfg["vmhost"] = None
+
         # physical installs need a interface configure to download APKs and a disk to install the OS
         cfg.setdefault("install_interfaces", """auto lo
 iface lo inet loopback
@@ -367,7 +378,7 @@ def _bootstrap_physical(cfg: dict, output_dir: str):
             cfg["system_partition"] = disk["partition"]
 
             # for the actual Alpine install, use the real path of the disk
-            # assume answerfile is sourced by installer and the shell will interperet the value
+            # assume answerfile is sourced by installer and the shell will interpret the value
             cfg["system_dev_real"] = script.disks.get_real_path(disk)
             break
 

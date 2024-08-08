@@ -93,46 +93,51 @@ class VmHost(Role):
         # also track SRIOV virtual function counts by interface name
         vf_counts = {}
 
-        for host in self._cfg["hosts"].values():
-            if "uplink" in host:
-                if "macvtap" in host["uplink"]:
-                    uplink = host["uplink"]["macvtap"]
+        hostname = self._cfg["hostname"]
+
+        for vm in self._cfg["hosts"].values():
+            if not vm["is_vm"] and (vm["vmhost"] != hostname):
+                continue
+
+            location = f"in host '{vm['hostname']}'"
+
+            if "uplink" in vm:
+                if "macvtap" in vm["uplink"]:
+                    uplink = vm["uplink"]["macvtap"]
 
                     if uplink in uplinks:
-                        raise ValueError(f"cannot reuse interface {uplink} for uplink in host {host['hostname']}")
+                        raise ValueError(f"cannot reuse interface '{uplink}' for uplink {location}")
 
                     uplinks.add(uplink)
-                elif "passthrough" in host["uplink"]:
-                    address = host["uplink"]["passthrough"]["pci_address"]
-                    uplink = host["uplink"]["passthrough"]["name"]
+                elif "passthrough" in vm["uplink"]:
+                    address = vm["uplink"]["passthrough"]["pci_address"]
+                    uplink = vm["uplink"]["passthrough"]["name"]
 
                     if address in addresses:
-                        raise ValueError(f"cannot reuse PCI address {address} for uplink in host {host['hostname']}")
+                        raise ValueError(f"cannot reuse PCI address '{address}' for uplink {location}")
                     if uplink in uplinks:
-                        raise ValueError(f"cannot reuse interface {uplink} for uplink in host {host['hostname']}")
+                        raise ValueError(f"cannot reuse interface '{uplink}' for uplink {location}")
 
                     addresses.add(address)
                     uplinks.add(uplink)
+
                     if uplink in vf_counts:
                         vf_counts[uplink] += 1
                     else:
                         vf_counts[uplink] = 1
 
-            for disk in host["disks"]:
-                if not host["is_vm"]:
-                    continue
-
-                path = disk["host_path"]
+            for disk in vm["disks"]:
+                path = disk["host_path"] + disk["partition"]
 
                 if path in disks:
-                    raise ValueError(f"cannot reuse disk {path} in host {host['hostname']}")
+                    raise ValueError(f"cannot reuse disk '{path}' {location}")
 
                 disks.add(path)
 
                 if disk["type"] == "passthrough":
                     address = disk["pci_address"]
                     if address in addresses:
-                        raise ValueError(f"cannot reuse PCI address {address} for disk in host {host['hostname']}")
+                        raise ValueError(f"cannot reuse PCI address '{address}' for disk {location}")
 
                     addresses.add(address)
 
@@ -210,7 +215,6 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
         setup.append("rootinstall $DIR/logrotate-openvswitch /etc/logrotate.d/openvswitch")
         setup.blank()
 
-        # call yodel.sh for each VM
         setup.comment("run yodel.sh for each VM for this site")
         setup.append("cd $SITE_DIR")
         setup.comment("let VM's yodel.sh know that it is running inside another yodel")
@@ -221,25 +225,29 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
         disk_image_paths = set()
         last_size = 0
 
-        for _, host in self._cfg["hosts"].items():
-            hostname = host["hostname"]
+        for _, vm in self._cfg["hosts"].items():
+            hostname = vm["hostname"]
 
-            if not host["is_vm"] or hostname == self._cfg["hostname"]:
+            if not vm["is_vm"] or hostname == self._cfg["hostname"]:
                 continue
 
-            # create all non-system disk images before chroot
+            if vm["vmhost"] != self._cfg["hostname"]:
+                continue  # another VM host will handle this VM
+
+            # run yodel.sh for each VM
             setup.append(hostname + "/yodel.sh")
             setup.log("")
 
+            # create all non-system disk images before chroot
             new_disk_image_paths = set()
 
-            for disk in host["disks"]:
+            for disk in vm["disks"]:
                 if (disk["name"] != "system") and (disk["type"] == "img"):
                     path = os.path.dirname(disk["host_path"])
 
                     if path not in disk_image_paths:
                         disk_image_paths.add(path)
-                        # only setup paths once, even if shared by more than one host
+                        # only setup paths once, even if shared by more than one VM
                         new_disk_image_paths.add(path)
 
             # only output once
@@ -265,21 +273,22 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
                 self._cfg["after_chroot"].append("rm -rf " + path)
                 self._cfg["after_chroot"].append("")
 
-            # unnest the VM's chroot scripts
-            if host["unnested_before_chroot"]:
+            # unnest the VM's chroot scripts, removing unneeded, trailing newlines
+            if vm["unnested_before_chroot"]:
                 self._cfg["before_chroot"].append(f"# before chroot from {hostname}")
-                self._cfg["before_chroot"].extend(host["unnested_before_chroot"])
+                self._cfg["before_chroot"].extend(vm["unnested_before_chroot"])
                 if not self._cfg["before_chroot"][-1]:
                     self._cfg["before_chroot"] = self._cfg["before_chroot"][:-1]
                 self._cfg["before_chroot"].append(f"# end before chroot from {hostname}")
                 self._cfg["before_chroot"].append("")
-            if host["unnested_after_chroot"]:
+            if vm["unnested_after_chroot"]:
                 self._cfg["after_chroot"].append(f"# after chroot from {hostname}")
-                self._cfg["after_chroot"].extend(host["unnested_after_chroot"])
+                self._cfg["after_chroot"].extend(vm["unnested_after_chroot"])
                 if not self._cfg["after_chroot"][-1]:
                     self._cfg["after_chroot"] = self._cfg["after_chroot"][:-1]
                 self._cfg["after_chroot"].append(f"# end after chroot from {hostname}")
                 self._cfg["after_chroot"].append("")
+        # for each VM
 
         setup.blank()
         setup.comment("add uplinks _after_ setting up everything else, since uplinks can interfere with existing connectivity")

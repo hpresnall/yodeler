@@ -1,5 +1,11 @@
+VMHOST=$VMHOST
 HOST_BACKUP=$HOST_BACKUP
 AUTOSTART=$AUTOSTART
+
+if [ "$$VMHOST" != "$$(hostname)" ]; then
+  log "Can only setup VM '$HOSTNAME' on VM host '$$VMHOST'"
+  exit 1
+fi
 
 log "Setting up environment to build VM '$HOSTNAME'"
 
