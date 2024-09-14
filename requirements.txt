@@ -1,2 +1,8 @@
 pyyaml
 coverage
+
+# pipx install coverage
+# pipx inject coverage pyyaml
+# coverage run --source=. -m unittest discover && coverage html
+# ~/.local/pipx/venvs/coverage/bin/python3 yodeler.py sites/standard /tmp
+# or source ~/.local/pipx/venvs/coverage/bin/activate;python3 yodeler.py sites/standard /tmp;deactivate
