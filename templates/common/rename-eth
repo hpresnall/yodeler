@@ -1,5 +1,5 @@
 #!/sbin/openrc-run
-# system service that renames network interfaces based on their MAC address
+# system service that renames network interfaces based on their MAC addresses
 # meant for physical systems with multiple network cards that, depending on
 # boot init order, are named differently each time
 

@@ -18,7 +18,7 @@ domain = xml.parse(domain_xml).getroot()
 
 # remove boot element from top-level os
 os = domain.find("os")
-if os:
+if os is not None:
     boot = os.find("boot")
 
     if boot is not None:

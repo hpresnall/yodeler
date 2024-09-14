@@ -74,4 +74,4 @@ def add_packages(cfg: dict):
     if cfg["metrics"]["nvme"]["enabled"]:
         cfg["packages"].add("nvme-cli")
     if cfg["metrics"]["onewire"]["enabled"]:
-        cfg["packages"].add("owfw")
+        cfg["packages"].add("owfs")
