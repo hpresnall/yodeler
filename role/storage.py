@@ -212,6 +212,10 @@ class Storage(Role):
 
         setup.comment("configure storage permissions on first boot")
         setup.append("install -o root -g root -m 750 storage_perms.start /etc/local.d")
+        setup.blank()
+
+        setup.comment("do not run netbios")
+        setup.append("echo \'daemon_list=\"smbd\"' >> /etc/conf.d/samba")
 
         local.comment("only run once")
         local.append("mv /etc/local.d/storage_perms.start /etc/local.d/storage_perms.done")
