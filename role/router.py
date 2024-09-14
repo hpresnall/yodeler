@@ -136,7 +136,7 @@ class Router(Role):
         libvirt_interfaces = []
 
         if self._cfg["is_vm"]:
-            # uplink can be an existing vswitch or a physical iface on the host via macvtap
+            # create libvirt uplink interface
             if "macvtap" in uplink:
                 uplink_xml = libvirt.macvtap_interface(uplink)
             elif "passthrough" in uplink:

@@ -24,7 +24,7 @@ def write_vm_xml(cfg: dict, output_dir: str) -> None:
         elif disk["type"] == "device":
             devices.append(_disk_device(disk["host_path"], disk["path"]))
         elif disk["type"] == "passthrough":
-            devices.append(_disk_passthrough(disk["bus"], disk["slot"], disk["function"]))
+            devices.append(_disk_passthrough(disk))
         else:
             raise ValueError(f"unknown disk type '{disk['type']} in {cfg['hostname']}")
 
@@ -77,7 +77,7 @@ def _disk_device(host_dev: str, virtual_dev: str) -> xml.Element:
     return disk
 
 
-def _disk_passthrough(bus: int, slot: int, function: int) -> xml.Element:
+def _disk_passthrough(disk_cfg: dict) -> xml.Element:
     """Create a <disk> XML element for the given host path in /dev.
     <hostdev mode='subsystem' type='pci' managed='yes'>
       <source>
@@ -86,12 +86,13 @@ def _disk_passthrough(bus: int, slot: int, function: int) -> xml.Element:
     </hostdev>
     """
     disk = xml.Element("hostdev", {"mode": "subsystem", "type": "pci", "managed": "yes"})
+    disk.insert(0, xml.Comment(f"PCI passthrough of {disk_cfg['host_path']} for {disk_cfg['name']}"))
     source = xml.SubElement(disk, "source")
     xml.SubElement(source, "address", {
         "domain": "0x0000",  # domain is always 0
-        "bus": f"{bus:#0{4}x}",  # padding count includes '0x'
-        "slot": f"{slot:#0{4}x}",
-        "function": f"{function:#0{3}x}"
+        "bus": f"{disk_cfg['bus']:#0{4}x}",  # padding count includes '0x'
+        "slot": f"{disk_cfg['slot']:#0{4}x}",
+        "function": f"{disk_cfg['function']:#0{3}x}"
     })
 
     return disk
@@ -149,6 +150,7 @@ def passthrough_interface(passthrough: dict, mac_address: str) -> xml.Element:
     </interface>
     """
     interface = xml.Element("interface", {"type": "hostdev", "managed": "yes"})
+    interface.insert(0, xml.Comment(f"PCI passthrough of {passthrough['name']}"))
     source = xml.SubElement(interface, "source")
     xml.SubElement(source, "address",
                    {"type": "pci",
