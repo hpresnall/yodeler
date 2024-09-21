@@ -50,7 +50,6 @@ vswitches:
         # firewall will allow any access to all vlans, including the internet
         # can also set allow_internet: true to only allow some vlans + the internet
         access_vlans: all
-        allow_access_stopped_firewall: true # allow internet access when firewall is stopped
         allow_dns_update: true # allow this subnet to make DDNS updates
       - name: client
         id: 20

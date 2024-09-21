@@ -443,7 +443,7 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
         for h in cfg["hosts"].values():
             if hostname in h["aliases"]:
                 host = True
-                hostname = location["hostname"] = h["hostname"]
+                hostname = location["hostname"] = h["hostname"]  # update alias to actual hostname
                 _logger.debug("%s found '%s' as a top-level host alias for '%s'", loc_name, hostname, h["hostname"])
                 break
 
@@ -464,7 +464,7 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
                 _logger.debug("%s found '%s' as a firewall static_host without an %s address; removing rule",
                               loc_name, hostname, ip_version)
             continue
-        # else not a static host, check dhcp rerservations
+        # else not a static host, check dhcp reservations
 
         for reservation in vlan["dhcp_reservations"]:
             if (hostname == reservation["hostname"]):

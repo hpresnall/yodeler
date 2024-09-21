@@ -305,8 +305,6 @@ DEFAULT_VLAN_CONFIG = {
     "ipv6_disabled": False,
     "dhcp4_enabled": True,  # DHCP server will be configured
     "allow_internet": False,  # firewall will restrict outbound internet access
-    # do not allow internet access when firewall is stopped
-    "allow_access_stopped_firewall": False,
     "allow_dns_update": False,  # do not allow this subnet to make DDNS updates
     "dhcp_min_address_ipv4": 16,
     "dhcp_max_address_ipv4": 252,
@@ -325,7 +323,6 @@ _DEFAULT_VLAN_CONFIG_TYPES = {
     "ipv6_disabled": bool,
     "dhcp4_enabled": bool,
     "allow_internet": bool,
-    "allow_access_stopped_firewall": bool,
     "allow_dns_update": bool,
     "dhcp_min_address_ipv4": int,
     "dhcp_max_address_ipv4": int,

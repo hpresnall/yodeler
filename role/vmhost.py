@@ -184,7 +184,7 @@ fi
 sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
 """)
 
-        # libvirt hook scripts for network
+        # libvirt hook scripts for networks (i.e. vswitches) and vms
         file.copy_template(self.name, "network_hook", output_dir)
         file.copy_template(self.name, "qemu_hook", output_dir)
 
