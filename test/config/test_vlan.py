@@ -131,22 +131,6 @@ class TestVlan(base.TestCfgBase):
         del self._host_yaml["interfaces"][0]["vlan"]
         self.build_error()
 
-    def test_unknown_access_vlans(self):
-        self._site_yaml["vswitches"][0]["vlans"][0]["access_vlans"] = [20]
-        self.build_error()
-
-    def test_non_array_access_vlans(self):
-        self._site_yaml["vswitches"][0]["vlans"][0]["access_vlans"] = 10
-        self.build_error()
-
-    def test_str_access_vlans(self):
-        self._site_yaml["vswitches"][0]["vlans"][0]["access_vlans"] = "10"
-        self.build_error()
-
-    def test_all_access_vlans(self):
-        self._site_yaml["vswitches"][0]["vlans"][0]["access_vlans"] = "all"
-        self.build_cfg()
-
     def test_invalid_domain_vlan(self):
         # vlan domain not in top-level domain
         self._site_yaml["domain"] = "yodeler.internal"
@@ -302,7 +286,7 @@ class TestVlan(base.TestCfgBase):
 
     def test_vlan_dhcpres_nonlist_aliases(self):
         self._site_yaml["vswitches"][0]["vlans"][0]["dhcp_reservations"] = [
-            {"hostname": "pub-test", "ipv4_address": "192.168.1.5", "mac_address": "00:11:22:33:44:55", "aliases": "single_string"}]
+            {"hostname": "pub-test", "ipv4_address": "192.168.1.5", "mac_address": "00:11:22:33:44:55", "aliases": "single-string"}]
         self.build_cfg()
 
     def test_vlan_dhcpres_nonstring_alias(self):

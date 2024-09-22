@@ -107,9 +107,11 @@ def _parse_rules(cfg: dict, firewall: dict) -> list[dict]:
 
         actions = []
 
-        if "allow" in rule:
+        if ("allow-all" in rule) and rule["allow-all"]:  # allow-all: true supercedes other rules
+            actions.append({"action": "allow-all", "type": "allow-all"})
+        elif "allow" in rule:
             actions.extend(_parse_action("allow", rule.get("allow"), location))
-        if "forward" in rule:
+        elif "forward" in rule:
             actions.extend(_parse_action("forward", rule.get("forward"), location))
 
         if not actions:

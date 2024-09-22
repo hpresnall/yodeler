@@ -47,9 +47,6 @@ vswitches:
         # assumes 'ipv6_pd_prefixlen' of 56 defined in the router uplink
         ipv6_pd_network: 10
         dhcp4_enabled: false # DHCP server will not be configured
-        # firewall will allow any access to all vlans, including the internet
-        # can also set allow_internet: true to only allow some vlans + the internet
-        access_vlans: all
         allow_dns_update: true # allow this subnet to make DDNS updates
       - name: client
         id: 20
@@ -61,9 +58,6 @@ vswitches:
         dhcp_min_address_ipv4: 16
         dhcp_max_address_ipv4: 128
         # dhcp6_managed defaults to false so DHCP6 will be information only
-        # allow unrescricted access to the internet, supercedes later firewall rules
-        # allow_internet: true
-        allow_internet: true
         dhcp_reservations:
           - hostname: laptop
             ipv4_address: 192.168.220.24
@@ -96,11 +90,19 @@ firewall:
   #   - name: other
   #     addresses: [10.10.10.0/24, 10.20.0.0/16]
   rules:
-    - comment: all vlans have basic internet access
+    - comment: servers have access to EVERYTHING, including the internet
+      source:
+        vswitch: public
+        vlan: server
+      destination:
+        vlan: all # source vlan name; 'all' for all routable networks; 'internet' for outbound
+      allow-all: true
+    - comment: clients have basic internet access
       # source and destination can also be plural and a list of locations
       # multiple values will be multiplexed into a rule for each source / destination combo
       source:
-        vlan: all # source vlan name; 'all' for all routable networks; 'internet' for outbound
+        vswitch: public
+        vlan: client
       destination:
         vlan: internet
       allow:
@@ -115,7 +117,6 @@ firewall:
         - { proto: tcp, ports: "8000:8999", comment: faux HTTP ports }
         - { proto: tcp, ports: 5228, comment: Android and Chrome sync }
        # 'allow' can also be 'forward' to route the traffic to a single destination host or IP
-    # server vlan  has access_vlans=all so no rules needed
     - comment: clients can SSH to servers
       source: 
         # vswitch required when vlan is not 'all' or 'internet'
@@ -130,4 +131,3 @@ firewall:
         vlan: server
       allow:
         - ssh
-      # client has allow_internet=true so no extra rules needed

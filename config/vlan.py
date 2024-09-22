@@ -62,11 +62,6 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
 
         parse.configure_defaults(cfg_name, DEFAULT_VLAN_CONFIG, _DEFAULT_VLAN_CONFIG_TYPES, vlan)
 
-        # optional list of other vlans this vlan can access _without_ firewall restrictions
-        # allows special value 'all' to indicate access to every vlan on the vswitch
-        vlan["access_vlans"] = parse.read_string_list_plurals({"access_vlan", "access_vlans"}, vlan, cfg_name)
-        vlan.pop("access_vlan", None)
-
         vlan["known_aliases"] = set()  # track for easier ducplicate checking of hosts/aliases
 
         _validate_subnet(vswitch_name, vlan, "ipv4")
@@ -88,7 +83,6 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
     _logger.debug("vlan '%s' known_aliases=%s", vlan["name"], vlan["known_aliases"])
 
     _configure_default_vlan(vswitch)
-    _validate_access_vlans(vswitch)
 
 
 def _validate_subnet(vswitch_name: str, vlan: dict, ip_version: str):
@@ -144,15 +138,17 @@ def _validate_dhcp_reservations(vswitch_name: str, vlan: dict):
     if not isinstance(reservations, list):
         raise KeyError(f"dhcp_reservations in {location} must be an array")
 
-    known_aliases = vlan["known_aliases"]
-    role_names = roles.names()
-
     for i, res in enumerate(reservations, start=1):
         location = f"{location}.dhcp_reservations[{i}]"
         parse.non_empty_dict(location, res)
 
         # hostname & mac address required; ip addresses are not
         _validate_hostname(vlan, res, location)
+
+        if "mac_address" in res:
+            parse.validate_mac_address(res["mac_address"], location)
+        else:
+            raise ValueError(f"no mac_address defined for {location}")
 
         # no ip addresses specified => reservation of hostname only
         _validate_ipaddress("ipv4", vlan, res, location)
@@ -234,7 +230,7 @@ def _validate_hostname(vlan: dict, cfg: dict, location: str):
 
     if hostname in vlan["known_aliases"]:
         raise ValueError(f"duplicate hostname or alias '{hostname}' in {location}")
-    if dns.invalid_hostname(hostname):
+    elif dns.invalid_hostname(hostname):
         raise ValueError(f"invalid hostname '{hostname}' defined for {location}")
 
     vlan["known_aliases"].add(hostname)
@@ -257,10 +253,12 @@ def _validate_aliases(vlan: dict, cfg: dict, location: str):
 
         if alias == hostname:
             continue
-        if alias in vlan["known_aliases"]:
-            raise ValueError(f"duplicate hostname or alias '{hostname}' in {location}")
-        if alias in role_names:
+        elif alias in vlan["known_aliases"]:
+            raise ValueError(f"duplicate hostname or alias '{alias}' in {location}")
+        elif alias in role_names:
             raise ValueError(f"{location}' alias cannot be a role name")
+        elif dns.invalid_hostname(alias):
+            raise ValueError(f"invalid alias '{alias}' in '{location}'")
 
         vlan["known_aliases"].add(alias)
         cfg["aliases"].add(alias)
@@ -287,24 +285,6 @@ def _configure_default_vlan(vswitch: dict):
         vlan["default"] = True
     else:
         vswitch["default_vlan"] = None
-
-
-def _validate_access_vlans(vswitch: dict):
-    for vlan in vswitch["vlans"]:
-        access_vlans = []
-
-        for vlan_id in vlan["access_vlans"]:
-            if vlan_id == "all":  # if any value is all, only value is all
-                access_vlans = ["all"]
-                break
-            try:
-                # accept name or number; store name
-                access_vlan = lookup(vlan_id, vswitch)
-                access_vlans.append(access_vlan["name"])
-            except KeyError as ke:
-                raise ValueError(f"invalid access_vlan in vlan '{vlan['name']}'") from ke
-
-        vlan["access_vlans"] = access_vlans
 
 
 def lookup(vlan_id: str | int | None, vswitch: dict):
@@ -336,7 +316,6 @@ DEFAULT_VLAN_CONFIG = {
     "domain": "",
     "ipv6_disabled": False,
     "dhcp4_enabled": True,  # DHCP server will be configured
-    "allow_internet": False,  # firewall will restrict outbound internet access
     "allow_dns_update": False,  # do not allow this subnet to make DDNS updates
     "dhcp_min_address_ipv4": 16,
     "dhcp_max_address_ipv4": 252,
@@ -354,7 +333,6 @@ _DEFAULT_VLAN_CONFIG_TYPES = {
     "domain": str,
     "ipv6_disabled": bool,
     "dhcp4_enabled": bool,
-    "allow_internet": bool,
     "allow_dns_update": bool,
     "dhcp_min_address_ipv4": int,
     "dhcp_max_address_ipv4": int,

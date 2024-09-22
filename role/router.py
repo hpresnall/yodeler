@@ -355,24 +355,6 @@ def _configure_shorewall_vlan(shorewall, vswitch_name, vlan):
     # dhcpcd will assign addresses, no need for SLAAC
     shorewall["interfaces6"].append((f"{vlan_name}\t{shorewall_name}\ttcpflags,dhcp,rpfilter,accept_ra=0"))
 
-    all_access = False
-
-    for access in vlan["access_vlans"]:
-        if access == "all":
-            all_access = True
-            shorewall["policy"].append(f"# {vlan_name} vlan has full access to EVERYTHING")
-        else:
-            shorewall["policy"].append(f"# {vlan_name} vlan has full access to vlan {access}")
-        shorewall["policy"].append(f"{vlan_name}\t{access}\tACCEPT")
-        shorewall["policy"].append("")
-        # all should be the only item in the list from validation, so loop will end
-
-    #  all access => internet
-    if not all_access and vlan["allow_internet"]:
-        shorewall["policy"].append(f"# {vlan_name} vlan has full internet access")
-        shorewall["policy"].append(f"{vlan_name}\tinet\tACCEPT")
-        shorewall["policy"].append("")
-
     # allow all hosts to ping the firewall
     shorewall["rules"].append(f"Ping(ACCEPT)\t{vlan_name}\t$FW")
     shorewall["rules6"].append(f"Ping(ACCEPT)\t{vlan_name}\t$FW")
@@ -520,7 +502,7 @@ def _add_shorewall_host_config(cfg: dict, shorewall: dict, routable_vlans: list[
                 shorewall["params6"].append("\n# ip addresses from external_hosts")
                 comment6 = True
             for hostname in host["hostnames"]:
-                hostname =hostname.upper().replace(".", "_")
+                hostname = hostname.upper().replace(".", "_")
                 shorewall["params6"].append(
                     f"{hostname}_INET=inet:{host['ipv6_address']}")
 
@@ -540,11 +522,6 @@ def _find_valid_vlans_for_host(host: dict, routable_vlans: list[dict], shorewall
         for routable_vlan in routable_vlans:
             if routable_vlan["name"] == vlan_name:
                 continue  # no rule needed for same vlan
-
-            # no need for more specific rule if vlan can already access the host's entire vlan
-            access_vlans = routable_vlan["access_vlans"]
-            if (vlan_name in access_vlans) or ("all" in access_vlans):
-                continue
 
             ipv4 = ipv6 = False
 
@@ -603,7 +580,7 @@ def _parse_firewall_location(cfg: dict, location: dict, ip_version: int,  loc_na
     if "hostname" in location:
         # match value in Shorewall params
         if vlan == "inet":
-            return f"${location['hostname'].upper().replace(".","_")}_{vlan.upper()}"
+            return f"${location['hostname'].upper().replace(".", "_")}_{vlan.upper()}"
         else:
             return f"${location['hostname'].upper()}_{vlan.upper()}"
     elif "ipset" in location:
@@ -624,6 +601,7 @@ def _add_shorewall_rules(cfg: dict, shorewall: dict):
 def _add_shorewall_action(cfg: dict, rule: dict, rule_idx: int, ip_version: int, shorewall: dict):
     key = "ipv4" if ip_version == 4 else "ipv6"
     actions = []
+    allow_all_comment = True
 
     # rule may be for only one ip version
     if key not in rule:
@@ -642,14 +620,22 @@ def _add_shorewall_action(cfg: dict, rule: dict, rule_idx: int, ip_version: int,
 
             for action in rule["actions"]:
                 a = action["action"]
-                if a == "allow":
+                if (a == "allow") or (a == "allow-all"):
                     a = "ACCEPT"
                 elif a == "forward":
                     a = "DNAT"
                 else:
                     a = a.upper()
 
-                if action["type"] == "named":
+                if action["type"] == "allow-all":
+                    # append rule directly to policy file, commenting only once
+                    # policy for ipv6 is copied; avoid duplicate output
+                    if ip_version == 4:
+                        if allow_all_comment and rule["comment"]:
+                            shorewall["policy"].append("# " + rule["comment"])
+                            allow_all_comment = False
+                        shorewall["policy"].append(s + '\t' + d + '\t' + a + '\n')
+                elif action["type"] == "named":
                     if action["protocol"] in _allowed_macros:
                         a = _allowed_macros[action["protocol"]] + '(' + a + ')'
                     else:
@@ -714,10 +700,10 @@ def _write_shorewall_config(cfg: dict, shorewall: dict, setup: shell.ShellScript
         file.write("mangle", dns + dhcrelay6, shorewall6)
 
     template = """# drop everything coming in from the internet
-inet all DROP    NFLOG({0})
+inet\tall\tDROP\tNFLOG({0})
 
 # reject everything else
-all all REJECT  NFLOG({0})
+all\tall\tREJECT\tNFLOG({0})
 """
     shorewall["policy6"] = list(shorewall["policy"])
     shorewall["policy"].append(template.format(4))
