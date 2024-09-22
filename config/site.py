@@ -96,7 +96,7 @@ def validate(site_yaml: dict | str | None) -> dict:
     # order matters here; vswitch / vlans first since the firewall config needs that information
     vswitch.validate(site_cfg)
     firewall.validate(site_cfg)
-    _validate_additional_dns_entries(site_cfg)
+    _validate_external_hosts(site_cfg)
 
     # map hostname to host config
     site_cfg["hosts"] = {}
@@ -248,21 +248,22 @@ def _validate_full_site(site_cfg: dict):
     firewall.validate_rule_hostnames(site_cfg)
 
 
-def _validate_additional_dns_entries(cfg: dict):
-    if not "additional_dns_entries" in cfg:
-        cfg["additional_dns_entries"] = []
+def _validate_external_hosts(cfg: dict):
+    if not "external_hosts" in cfg:
+        cfg["external_hosts"] = []
         return
 
-    additional_dns = cfg["additional_dns_entries"]
-    location = "additional_dns_entries"
+    external = cfg["external_hosts"]
+    location = "external_hosts"
 
-    if not isinstance(additional_dns, list):
+    if not isinstance(external, list):
         raise ValueError(f"{location} must be a list")
 
-    for i, entry in enumerate(additional_dns, start=1):
+    for i, entry in enumerate(external, start=1):
         if not isinstance(entry, dict):
             raise ValueError(f"{location}[{i}] must be a dict")
 
+        # allow a list of hostnames to map to the same ip address
         entry["hostnames"] = parse.read_string_list_plurals({"hostname", "hostnames"}, entry, location)
         entry.pop("hostname", None)
 
@@ -282,6 +283,8 @@ def _validate_additional_dns_entries(cfg: dict):
                 entry["ipv6_address"] = ipaddress.ip_address(entry["ipv6_address"])
             except ValueError as ve:
                 raise ValueError(f"invalid ipv6_address for {location}[{i}]") from ve
+        else:
+            entry["ipv6_address"] = None
 
 
 def _setup_site_build_scripts(cfg: dict, output_dir: str):

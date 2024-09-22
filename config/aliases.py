@@ -11,7 +11,7 @@ def configure(cfg: dict):
     aliases = parse.read_string_list_plurals({"alias", "aliases"}, cfg, "alias for " + cfg["hostname"])
     cfg.pop("alias", None)
 
-    # final set of aliases is all defined values plus role names & role aliases
+    # final set of aliases is all defined values plus role names & role aliases as set in make_unique()
     cfg["aliases"] = set()
 
     for alias in aliases:
@@ -56,14 +56,11 @@ def _make_unique(cfg: dict, role: str, alias: str):
 
 
 def validate(cfg: dict):
-    """Check all aliases for duplicates against the firewall's 'static_hosts' and any DHCP reservations in connected
+    """Check all aliases for duplicates against any DHCP reservations or static hosts in connected
     vlan's. Does not check against all aliases in the site since all hosts may not have been defined."""
     hostname = cfg["hostname"]
 
     for alias in cfg["aliases"]:
-        if alias in cfg["firewall"]["static_hosts"]:
-            raise ValueError(f"alias '{alias}' for host '{hostname}' is already used in firewall.static_hosts")
-
         # ensure no clashes with other hosts
         for other_hostname, other_host in cfg["hosts"].items():
             if other_hostname == hostname:
@@ -73,7 +70,7 @@ def validate(cfg: dict):
                 raise ValueError(
                     f"alias '{alias}' for host '{hostname}' is already used as an alias for '{other_hostname}'")
 
-    # ensure no clashes with DHCP reservations
+    # ensure no clashes with DHCP reservations or static hostnames
     aliases = set(cfg["aliases"])
     aliases.add(cfg["hostname"])
 
@@ -86,4 +83,4 @@ def validate(cfg: dict):
 
         if not aliases.isdisjoint(vlan_aliases):
             raise ValueError(
-                f"vlan '{vlan}' contains DHCP reservations {aliases.intersection(vlan_aliases)} that conflict with a global hostname or alias")
+                f"vlan '{vlan}' contains DHCP reservations or static hosts {aliases.intersection(vlan_aliases)} that conflict with a global hostname or alias")

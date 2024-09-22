@@ -55,14 +55,14 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     site_cfg = parse.non_empty_dict("site_cfg", site_cfg)
     host_yaml = parse.non_empty_dict("host_yaml", host_yaml)
 
+    # basic hostname validation
+    # full validation happens after all hosts / aliases are parsed in site.py
     hostname = parse.non_empty_string("hostname", host_yaml, "host_yaml").lower()  # lowercase for consistency
 
     if dns.invalid_hostname(hostname):
         raise ValueError(f"invalid hostname '{hostname}'")
     if hostname in site_cfg["hosts"]:
         raise ValueError(f"duplicate hostname '{hostname}'")
-    if hostname in site_cfg["firewall"]["static_hosts"]:
-        raise ValueError(f"duplicate hostname '{hostname}' in firewall.static_hosts")
     if (hostname == "site") or (hostname == "profile") or (hostname == "site_build"):
         raise ValueError(f"invalid hostname '{hostname}'")
     host_yaml["hostname"] = hostname
@@ -73,7 +73,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     host_yaml.pop("domain", None)
     host_yaml.pop("external_ntp", None)
     host_yaml.pop("external_dns", None)
-    host_yaml.pop("additional_dns_entries", None)
+    host_yaml.pop("external_hosts", None)
     host_yaml.pop("site_enable_metrics", None)
     host_yaml.pop("profile", None)
 

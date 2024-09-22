@@ -67,10 +67,13 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
         vlan["access_vlans"] = parse.read_string_list_plurals({"access_vlan", "access_vlans"}, vlan, cfg_name)
         vlan.pop("access_vlan", None)
 
-        _validate_vlan_subnet(vswitch_name, vlan, "ipv4")
-        _validate_vlan_subnet(vswitch_name, vlan, "ipv6")
-        _validate_vlan_dhcp_reservations(vswitch_name, vlan)
-        _validate_vlan_ipv6_pd_network(vlan, ipv6_pd_networks, ipv6_pd_network_count)
+        vlan["known_aliases"] = set()  # track for easier ducplicate checking of hosts/aliases
+
+        _validate_subnet(vswitch_name, vlan, "ipv4")
+        _validate_subnet(vswitch_name, vlan, "ipv6")
+        _validate_dhcp_reservations(vswitch_name, vlan)
+        _validate_static_hosts(vswitch_name, vlan)
+        _validate_ipv6_pd_network(vlan, ipv6_pd_networks, ipv6_pd_network_count)
         ipv6_pd_network_count += 1
 
         # domain must be a subdomain of the top-level site
@@ -82,11 +85,13 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
         if not vlan["domain"] and (len(vlans) == 1):
             vlan["domain"] = domain
 
+    _logger.debug("vlan '%s' known_aliases=%s", vlan["name"], vlan["known_aliases"])
+
     _configure_default_vlan(vswitch)
     _validate_access_vlans(vswitch)
 
 
-def _validate_vlan_subnet(vswitch_name: str, vlan: dict, ip_version: str):
+def _validate_subnet(vswitch_name: str, vlan: dict, ip_version: str):
     # ipv4 subnet is required
     # ipv6 subnet is optional; this does not preclude addresses from a prefix assignment
     subnet = vlan.get(ip_version + "_subnet")
@@ -132,64 +137,51 @@ def _validate_vlan_subnet(vswitch_name: str, vlan: dict, ip_version: str):
         raise ValueError(f"{min_key} > {max_key} for vlan '{vlan_name}' for vswitch '{vswitch_name}'")
 
 
-def _validate_vlan_dhcp_reservations(vswitch_name: str, vlan: dict):
+def _validate_dhcp_reservations(vswitch_name: str, vlan: dict):
     reservations = vlan.setdefault("dhcp_reservations", [])
-    cfg_name = f"vswitch['{vswitch_name}'].vlan['{vlan['name']}']"
+    location = f"vswitch['{vswitch_name}'].vlan['{vlan['name']}']"
 
     if not isinstance(reservations, list):
-        raise KeyError(f"dhcp_reservations in {cfg_name} must be an array")
+        raise KeyError(f"dhcp_reservations in {location} must be an array")
 
-    known_aliases = set()
+    known_aliases = vlan["known_aliases"]
     role_names = roles.names()
 
     for i, res in enumerate(reservations, start=1):
-        location = f"{cfg_name}.dhcp_reservations[{i}]"
+        location = f"{location}.dhcp_reservations[{i}]"
         parse.non_empty_dict(location, res)
 
         # hostname & mac address required; ip addresses are not
-        hostname = parse.non_empty_string("hostname", res, location).lower()
+        _validate_hostname(vlan, res, location)
 
-        if hostname in known_aliases:
-            raise ValueError(f"duplicate hostname or alias '{hostname}' in {cfg_name}")
-        known_aliases.add(hostname)
+        # no ip addresses specified => reservation of hostname only
+        _validate_ipaddress("ipv4", vlan, res, location)
+        _validate_ipaddress("ipv6", vlan, res, location)
 
-        if dns.invalid_hostname(hostname):
-            raise ValueError(f"invalid hostname '{hostname}' defined for {location}")
-
-        # cannot check for duplicate cfg[hosts] / aliases here since hosts have not yet been defined
-        res["hostname"] = hostname
-
-        _validate_ipaddress("ipv4", i-1, vlan, location)
-        _validate_ipaddress("ipv6", i-1, vlan, location)
-
-        if "mac_address" in res:
-            parse.validate_mac_address(res["mac_address"], location)
-        else:
-            raise ValueError(f"no mac_address defined for {location}")
-
-        aliases = parse.read_string_list_plurals({"alias", "aliases"}, res, location)
-        res.pop("alias", None)
-
-        res["aliases"] = set()
-
-        for alias in aliases:
-            alias = alias.lower()
-            if alias == hostname:
-                continue
-            if alias in known_aliases:
-                raise ValueError(f"duplicate hostname or alias '{hostname}' in {cfg_name}")
-            known_aliases.add(alias)
-            res["aliases"].add(alias)
-
-    if not known_aliases.isdisjoint(role_names):
-        raise ValueError(
-            f"{cfg_name}' contains DHCP reservations that conflict with a role name; {known_aliases.intersection(role_names)}")
-
-    vlan["known_aliases"] = known_aliases  # track for easier ducplicate checking of hosts/aliases
-    _logger.debug("%s known_aliases=%s", cfg_name, known_aliases)
+        _validate_aliases(vlan, res, location)
 
 
-def _validate_vlan_ipv6_pd_network(vlan: dict, ipv6_pd_networks: set, ipv6_pd_network_count):
+def _validate_static_hosts(vswitch_name: str, vlan: dict):
+    hosts = vlan.setdefault("static_hosts", [])
+    location = f"vswitch['{vswitch_name}'].vlan['{vlan['name']}']"
+
+    if not isinstance(hosts, list):
+        raise KeyError(f"static_hosts in {location} must be an array")
+
+    for i, host in enumerate(hosts, start=1):
+        location = f"{location}.static_hosts[{i}]"
+        parse.non_empty_dict(location, host)
+
+        # hostname and ipv4 address required
+        _validate_hostname(vlan, host, location)
+
+        _validate_ipaddress("ipv4", vlan, host, location, required=True)
+        _validate_ipaddress("ipv6", vlan, host, location)
+
+        _validate_aliases(vlan, host, location)
+
+
+def _validate_ipv6_pd_network(vlan: dict, ipv6_pd_networks: set, ipv6_pd_network_count):
     # ensure prefix delegation network is valid and not reused
     if (vlan["ipv6_disabled"]):
         vlan["ipv6_pd_network"] = None
@@ -212,15 +204,18 @@ def _validate_vlan_ipv6_pd_network(vlan: dict, ipv6_pd_networks: set, ipv6_pd_ne
     ipv6_pd_networks.add(ipv6_pd_network)
 
 
-def _validate_ipaddress(ip_version: str, index: int, vlan: dict, location: str):
+def _validate_ipaddress(ip_version: str, vlan: dict, cfg: dict, location: str, required: bool = False):
     key = ip_version + "_address"
 
-    if key not in vlan["dhcp_reservations"][index]:
-        vlan["dhcp_reservations"][index][key] = None
-        return
+    if key not in cfg:
+        if required:
+            raise ValueError(f"{ip_version}_address required for {location}")
+        else:
+            cfg[key] = None
+            return
 
     try:
-        address = ipaddress.ip_address(vlan["dhcp_reservations"][index][key])
+        address = ipaddress.ip_address(cfg[key])
     except ValueError as ve:
         raise ValueError(f"invalid {ip_version}_address for {location}") from ve
 
@@ -231,7 +226,44 @@ def _validate_ipaddress(ip_version: str, index: int, vlan: dict, location: str):
     if address not in vlan[ip_version + "_subnet"]:
         raise ValueError(f"invalid {ip_version}_address {address} for {location}; it is not in the vlan's subnet")
 
-    vlan["dhcp_reservations"][index][key] = address
+    cfg[key] = address
+
+
+def _validate_hostname(vlan: dict, cfg: dict, location: str):
+    hostname = parse.non_empty_string("hostname", cfg, location).lower()
+
+    if hostname in vlan["known_aliases"]:
+        raise ValueError(f"duplicate hostname or alias '{hostname}' in {location}")
+    if dns.invalid_hostname(hostname):
+        raise ValueError(f"invalid hostname '{hostname}' defined for {location}")
+
+    vlan["known_aliases"].add(hostname)
+
+    # cannot check for duplicate cfg[hosts] / aliases here since hosts have not yet been defined
+    cfg["hostname"] = hostname
+
+
+def _validate_aliases(vlan: dict, cfg: dict, location: str):
+    aliases = parse.read_string_list_plurals({"alias", "aliases"}, cfg, location)
+    cfg.pop("alias", None)
+
+    cfg["aliases"] = set()
+
+    hostname = cfg["hostname"]
+    role_names = roles.names()
+
+    for alias in aliases:
+        alias = alias.lower()
+
+        if alias == hostname:
+            continue
+        if alias in vlan["known_aliases"]:
+            raise ValueError(f"duplicate hostname or alias '{hostname}' in {location}")
+        if alias in role_names:
+            raise ValueError(f"{location}' alias cannot be a role name")
+
+        vlan["known_aliases"].add(alias)
+        cfg["aliases"].add(alias)
 
 
 def _configure_default_vlan(vswitch: dict):

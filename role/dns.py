@@ -154,7 +154,8 @@ class Dns(Role):
                         allow_subnets.append(str(vlan["ipv6_subnet"]))
 
         _create_host_entries(setup, self._cfg, dns_domain)
-        _create_reservation_entries(setup, self._cfg)
+        # no entries needed for DHCP reservations; DDNS will dynamically add the host when it requests an address
+        _create_static_host_entries(setup, self._cfg)
 
         setup.append("pdnsutil rectify-all-zones")
 
@@ -184,19 +185,24 @@ class Dns(Role):
         file.substitute_and_write(self.name, "pdns.conf", pdns_conf, output_dir)
         file.substitute_and_write(self.name, "recursor.conf", pdns_conf, output_dir)
 
-        if self._cfg["additional_dns_entries"]:
+        # directly add external hostnames to /etc/hosts; PDSN recursor will serve these
+        if self._cfg["external_hosts"]:
             hosts = [""]
-            for additional_dns in self._cfg["additional_dns_entries"]:
-                hosts.append(str(additional_dns["ipv4_address"]) + " " + " ".join(additional_dns["hostnames"]))
+            output = False
 
-                if "ipv6_address" in additional_dns:
-                    hosts.append(str(additional_dns["ipv6_address"]) + " " + " ".join(additional_dns["hostnames"]))
+            for external in self._cfg["external_hosts"]:
+                output = True
+                hosts.append(str(external["ipv4_address"]) + " " + " ".join(external["hostnames"]))
 
-            hosts.append("")
-            file.write("other_hosts", "\n".join(hosts), output_dir)
-            setup.blank()
-            setup.comment("assemble complete hosts file")
-            setup.append("cat $DIR/other_hosts >> /etc/hosts")
+                if "ipv6_address" in external:
+                    hosts.append(str(external["ipv6_address"]) + " " + " ".join(external["hostnames"]))
+
+            if output:
+                hosts.append("")
+                file.write("external_hosts", "\n".join(hosts), output_dir)
+                setup.blank()
+                setup.comment("assemble complete hosts file")
+                setup.append("cat $DIR/external_hosts >> /etc/hosts")
 
 
 def _add_zone(setup: shell.ShellScript, vlan: dict, dns_domain: str, dns_server: str):
@@ -347,8 +353,8 @@ def _create_host_entries(setup: shell.ShellScript, cfg: dict, dns_domain: str):
                 setup.blank()
 
 
-def _create_reservation_entries(setup: shell.ShellScript, cfg: dict):
-    setup.comment("DNS entries for each DHCP reservation")
+def _create_static_host_entries(setup: shell.ShellScript, cfg: dict):
+    setup.comment("DNS entries for each static_host")
 
     for vswitch in cfg["vswitches"].values():
         for vlan in vswitch["vlans"]:
@@ -356,22 +362,21 @@ def _create_reservation_entries(setup: shell.ShellScript, cfg: dict):
             if not vlan["domain"]:
                 continue
 
-            for res in vlan["dhcp_reservations"]:
-                if res["ipv4_address"] or res["ipv6_address"]:
-                    host = {
-                        "name": res["hostname"],
-                        "domain": vlan["domain"],
-                        "ipv4_address": res["ipv4_address"] if res["ipv4_address"] else "dhcp",
-                        "ipv6_address": res["ipv6_address"],
-                        "ipv4_subnet": vlan["ipv4_subnet"],
-                        "ipv6_subnet": vlan["ipv6_subnet"],
-                    }
+            for host in vlan["static_hosts"]:
+                entry = {
+                    "name": host["hostname"],
+                    "domain": vlan["domain"],
+                    "ipv4_address": host["ipv4_address"] if host["ipv4_address"] else "dhcp",
+                    "ipv6_address": host["ipv6_address"],
+                    "ipv4_subnet": vlan["ipv4_subnet"],
+                    "ipv6_subnet": vlan["ipv6_subnet"],
+                }
 
-                    output = _add_entry(setup, host)
+                output = _add_entry(setup, entry)
 
-                    for alias in res["aliases"]:
-                        _add_cname(setup, alias, host)
-                        output |= True
+                for alias in host["aliases"]:
+                    _add_cname(setup, alias, host)
+                    output |= True
 
-                    if output:
-                        setup.blank()
+                if output:
+                    setup.blank()

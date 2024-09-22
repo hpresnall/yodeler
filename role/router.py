@@ -480,24 +480,7 @@ def _add_shorewall_host_config(cfg: dict, shorewall: dict, routable_vlans: list[
         if rules6:
             shorewall["rules6"].extend(rules6)
 
-    # for additional hosts, add params for each ip address
-    comment4 = comment6 = False
-
-    for host in cfg["firewall"]["static_hosts"].values():
-        hostname = host["hostname"].upper()
-        vlan = host["vlan"]
-        if host["ipv4_address"]:
-            if not comment4:
-                shorewall["params"].append("\n# static host ip addresses for non-Yodeler defined systems")
-                comment4 = True
-            shorewall["params"].append(f"{hostname}_{vlan.upper()}={vlan}:{host['ipv4_address']}")
-        if host["ipv6_address"]:
-            if not comment6:
-                shorewall["params6"].append("\n# static host ip addresses for non-Yodeler defined systems")
-                comment6 = True
-            shorewall["params6"].append(f"{hostname}_{vlan.upper()}={vlan}:{host['ipv6_address']}")
-
-    # for DHCP reservations, add a param if an ip address exists
+    # for vlan DHCP reservations & static hosts, add a param if an ip address exists
     # firewall will not allow rules if there is no address and ensures aliases are not used
     comment4 = comment6 = False
 
@@ -507,19 +490,39 @@ def _add_shorewall_host_config(cfg: dict, shorewall: dict, routable_vlans: list[
                 continue  # no need to add non-routable reservations to the firewall
 
             vlan_name = vlan['name']
-            for res in vlan["dhcp_reservations"]:
-                if res["ipv4_address"]:
+            for host in vlan["dhcp_reservations"] + vlan["static_hosts"]:
+                if host["ipv4_address"]:
                     if not comment4:
-                        shorewall["params"].append("\n# ip addresses from DHCP reservations")
+                        shorewall["params"].append("\n# ip addresses from DHCP reservations & static hostnames")
                         comment4 = True
                     shorewall["params"].append(
-                        f"{res['hostname'].upper()}_{vlan_name.upper()}={vlan_name}:{res['ipv4_address']}")
-                if res["ipv6_address"]:
+                        f"{host['hostname'].upper()}_{vlan_name.upper()}={vlan_name}:{host['ipv4_address']}")
+                if host["ipv6_address"]:
                     if not comment6:
                         shorewall["params6"].append("\n# ip addresses from DHCP reservations")
                         comment6 = True
                     shorewall["params6"].append(
-                        f"{res['hostname'].upper()}_{vlan_name.upper()}={vlan_name}:{res['ipv6_address']}")
+                        f"{host['hostname'].upper()}_{vlan_name.upper()}={vlan_name}:{host['ipv6_address']}")
+
+    comment4 = comment6 = False
+
+    for host in cfg["external_hosts"]:
+        if host["ipv4_address"]:
+            if not comment4:
+                shorewall["params"].append("\n# ip addresses from external hosts")
+                comment4 = True
+            for hostname in host["hostnames"]:
+                hostname = hostname.upper().replace(".", "_")
+                shorewall["params"].append(
+                    f"{hostname}_INET=inet:{host['ipv4_address']}")
+        if host["ipv6_address"]:
+            if not comment6:
+                shorewall["params6"].append("\n# ip addresses from external_hosts")
+                comment6 = True
+            for hostname in host["hostnames"]:
+                hostname =hostname.upper().replace(".", "_")
+                shorewall["params6"].append(
+                    f"{hostname}_INET=inet:{host['ipv6_address']}")
 
 
 def _find_valid_vlans_for_host(host: dict, routable_vlans: list[dict], shorewall: dict) -> list[dict]:
@@ -599,7 +602,10 @@ def _parse_firewall_location(cfg: dict, location: dict, ip_version: int,  loc_na
     # location from firewall.py has optional hostname, ipset or ip address
     if "hostname" in location:
         # match value in Shorewall params
-        return f"${location['hostname'].upper()}_{vlan.upper()}"
+        if vlan == "inet":
+            return f"${location['hostname'].upper().replace(".","_")}_{vlan.upper()}"
+        else:
+            return f"${location['hostname'].upper()}_{vlan.upper()}"
     elif "ipset" in location:
         return f"{vlan}:+{location['ipset']}"
     elif "ipaddress" in location:
