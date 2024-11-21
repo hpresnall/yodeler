@@ -197,6 +197,7 @@ class Router(Role):
                     ))
 
                     dhrelay6_ifaces.append(vlan["router_iface"])
+            # for each vlan
 
             if has_routable_vlans:
                 if not comment:
@@ -212,6 +213,7 @@ class Router(Role):
                     # new libvirt interface to trunk the vlans
                     libvirt_interfaces.append(libvirt.router_interface(
                         self._cfg['hostname'], vswitch, vswitch["router_iface"]["mac_address"]))
+        # for each vswitch
 
         # blank line after ping rules from vlan to firewall
         shorewall["rules"].append("")

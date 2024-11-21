@@ -347,9 +347,9 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
         hostname = location["hostname"]
         vlan = location["vlan"]  # already validated in _parse_locations()
 
-        host = hostname in cfg["hosts"]
+        found = hostname in cfg["hosts"]
 
-        if host:
+        if found:
             _validate_host_vlan(cfg, hostname, vlan, loc_name)
             _logger.debug("%s found '%' as a top-level host", loc_name, hostname)
             continue
@@ -357,22 +357,22 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
 
         for h in cfg["hosts"].values():
             if hostname in h["aliases"]:
-                host = True
+                found = True
                 hostname = location["hostname"] = h["hostname"]  # update alias to actual hostname
                 _logger.debug("%s found '%s' as a top-level host alias for '%s'", loc_name, hostname, h["hostname"])
                 break
 
-        if host:
+        if found:
             _validate_host_vlan(cfg, hostname, vlan, loc_name)
             continue
         # else not an alias, check external_hosts
 
         for ext in cfg["external_hosts"]:
             if hostname in ext["hostnames"]:
-                host = True
+                found = True
                 break
 
-        if host:
+        if found:
             if vlan["name"] != "internet":
                 raise ValueError(
                     f"invalid hostname '{hostname}' in {loc_name}; the vlan must be 'internet' for externally defined hosts")
@@ -382,16 +382,16 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
 
         if hostname not in vlan["known_aliases"]:
             raise ValueError(
-                f"invalid hostname '{hostname}' in {loc_name}; could not find a DHCP reservation in vlan '{vlan['name']}'")
+                f"invalid hostname '{hostname}' in {loc_name}; could not find a site-level host or alias, DHCP reservation or static host in vlan '{vlan['name']}', or an external host")
 
         for vlan_host in vlan["dhcp_reservations"] + vlan["static_hosts"]:
             if (hostname == vlan_host["hostname"]):
-                host = True
+                found = True
             elif hostname in vlan_host["aliases"]:
                 location["hostname"] = vlan_host["hostname"]
-                host = True
+                found = True
 
-            if host:
+            if found:
                 if vlan_host[ip_version + "_address"]:
                     # reservation address must be in vlan; no need to recheck here
                     _logger.debug("%s found '%s' as a dhcp reservation", loc_name, hostname)
@@ -401,12 +401,12 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
                                   loc_name, hostname, ip_version)
                 break
 
-        if host:
+        if found:
             _logger.debug("%s found '%s' as a DHCP reservation in vlan '%s'", loc_name, hostname, vlan["name"])
             continue
         else:  # if this happens, vlan["known_aliases"] does not line up with the rest of the vlan config
             raise ValueError(
-                f"invalid hostname '{hostname}' in {loc_name}; could not find a DHCP reservation or static host in vlan '{vlan['name']}'")
+                f"invalid hostname '{hostname}' in {loc_name}; could not find a site-level host or alias, DHCP reservation or static host in vlan '{vlan['name']}', or an external host")
     # for locations
 
     deleted_locations = []

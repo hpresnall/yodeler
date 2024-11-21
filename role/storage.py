@@ -120,6 +120,7 @@ class Storage(Role):
 
         # create base samba config, then add all the shares
         smb_conf = [file.substitute(self.name, "smb.conf", {
+            "HOSTNAME": self._cfg["hostname"],
             "SITE_UPPER": self._cfg["site_name"].upper(),
             "SITE_DESC": self._cfg["site_name"] + " storage",
             "ALIASES": " ".join([a for a in self._cfg["aliases"] if a != "storage"]),
