@@ -40,7 +40,7 @@ else
   sed -i -E "s/^tty([3-6])/\#tty\1/g" /etc/inittab
 
   # force console video mode in kernel opts
-  sed -i -e "s/quiet/video=1920x1080 quiet/g" /boot/grub/grub.cfg
+  sed -i -e "s/quiet/video=1920x1080 quiet/g" /etc/default/grub
 
   # non-root user will be configured by Alpine setup
 
