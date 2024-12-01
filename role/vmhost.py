@@ -181,7 +181,7 @@ if $(grep vendor_id /proc/cpuinfo | head -n 1 | grep AMD > /dev/null); then
 else
   iommu="intel_iommu=on"
 fi
-sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /boot/grub/grub.cfg
+sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /etc/default/grub
 """)
 
         # libvirt hook scripts for networks (i.e. vswitches) and vms

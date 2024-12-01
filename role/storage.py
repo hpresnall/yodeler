@@ -40,6 +40,7 @@ class Storage(Role):
         before_chroot.append("modprobe zfs")
         before_chroot.append("")
         before_chroot.append("log \"Loop mounting storage disks for zpool configuration\"")
+        before_chroot.append("")
 
         image_disks_count = 1
 

@@ -177,7 +177,11 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
         setup.blank()
 
-    # not removing host's /tmp, just its contents
+    setup.comment("ensure any additions to Grub are applied")
+    setup.append("update-grub")
+    setup.blank()
+
+    setup.comment("not removing host's /tmp, just its contents")
     setup.append("rm -rf $SETUP_TMP/*")
     setup.blank()
 
