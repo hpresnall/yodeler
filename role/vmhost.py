@@ -42,7 +42,7 @@ class VmHost(Role):
         for vswitch in self._cfg["vswitches"].values():
             vswitch_name = vswitch["name"]
 
-            # create interfaces for iface for vswitch itself and its uplinks
+            # create interfaces for the vswitch itself and its uplinks
             vswitch_interfaces.append(interfaces.for_port(vswitch_name, "vswitch", "vswitch"))
             vswitch_interfaces.extend(_create_uplink_ports(vswitch))
 

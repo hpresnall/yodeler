@@ -77,6 +77,7 @@ class Router(Role):
             if vlan_interfaces:  # i.e. any routable vlans
                 if iface_name == "missing":
                     raise ValueError(f"vswitch {vswitch['name']} has routable vlans, but does not define an uplink")
+
                 # create the parent interface for the vlan interfaces
                 comment = f"vlans on '{vswitch['name']}' vswitch"
 

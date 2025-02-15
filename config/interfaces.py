@@ -430,7 +430,7 @@ def configure_uplink(cfg: dict):
         raise KeyError(f"{location} must define an uplink")
 
     if "uplink" in cfg["profile"]:
-        o_loc = f"profile['{cfg['profile_name']}']['{cfg['hostname']}'].uplink"
+        o_loc = f"profile['{cfg['profile_name']}']['{location}'].uplink"
         new_uplink = parse.non_empty_dict(o_loc, cfg["profile"]["uplink"])
         old_uplink = dict(uplink)
 
@@ -451,8 +451,12 @@ def configure_uplink(cfg: dict):
     # allow some end user configuration of the uplink interface YAML
     # but it will always use forwarding
     uplink["type"] = "uplink"
-    parse.set_default_string("comment", uplink, "internet uplink")
     uplink["forward"] = True
+
+    if "comment" in uplink:
+        uplink["comment"] = ["internet uplink", uplink["comment"]]
+    else:
+        uplink["comment"] = "internet uplink"
 
     # delegated prefixes for ipv6; used by dhcpcd
     uplink["ipv6_delegated_prefixes"] = []

@@ -53,7 +53,7 @@ def _parse_ipsets(firewall: dict) -> tuple[dict, dict]:
             raise ValueError(f"ipsets[{idx}] must be an object")
 
         name = parse.non_empty_string("name", ipset, f"ipset[{idx}]").lower()
-        addresses = ipset["addresses"] if "addresses" in ipset else []
+        addresses = ipset.get("addresses", [])
         parse.non_empty_list(f"ipsets[{idx}]['addresses']", addresses)
 
         try:
@@ -118,7 +118,7 @@ def _parse_rules(cfg: dict, firewall: dict) -> list[dict]:
             raise KeyError("no actions defined for " + location)
 
         parsed_rule = {
-            "comment": rule["comment"] if "comment" in rule else "",
+            "comment": rule.get("comment", ""),
             "ipv4": {"sources": sources4, "destinations": destinations4},
             "ipv6": {"sources": sources6, "destinations": destinations6},
             "actions": actions
@@ -307,7 +307,7 @@ def _parse_action(name: str, actions: list, location: str) -> list[dict]:
                 raise ValueError(
                     f"port for {location} must be a string or int, not {type(unparsed_ports)}")
 
-            comment = action["comment"] if "comment" in action else ""
+            comment = action.get("comment", "")
 
             parsed_actions.append({"action": name, "type": "protoport",
                                   "protocol": protocol, "ports": ports, "comment": comment})
@@ -351,7 +351,7 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
 
         if found:
             _validate_host_vlan(cfg, hostname, vlan, loc_name)
-            _logger.debug("%s found '%' as a top-level host", loc_name, hostname)
+            _logger.debug("%s found '%s' as a top-level host", loc_name, hostname)
             continue
         # else hostname is not a host, check aliases
 
@@ -394,17 +394,16 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
             if found:
                 if vlan_host[ip_version + "_address"]:
                     # reservation address must be in vlan; no need to recheck here
-                    _logger.debug("%s found '%s' as a dhcp reservation", loc_name, hostname)
+                    _logger.debug("%s found '%s' as an %s DHCP reservation in vlan '%s'",
+                                  loc_name, hostname, ip_version, vlan["name"])
                 else:
                     locations_to_remove.append(i-1)
-                    _logger.debug("%s found '%s' as a dhcp reservation without an %s address; removing rule",
-                                  loc_name, hostname, ip_version)
+                    _logger.debug("%s found '%s' as a DHCP reservation without an %s address; removing rule from vlan '%s'",
+                                  loc_name, hostname, ip_version, vlan["name"])
                 break
 
-        if found:
-            _logger.debug("%s found '%s' as a DHCP reservation in vlan '%s'", loc_name, hostname, vlan["name"])
-            continue
-        else:  # if this happens, vlan["known_aliases"] does not line up with the rest of the vlan config
+        if not found:
+            # if this happens, vlan["known_aliases"] does not line up with the rest of the vlan config
             raise ValueError(
                 f"invalid hostname '{hostname}' in {loc_name}; could not find a site-level host or alias, DHCP reservation or static host in vlan '{vlan['name']}', or an external host")
     # for locations
@@ -418,7 +417,7 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
     if not rule[ip_version][src_or_dest]:
         del rule[ip_version]
         _logger.debug(
-            f"removing firewall.rule[{idx}] for with no valid {src_or_dest} for {ip_version} in {deleted_locations}")
+            f"removing firewall.rule[{idx}] with no valid {src_or_dest} for {ip_version}")
 
 
 def _validate_host_vlan(cfg: dict, hostname: str, vlan: dict, loc_name: str):

@@ -102,7 +102,14 @@ def _port(cfg: dict, iface: dict):
     name = iface["name"]
 
     if "comment" in iface:
-        buffer.append("# " + iface["comment"])
+        comment = iface["comment"]
+
+        if isinstance(comment, str):
+            buffer.append("# " + comment)
+        elif isinstance(comment, list) and comment:
+            [buffer.append("# " + c) for c in comment]
+        else:
+            raise ValueError(f"invalid comment for iface['{name}']; it must be string or list")
 
     buffer.append(f"auto {name}")
     buffer.append(f"iface {name}")

@@ -80,7 +80,8 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
         if not vlan["domain"] and (len(vlans) == 1):
             vlan["domain"] = domain
 
-    _logger.debug("vlan '%s' known_aliases=%s", vlan["name"], vlan["known_aliases"])
+    if vlan["known_aliases"]:
+        _logger.debug("vlan '%s' known_aliases=%s", vlan["name"], vlan["known_aliases"])
 
     _configure_default_vlan(vswitch)
 

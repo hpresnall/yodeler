@@ -204,7 +204,8 @@ def _validate_full_site(site_cfg: dict):
     for host_cfg in site_cfg["hosts"].values():
         hostname = host_cfg["hostname"]
 
-        _logger.debug("validating aliases for host '%s'; %s", hostname, host_cfg["aliases"])
+        if host_cfg["aliases"]:
+            _logger.debug("validating aliases for host '%s'; %s", hostname, host_cfg["aliases"])
 
         if hostname in aliases:
             raise KeyError(f"hostname '{hostname}' cannot be the same as another host's alias")

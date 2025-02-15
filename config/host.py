@@ -41,7 +41,7 @@ def load(site_cfg: dict, host_path: str | None) -> dict:
 
     host_cfg = validate(site_cfg, host_yaml)
 
-    _logger.debug("loaded host '%s' from '%s'", host_cfg["hostname"], host_path)
+    _logger.debug("loaded host '%s'", host_cfg["hostname"])
 
     return host_cfg
 
@@ -197,17 +197,17 @@ def write_scripts(host_cfg: dict, output_dir: str):
     _preview_dir(host_dir)
 
 
-def validate_overridable_site_defaults(site_cfg: dict):
+def validate_overridable_site_defaults(cfg: dict):
     # overlay the profile values into the site config, if any
     for key in DEFAULT_SITE_CONFIG.keys():
-        if key in site_cfg["profile"]:
-            site_cfg[key] = site_cfg["profile"][key]
+        if key in cfg["profile"]:
+            cfg[key] = cfg["profile"][key]
 
     # ensure overridden default values are the correct type and arrays only contain strings
-    parse.configure_defaults("site_yaml", DEFAULT_SITE_CONFIG, _DEFAULT_SITE_CONFIG_TYPES, site_cfg)
+    parse.configure_defaults("site_yaml", DEFAULT_SITE_CONFIG, _DEFAULT_SITE_CONFIG_TYPES, cfg)
 
-    site_cfg["alpine_repositories"] = parse.read_string_list(
-        "alpine_repositories", site_cfg, f"site '{site_cfg['site_name']}'")
+    cfg["alpine_repositories"] = parse.read_string_list(
+        "alpine_repositories", cfg, f"site '{cfg['site_name']}'")
 
 
 def _set_defaults(cfg: dict):
@@ -225,7 +225,7 @@ def _set_defaults(cfg: dict):
         if not isinstance(value, kind):
             raise KeyError(f"{key} value '{value}' in '{cfg['hostname']}' is {type(value)} not {kind}")
 
-    # overlay the profile values into the site config, if any
+    # overlay the profile values into the host config, if any
     for key in DEFAULT_CONFIG.keys():
         if key in cfg["profile"]:
             cfg[key] = cfg["profile"][key]
@@ -250,7 +250,7 @@ def _set_defaults(cfg: dict):
     else:
         cfg["vmhost"] = None
 
-        # physical installs need an interface configure to download APKs and a disk to install the OS
+        # physical installs need an interface configured to download APKs and a disk to install the OS
         cfg.setdefault("install_interfaces", """auto lo
 iface lo inet loopback
 auto eth0
@@ -299,7 +299,7 @@ def _load_roles(cfg: dict):
     ordered_roles.extend(role_names)
 
     for role_name in ordered_roles:
-        _logger.debug("loading role '%s' for '%s'", role_name, cfg["hostname"])
+        _logger.debug("adding role '%s' to '%s'", role_name, cfg["hostname"])
 
         role_name = role_name.lower()
         role = roles.load(role_name, cfg)
@@ -341,7 +341,9 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
 
     if _logger.isEnabledFor(logging.DEBUG):
         _logger.debug("adding packages %s", host_cfg["packages"])
-        _logger.debug("removing packages %s", host_cfg["remove_packages"])
+
+        if host_cfg["remove_packages"]:
+            _logger.debug("removing packages %s", host_cfg["remove_packages"])
 
 
 def _configure_before_and_after_chroot(cfg: dict):
