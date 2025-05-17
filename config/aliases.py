@@ -16,7 +16,7 @@ def configure(cfg: dict):
 
     for alias in aliases:
         if dns.invalid_hostname(alias):
-            raise ValueError(f"invalid alias '{alias}' for host '{hostname}'")
+            raise ValueError(f"invalid alias '{alias}' for host '{hostname}'; not a valid DNS name")
         cfg["aliases"].add(alias.lower())
 
     # ensure hostname is not duplicated by an alias

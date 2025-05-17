@@ -96,6 +96,7 @@ class VmHost(Role):
         hostname = self._cfg["hostname"]
 
         for vm in self._cfg["hosts"].values():
+            # skip other physical hosts
             if not vm["is_vm"] and (vm["vmhost"] != hostname):
                 continue
 
@@ -194,7 +195,7 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /etc/default/grub
         vf_cfg_template = string.Template(file.read_template(self.name, "sriov.sh"))
         vf_cfg = []
 
-        # virtual functions are variable so just substitue the variable name for the interface
+        # virtual function interfaces are created at runtime, so just use a shell variable
         disable_vf_ipv6 = []
         sysctl.add_disable_ipv6_to_script(disable_vf_ipv6, "$vf", "    ")
         disable_vf_ipv6 = "\n".join(disable_vf_ipv6)

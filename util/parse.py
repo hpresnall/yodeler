@@ -176,9 +176,9 @@ _VALID_MAC = re.compile("^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$")
 def validate_mac_address(mac_address, location: str):
     """Ensure the given MAC address is a string and represents a valid value.
     Upper and lowercase are accepted as well as ':' or '-' separators."""
-
     if not isinstance(mac_address, str):
         raise ValueError(f"invalid mac_address '{mac_address}' for {location}; it must be a string")
+
+    # mac address case is up to the client, but upper() for regex here
     if not _VALID_MAC.match(mac_address.upper()):
-        # mac address case is up to the client, but upper() for regex here
         raise ValueError(f"invalid mac_address '{mac_address}' for {location}")

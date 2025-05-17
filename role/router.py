@@ -729,7 +729,7 @@ def _write_ipsets(cfg: dict, setup: shell.ShellScript):
 
     for name, ipset in cfg["firewall"]["ipsets4"].items():
         setup.append(
-            f"echo \"create {name} hash:{ipset['type']} family {ipset['family']} hashsize {ipset['hashsize']} maxelem {len(ipset['addresses'])}\"  >> $IPSETS_4")
+            f"echo \"create {name} hash:{ipset['type']} family {ipset['family']} hashsize {ipset['hashsize']} maxelem {len(ipset['addresses'])}\" >> $IPSETS_4")
 
         for address in ipset["addresses"]:
             setup.append(f"echo \"add {name} {address}\" >> $IPSETS_4")
@@ -738,7 +738,7 @@ def _write_ipsets(cfg: dict, setup: shell.ShellScript):
 
     for name, ipset in cfg["firewall"]["ipsets6"].items():
         setup.append(
-            f"echo \"create {name} hash:{ipset['type']} family {ipset['family']} hashsize {ipset['hashsize']} maxelem {len(ipset['addresses'])}\"  >> $IPSETS_6")
+            f"echo \"create {name} hash:{ipset['type']} family {ipset['family']} hashsize {ipset['hashsize']} maxelem {len(ipset['addresses'])}\" >> $IPSETS_6")
 
         for address in ipset["addresses"]:
             setup.append(f"echo \"add {name} {address}\" >> $IPSETS_6")

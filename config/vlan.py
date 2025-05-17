@@ -206,7 +206,7 @@ def _validate_ipaddress(ip_version: str, vlan: dict, cfg: dict, location: str, r
 
     if key not in cfg:
         if required:
-            raise ValueError(f"{ip_version}_address required for {location}")
+            raise ValueError(f"{location}.{key} required")
         else:
             cfg[key] = None
             return
@@ -214,14 +214,14 @@ def _validate_ipaddress(ip_version: str, vlan: dict, cfg: dict, location: str, r
     try:
         address = ipaddress.ip_address(cfg[key])
     except ValueError as ve:
-        raise ValueError(f"invalid {ip_version}_address for {location}") from ve
+        raise ValueError(f"{location} invalid {key}") from ve
 
     if (ip_version == "ipv6") and (vlan["ipv6_subnet"] is None):
-        _logger.warning("ipv6_address %s for %s with no ipv6_subnet will be ignored", address, location)
+        _logger.warning("%s ipv6_address %s will be ignored in vlan with no ipv6_subnet defined", location, address)
         return
 
     if address not in vlan[ip_version + "_subnet"]:
-        raise ValueError(f"invalid {ip_version}_address {address} for {location}; it is not in the vlan's subnet")
+        raise ValueError(f"{location} invalid {key} {address}; it is not in the vlan's subnet")
 
     cfg[key] = address
 
@@ -230,9 +230,9 @@ def _validate_hostname(vlan: dict, cfg: dict, location: str):
     hostname = parse.non_empty_string("hostname", cfg, location).lower()
 
     if hostname in vlan["known_aliases"]:
-        raise ValueError(f"duplicate hostname or alias '{hostname}' in {location}")
+        raise ValueError(f"{location} duplicate hostname or alias '{hostname}'")
     elif dns.invalid_hostname(hostname):
-        raise ValueError(f"invalid hostname '{hostname}' defined for {location}")
+        raise ValueError(f"{location} invalid hostname '{hostname}' defined")
 
     vlan["known_aliases"].add(hostname)
 
@@ -255,11 +255,11 @@ def _validate_aliases(vlan: dict, cfg: dict, location: str):
         if alias == hostname:
             continue
         elif alias in vlan["known_aliases"]:
-            raise ValueError(f"duplicate hostname or alias '{alias}' in {location}")
+            raise ValueError(f"{location} duplicate hostname or alias '{alias}'")
         elif alias in role_names:
-            raise ValueError(f"{location}' alias cannot be a role name")
+            raise ValueError(f"{location} alias cannot be a role name")
         elif dns.invalid_hostname(alias):
-            raise ValueError(f"invalid alias '{alias}' in '{location}'")
+            raise ValueError(f"{location} invalid alias '{alias}'")
 
         vlan["known_aliases"].add(alias)
         cfg["aliases"].add(alias)

@@ -571,13 +571,13 @@ def validate_renaming(cfg: dict):
         raise ValueError(f"{location} must be a list")
 
     for i, rename in enumerate(renamings, start=1):
-        m_loc = location + f"[{i}]"
+        r_loc = location + f"[{i}]"
 
         if not isinstance(rename, dict):
-            raise ValueError(f"{m_loc} must be a dict, not a {type(rename)}")
+            raise ValueError(f"{r_loc} must be a dict, not a {type(rename)}")
 
         # must include name and valid MAC address
-        parse.non_empty_string("name", rename, m_loc)
+        parse.non_empty_string("name", rename, r_loc)
 
         mac_address = rename.get("mac_address")
-        parse.validate_mac_address(mac_address, m_loc)
+        parse.validate_mac_address(mac_address, r_loc)

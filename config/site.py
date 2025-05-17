@@ -118,8 +118,12 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
     total_mem = 0
     total_disk = 0
 
-    for host_path in os.listdir(site_dir):
+    host_paths = os.listdir(site_dir)
+    host_paths.sort()
+
+    for host_path in host_paths:
         if (host_path == "site.yaml") or (host_path.startswith("profile")):
+            _logger.debug("skipping file %s", host_path)
             continue
         if not host_path.endswith(".yaml"):
             _logger.debug("skipping file %s", host_path)
@@ -138,8 +142,9 @@ def _load_all_hosts(site_cfg: dict, site_dir: str):
 
     _validate_full_site(site_cfg)
 
+    _logger.info("loaded %d hosts for site '%s'", len(site_cfg["hosts"]), site_cfg["site_name"])
+
     if total_vms > 0:
-        _logger.info("loaded %d hosts for site '%s'", len(site_cfg["hosts"]), site_cfg["site_name"])
         _logger.info("total VM resources used: %d vCPUs, %d GB memory & %d GB disk",
                      total_vcpus, round(total_mem / 1024), round(total_disk / 1024))
 
@@ -204,13 +209,13 @@ def _validate_full_site(site_cfg: dict):
     for host_cfg in site_cfg["hosts"].values():
         hostname = host_cfg["hostname"]
 
-        if host_cfg["aliases"]:
-            _logger.debug("validating aliases for host '%s'; %s", hostname, host_cfg["aliases"])
-
         if hostname in aliases:
             raise KeyError(f"hostname '{hostname}' cannot be the same as another host's alias")
 
         aliases.add(hostname)
+
+        if host_cfg["aliases"]:
+            _logger.debug("validating aliases for host '%s'; %s", hostname, host_cfg["aliases"])
 
         # includes role names for the host which should be unique; see aliases.make_unique()
         for alias in host_cfg["aliases"]:

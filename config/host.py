@@ -116,7 +116,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     for role in host_cfg["roles"]:
         needs_site_build |= role.needs_build_image()
 
-        # add any additional configuration; this may include aliases
+        # add any additional configuration
         role.additional_configuration()
 
     host_cfg["needs_site_build"] = needs_site_build

@@ -4,8 +4,9 @@
 def validate(cfg: dict):
     """Ensure metrics are configured correctly, if required."""
     enable_metrics = True
-    # ignore host's enable_metrics setting
+
     if not cfg["site_enable_metrics"]:
+        # ignore host's enable_metrics setting
         enable_metrics = False
     elif not cfg["enable_metrics"]:
         # metrics disabled for the host

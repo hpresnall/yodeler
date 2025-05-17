@@ -63,10 +63,11 @@ vswitches:
             ipv4_address: 192.168.220.24
             ipv6_address: fd24:87e8:06c7:20::18
             mac_address: ab:cd:ef:12:34:56 # will add static DHCP assignment
-        # static_hosts: # for systems with staticly assigned IPs, not controlled by Yodeler
+        # for systems with statically assigned IPs, not configured by Yodeler or assigned a DHCP reservation
+        # static_hosts:
         #   - hostname: appliance
         #     ipv4_address: 192.168.220.101
-        #     # optional ipv6_address
+        #     optional ipv6_address
   # switch for "management" connections like physical switches, wireless access points, etc
   # the uplink is the port on the _vmhost_; this port is set as the uplink by open vswitch
   # for security, the router VM will not be on the management network
@@ -84,6 +85,12 @@ vswitches:
         ipv6_disabled: true
         dhcp_min_address_ipv4: 2
         dhcp_max_address_ipv4: 16
+# optional list of hosts outside of any Yodeler managed subnets
+# hostnames will be added to DNS and can be used in firewall rules
+# external_hosts:
+#   - hostnames: [foo.test, bar.test] # string or list of stings to support multiple aliases for the same ip address
+#     ipv4_address: 123.123.123.1
+#     optional ipv6_address
 firewall:
   # optionally add 'ipsets'
   # ipsets: # must be homogenous: all subnets or all address, all of the same IP version
@@ -124,7 +131,7 @@ firewall:
         vlan: client
         # optional ipv4_address, ipv6_address, ipset or hostname to narrow application from the entire vlan
         # if only ipv4 or ipv6 specified, rule will only exist for that version
-        # hostname can be from a host YAML, site level external_hosts or vlan level DHCP reservations or static_hosts
+        # hostname can be from a yodeler configured host, a site level name in external_hosts, of a vlan level DHCP reservation or static_hosts entry
         # configured host will use ipv4 and/org ipv6 addresses as defined
       destination:
         vswitch: public

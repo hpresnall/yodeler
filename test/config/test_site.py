@@ -91,12 +91,13 @@ class TestSite(unittest.TestCase):
                     required_files.append("dhcpcd.conf")
                     self.assertIn("firewall", host_cfg["aliases"])
                     self.assertNotIn("test", host_cfg["aliases"])
-                    self.assertIn("test2", host_cfg["aliases"])
+                    # alphabetical ordering of hosts => router before server so router is test1
+                    self.assertIn("test1", host_cfg["aliases"])
 
                 if hostname == "server":
                     required_files.remove("resolv.conf.head")  # completely dynamic config => no resolv.conf
                     self.assertNotIn("test", host_cfg["aliases"])
-                    self.assertIn("test1", host_cfg["aliases"])
+                    self.assertIn("test2", host_cfg["aliases"])
 
                 if hostname == "client":
                     self.assertIn("laptop", host_cfg["aliases"])
