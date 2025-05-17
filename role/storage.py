@@ -64,7 +64,7 @@ class Storage(Role):
             if disk["name"].startswith("storage"):
                 # creating zpool outside of vm, so use vm host's path
                 path = disk["host_path"]
-    
+
                 if disk["type"] == "img":
                     # mount / unmount image disks
                     # use loop mount rather than the raw disk image; set envvar on mount, use that for unmount
@@ -90,6 +90,7 @@ class Storage(Role):
         before_chroot.append(f"  log \"Creating ZFS storage pool at '{storage_dir}'\"")
         before_chroot.append(zpool.strip())
         before_chroot.append("fi")
+        before_chroot.append("")
 
         group = storage_cfg["group"]
         setup.log(f"Creating group '{group}' & all share users")
@@ -101,7 +102,9 @@ class Storage(Role):
         setup.append("fi")
         setup.blank()
 
+        # start user ids at 2048
         uid = 2048
+
         for user in storage_cfg["users"]:
             name = user["name"]
             pwd = user["password"]
@@ -190,6 +193,7 @@ class Storage(Role):
                 smb_conf.append("  guest ok = yes")
 
             smb_conf.append("")
+        # end for all shares
 
         smb_conf.append("")
         file.write("smb.conf", "\n".join(smb_conf), output_dir)
@@ -240,7 +244,7 @@ def _validate_storage(cfg: dict):
         raise ValueError(f"{storage_loc} illegal group name '{group}'")
 
     location = storage_loc + ".users"
-    invalid_names.add("group")  # cannot add group name as a user
+    invalid_names.add(group)  # cannot add group name as a user
     user_names = set()
 
     users = parse.non_empty_list(location, storage.get("users"))
