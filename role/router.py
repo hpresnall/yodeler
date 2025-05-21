@@ -603,6 +603,7 @@ def _add_shorewall_rules(cfg: dict, shorewall: dict):
 
 def _add_shorewall_action(cfg: dict, rule: dict, rule_idx: int, ip_version: int, shorewall: dict):
     key = "ipv4" if ip_version == 4 else "ipv6"
+    loc = f"firewall rule {rule_idx}"
     actions = []
     allow_all_comment = True
 
@@ -612,9 +613,9 @@ def _add_shorewall_action(cfg: dict, rule: dict, rule_idx: int, ip_version: int,
 
     # for every source/destination combo
     for source in rule[key]["sources"]:
+        s = _parse_firewall_location(cfg, source, ip_version, loc)
+
         for destination in rule[key]["destinations"]:
-            loc = f"firewall rule {rule_idx}"
-            s = _parse_firewall_location(cfg, source, ip_version, loc)
             d = _parse_firewall_location(cfg, destination, ip_version, loc)
 
             # _parse_firewall_location returns empty string on invalid hostnames

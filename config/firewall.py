@@ -319,6 +319,89 @@ def validate_rule_hostnames(cfg: dict):
     Also ensures that all firewall rules are written with a hostname and not an alias.
 
     Must be called after all hosts for the site are loaded."""
+
+    routable_vlans = []
+
+    for vswitch in cfg["vswitches"].values():
+        for vlan in vswitch["vlans"]:
+            if not vlan["routable"]:
+                continue
+
+            routable_vlans.append(vlan)
+
+    for host in cfg["hosts"].values():
+        # do not add any rules for non infrastructure hosts
+        if len(host["roles"]) == 1:  # i.e. only common role
+            continue
+
+        actions = [{"action": "allow", "type": "named", "protocol": "ping"}]
+        firewall = False
+
+        for role in host["roles"]:
+            if role.name == "router":
+                firewall = True
+
+        hostname = host["hostname"]
+        print("adding host rules for", hostname)
+
+        host_rule = {
+            "comment": f"allow access to host {hostname}",
+            "ipv4": {"sources": [], "destinations": []},
+            "ipv6": {"sources": [], "destinations": []},
+            "actions": actions
+        }
+
+        # use special firewall destination instead of all interfaces
+        if firewall:
+            fw = {"vlan": {"name": "firewall", "dhcp_reservations": []}}
+
+            host_rule["ipv4"]["destinations"].append(fw)
+            host_rule["ipv6"]["destinations"].append(fw)
+
+            for vlan in routable_vlans:
+                source = {"vlan": vlan}
+
+                host_rule["ipv4"]["sources"].append(source)
+                host_rule["ipv6"]["sources"].append(source)
+
+            cfg["firewall"]["rules"].append(host_rule)
+
+            host_rule = {
+                "comment": f"firewall can ping everything",
+                "ipv4": {"sources": [], "destinations": []},
+                "ipv6": {"sources": [], "destinations": []},
+                "actions": actions
+            }
+            all = {"vlan": {"name": "all", "dhcp_reservations": []}}
+            host_rule["ipv4"]["sources"].append(fw)
+            host_rule["ipv6"]["sources"].append(fw)
+            host_rule["ipv4"]["destinations"].append(all)
+            host_rule["ipv6"]["destinations"].append(all)
+
+            cfg["firewall"]["rules"].append(host_rule)
+        else:
+            for iface in host["interfaces"]:
+                if (iface["type"] not in {"std", "vlan"}) or (not iface["vlan"]["routable"]):
+                    continue
+
+                destination = {"vlan": iface["vlan"], "hostname": hostname}
+
+                host_rule["ipv4"]["destinations"].append(destination)
+                if iface["ipv6_address"]:
+                    host_rule["ipv6"]["destinations"].append(destination)
+
+                for vlan in routable_vlans:
+                    if iface["vlan"]["name"] == vlan["name"]:
+                        continue  # no need for rule in same vlan
+
+                    source = {"vlan": vlan}
+
+                    host_rule["ipv4"]["sources"].append(source)
+                    if iface["ipv6_address"]:
+                        host_rule["ipv6"]["sources"].append(source)
+
+            cfg["firewall"]["rules"].append(host_rule)
+
     for i, rule in enumerate(cfg["firewall"]["rules"], start=1):
         _validate_location_hostname(cfg, rule, i, "ipv4", "sources")
         _validate_location_hostname(cfg, rule, i, "ipv4", "destinations")
@@ -373,7 +456,7 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
                 else:
                     locations_to_remove.append(i-1)
                     _logger.info("%s found '%s' as a external host without an %s address; removing rule",
-                                  loc_name, hostname, ip_version)
+                                 loc_name, hostname, ip_version)
                 break
 
         if found:
@@ -425,11 +508,13 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
 
 
 def _validate_host_vlan(cfg: dict, hostname: str, vlan: dict, loc_name: str):
-    valid_vlan = False
-
     for iface in cfg["hosts"][hostname]["interfaces"]:
         if iface["vlan"]["name"] == vlan["name"]:
-            valid_vlan = True
+            return
 
-    if not valid_vlan:
-        raise ValueError(f"{loc_name} invalid host '{hostname}'; it has no interface defined in vlan '{vlan['name']}'")
+    if vlan["name"] == "firewall":
+        for role in cfg["hosts"][hostname]["roles"]:
+            if (role.name == "router"):
+                return
+
+    raise ValueError(f"{loc_name} invalid host '{hostname}'; it has no interface defined in vlan '{vlan['name']}'")

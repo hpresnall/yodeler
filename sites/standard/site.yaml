@@ -103,7 +103,7 @@ firewall:
         vlan: server
       destination:
         vlan: all # source vlan name; 'all' for all routable networks; 'internet' for outbound
-      allow-all: true
+      allow-all: true # blanket rule for all protocols & ports
     - comment: clients have basic internet access
       # source and destination can also be plural and a list of locations
       # multiple values will be multiplexed into a rule for each source / destination combo
@@ -132,7 +132,7 @@ firewall:
         # optional ipv4_address, ipv6_address, ipset or hostname to narrow application from the entire vlan
         # if only ipv4 or ipv6 specified, rule will only exist for that version
         # hostname can be from a yodeler configured host, a site level name in external_hosts, of a vlan level DHCP reservation or static_hosts entry
-        # configured host will use ipv4 and/org ipv6 addresses as defined
+        # configured host will use ipv4 and/or ipv6 addresses as defined
       destination:
         vswitch: public
         vlan: server
