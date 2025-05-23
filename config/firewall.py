@@ -14,9 +14,11 @@ _logger = logging.getLogger(__name__)
 
 
 def validate(cfg: dict):
-    """Validate the firewall configuration in the site configuration.
+    """Validate the firewall rules defined for the site.
 
-    Note that this function cannot validate rule hostnames since the site's hosts have not yet been defined."""
+    This function should be called before the site's hosts are loaded.
+    However, this means that this function cannot validate hostnames or aliases in rules.
+    These will be validated in validate_rule_hostnames()."""
     if "firewall" not in cfg:
         firewall = cfg["firewall"] = {
             "ipsets4": {},
@@ -139,9 +141,9 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
                 raise ValueError(f"vlan for {loc_name} cannot be empty")
         elif isinstance(vlan, int):
             if (vlan < 1) or (vlan > 4094):
-                raise KeyError(f"invalid vlan id '{vlan}' for {loc_name}")
+                raise ValueError(f"invalid vlan id '{vlan}' for {loc_name}")
         else:
-            raise KeyError(f"vlan must be string or int for {loc_name}, not {type(vlan)}")
+            raise ValueError(f"vlan must be string or int for {loc_name}, not {type(vlan)}")
 
         vlan_obj = None
 
@@ -161,9 +163,13 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
             vswitch = parse.non_empty_string("vswitch", loc, loc_name)
 
             if vswitch not in cfg["vswitches"]:
-                raise KeyError(f"{loc_name} invalid vswitch '{vswitch}'")
+                raise ValueError(f"{loc_name} invalid vswitch '{vswitch}'")
 
-            vlan_obj = vlans.lookup(vlan, cfg["vswitches"][vswitch])
+            try:
+                vlan_obj = vlans.lookup(vlan, cfg["vswitches"][vswitch])
+            except Exception as e:
+                raise  ValueError(f"{loc_name} invalid vlan '{vlan}'", e)
+
             vlan = vlan_obj["name"]
 
         parsed_location4 = {"vlan": vlan_obj}
@@ -210,7 +216,7 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
                 try:
                     address = ipaddress.ip_address(loc["ipv4_address"])
                 except ValueError as ve:
-                    raise KeyError(f"{loc_name} invalid ipv4 address '{loc['ipv4_address']}'") from ve
+                    raise ValueError(f"{loc_name} invalid ipv4 address '{loc['ipv4_address']}'") from ve
                 if not isinstance(address, ipaddress.IPv4Address):
                     raise ValueError(f"{loc_name} invalid ipv4 address '{loc['ipv4_address']}'")
                 if vlan_obj and (address not in vlan_obj["ipv4_subnet"]):
@@ -222,7 +228,7 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
                 try:
                     address = ipaddress.ip_address(loc["ipv6_address"])
                 except ValueError as ve:
-                    raise KeyError(f"{loc_name} invalid ipv6 address '{loc['ipv6_address']}'") from ve
+                    raise ValueError(f"{loc_name} invalid ipv6 address '{loc['ipv6_address']}'") from ve
                 if not isinstance(address, ipaddress.IPv6Address):
                     raise ValueError(f"{loc_name} invalid ipv6 address '{loc['ipv6_address']}'")
                 if vlan_obj and vlan_obj["ipv6_subnet"] and (address not in vlan_obj["ipv6_subnet"]):
@@ -320,6 +326,8 @@ def validate_rule_hostnames(cfg: dict):
 
     Must be called after all hosts for the site are loaded."""
 
+    # FIXME a lot of this may be unnecessary
+    # add rules regardless of host ifaces; let that get sorted out by the router
     routable_vlans = []
 
     for vswitch in cfg["vswitches"].values():
@@ -421,6 +429,7 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
         return
 
     for i, location in enumerate(rule[ip_version][src_or_dest], start=1):
+        # TODO check ipaddress and replace with hostname if possible; error if ipv4 and ipv4 do not match
         if not "hostname" in location:
             continue
 
@@ -495,10 +504,8 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
                 f"{loc_name} invalid hostname '{hostname}'; could not find a site-level host or alias, DHCP reservation or static host in vlan '{vlan['name']}', or an external host")
     # for locations
 
-    deleted_locations = []
-
     for location in locations_to_remove:
-        deleted_locations.append(rule[ip_version][src_or_dest].pop(location))
+        rule[ip_version][src_or_dest].pop(location)
 
     # if there is no src_or_dest, the whole rule is unnecessary
     if not rule[ip_version][src_or_dest]:
@@ -511,10 +518,5 @@ def _validate_host_vlan(cfg: dict, hostname: str, vlan: dict, loc_name: str):
     for iface in cfg["hosts"][hostname]["interfaces"]:
         if iface["vlan"]["name"] == vlan["name"]:
             return
-
-    if vlan["name"] == "firewall":
-        for role in cfg["hosts"][hostname]["roles"]:
-            if (role.name == "router"):
-                return
 
     raise ValueError(f"{loc_name} invalid host '{hostname}'; it has no interface defined in vlan '{vlan['name']}'")
