@@ -45,7 +45,7 @@ def load(site_cfg: dict, host_path: str | None) -> dict:
 
     return host_cfg
 
-
+# exposed for testing
 def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     """Validate the given YAML formatted host configuration.
 
@@ -113,6 +113,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
 
     needs_site_build = False
 
+    # all other config is valid, now add additional config and packages
     for role in host_cfg["roles"]:
         needs_site_build |= role.needs_build_image()
 
@@ -125,6 +126,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     _configure_packages(site_cfg, host_yaml, host_cfg)
 
     # note role.validate() is called _after_ all hosts are loaded in site.py
+    # see _validate_full_site()
 
     return host_cfg
 

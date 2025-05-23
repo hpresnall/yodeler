@@ -75,7 +75,7 @@ class Role(ABC):
 
 
 def load(role_name: str, host_cfg: dict) -> Role:
-    """Load an Role subclass instance using the given role name."""
+    """Load a Role subclass instance using the given role name."""
     if host_cfg is None:
         raise ValueError("host_cfg cannot be None")
 
@@ -109,7 +109,7 @@ def load_all():
     """Load all Role subclasses in the 'roles' package.
     This must be called before loading any host configuration."""
     roles_dir = os.path.dirname(__file__)
-    ignored_files = ["__init__.py", "roles.py"]
+    ignored_files = ["__init__.py", os.path.basename(__file__)]
 
     for file in os.listdir(roles_dir):
         if (file[-3:] != '.py') or (file in ignored_files):

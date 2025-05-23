@@ -41,8 +41,6 @@ class TestSite(unittest.TestCase):
             site.validate({"site_name": ""})
 
     def test_load_test_site(self):
-        role.load_all()
-
         site_cfg = site.load(os.path.join(self._base_path, "sites", "test"))
 
         self.assertEqual(site_cfg["site_name"], "test")
