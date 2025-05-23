@@ -31,13 +31,13 @@ class NTP(Role):
         for iface in self._cfg["interfaces"]:
             if (iface["type"] == "std") and (iface["ipv4_address"] == "dhcp"):
                 raise KeyError(
-                    f"host '{self._cfg['hostname']}' cannot configure aN NTP server with a DHCP address on interface '{iface['name']}'")
+                    f"host '{self._cfg['hostname']}' cannot configure an NTP server with a DHCP address on interface '{iface['name']}'")
 
         missing_vlans = interfaces.check_accessiblity(self._cfg["interfaces"],
                                                       self._cfg["vswitches"].values())
 
         if missing_vlans:
-            _logger.warning("vlans '%s' cannot access time from NTP host '%s'", self._cfg["hostname"], missing_vlans)
+            _logger.warning("vlans '%s' cannot access time from NTP host '%s'", missing_vlans, self._cfg["hostname"])
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         # chrony.create_conf() will be called by common

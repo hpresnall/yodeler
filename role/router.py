@@ -573,15 +573,17 @@ def _parse_firewall_location(cfg: dict, location: dict, ip_version: int,  loc_na
     vlan = location["vlan"]
 
     if vlan["name"] == "internet":
-        vlan = "inet"  # match Shorewall interfaces file
+        vlan = "inet"  # param name used in Shorewall interfaces file
     elif vlan["name"] == "firewall":
-        vlan = "$FW"  # match Shorewall firewall zone name
+        # Shorewall firewall zone name
+        # host, ipset and ip address are not allowed for firewall vlan
+        return "$FW"
     else:
         vlan = vlan["name"]
 
     # location from firewall.py has optional hostname, ipset or ip address
     if "hostname" in location:
-        # match value in Shorewall params
+        # set to value used in Shorewall params
         if vlan == "inet":
             return f"${location['hostname'].upper().replace(".", "_")}_{vlan.upper()}"
         else:
@@ -589,7 +591,7 @@ def _parse_firewall_location(cfg: dict, location: dict, ip_version: int,  loc_na
     elif "ipset" in location:
         return f"{vlan}:+{location['ipset']}"
     elif "ipaddress" in location:
-        # assume config already confirmed address matches ip version
+        # assume firewall config already confirmed address matches ip version
         return f"{vlan}:{location['ipaddress']}"
     else:
         return vlan
@@ -603,7 +605,7 @@ def _add_shorewall_rules(cfg: dict, shorewall: dict):
 
 def _add_shorewall_action(cfg: dict, rule: dict, rule_idx: int, ip_version: int, shorewall: dict):
     key = "ipv4" if ip_version == 4 else "ipv6"
-    loc = f"firewall rule {rule_idx}"
+    loc = f"firewall.rules[{rule_idx}]"
     actions = []
     allow_all_comment = True
 
@@ -617,10 +619,6 @@ def _add_shorewall_action(cfg: dict, rule: dict, rule_idx: int, ip_version: int,
 
         for destination in rule[key]["destinations"]:
             d = _parse_firewall_location(cfg, destination, ip_version, loc)
-
-            # _parse_firewall_location returns empty string on invalid hostnames
-            if not s or not d:
-                continue
 
             for action in rule["actions"]:
                 a = action["action"]

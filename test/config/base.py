@@ -12,6 +12,7 @@ import config.site as site
 import config.host as host
 import role.roles as roles
 
+
 class TestCfgBase(unittest.TestCase):
     """Base class for testing Yodler configuration functions."""
     _base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
