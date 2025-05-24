@@ -134,7 +134,7 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
         loc_name = location + f"[{idx}]"
 
         if "vlan" not in loc:
-            raise KeyError(f"vlan must be specified for {location}")
+            raise KeyError(f"{loc_name} vlan must be specified")
 
         vlan = loc["vlan"]
         if isinstance(vlan, str):
@@ -142,9 +142,9 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
                 raise ValueError(f"vlan for {loc_name} cannot be empty")
         elif isinstance(vlan, int):
             if (vlan < 1) or (vlan > 4094):
-                raise ValueError(f"invalid vlan id '{vlan}' for {loc_name}")
+                raise ValueError(f"{loc_name} invalid vlan id '{vlan}'")
         else:
-            raise ValueError(f"vlan must be string or int for {loc_name}, not {type(vlan)}")
+            raise ValueError(f"{loc_name} vlan must be string or int, not {type(vlan)}")
 
         vlan_obj = None
 
@@ -171,6 +171,9 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
                 raise ValueError(f"{loc_name} invalid vlan '{vlan}'", e)
 
             vlan = vlan_obj["name"]
+
+            if not vlan_obj["routable"]:
+                raise ValueError(f"{loc_name} invalid vlan '{vlan}'; it is not routable")
 
         parsed_location4 = {"vlan": vlan_obj}
         parsed_location6 = {"vlan": vlan_obj}
@@ -369,6 +372,9 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str
                 f"{loc_name} invalid hostname '{hostname}'; could not find a site-level host or alias, DHCP reservation or static host in vlan '{vlan['name']}', or an external host")
     # for locations
 
+    # reverse so pop() does not cause reordering
+    locations_to_remove.reverse()
+
     for location in locations_to_remove:
         rule[ip_version][src_or_dest].pop(location)
 
@@ -389,6 +395,7 @@ def _validate_host_vlan(cfg: dict, hostname: str, vlan: dict, loc_name: str):
 
 # functions to build rules; for use in role.additional_configuration
 def add_rule(cfg: dict, sources: list[dict], destinations: list[dict], actions: list[dict], comment:str=""):
+    # TODO check array lengths and error if empty
     rule =   {
         "comment": comment,
         "ipv4": {"sources": sources, "destinations":destinations},

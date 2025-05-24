@@ -170,10 +170,9 @@ class Router(Role):
         dhrelay4_ifaces = []
         dhrelay6_ifaces = []
 
-        comment = False
-
         for vswitch in self._cfg["vswitches"].values():
             has_routable_vlans = False
+            comment = False
 
             for vlan in vswitch["vlans"]:
                 if not vlan["routable"]:
