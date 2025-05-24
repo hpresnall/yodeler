@@ -358,10 +358,6 @@ def _configure_shorewall_vlan(shorewall, vswitch_name, vlan):
     # dhcpcd will assign addresses, no need for SLAAC
     shorewall["interfaces6"].append((f"{vlan_name}\t{shorewall_name}\ttcpflags,dhcp,rpfilter,accept_ra=0"))
 
-    # allow all hosts to ping the firewall
-    shorewall["rules"].append(f"Ping(ACCEPT)\t{vlan_name}\t$FW")
-    shorewall["rules6"].append(f"Ping(ACCEPT)\t{vlan_name}\t$FW")
-
     # snat only on ipv4; ipv6 will be routable
     shorewall["snat"].append(f"MASQUERADE\t{vlan['ipv4_subnet']}\t$INTERNET")
 
@@ -377,15 +373,12 @@ def _add_shorewall_host_config(cfg: dict, shorewall: dict, routable_vlans: list[
         if not valid_host_vlans:
             continue
 
-        ping = True
         rules = []
         rules6 = []
 
         for role in host["roles"]:
             if role.name == "common":
                 continue
-            if role.name == "router":
-                ping = False  # pings to the firewall have already been added
 
             start = len(rules)
             start6 = len(rules)
@@ -437,28 +430,6 @@ def _add_shorewall_host_config(cfg: dict, shorewall: dict, routable_vlans: list[
                 rules.append("")
             if (len(rules6) - start6) > 0:
                 rules6.append("")
-
-        if ping or rules:
-            shorewall["rules"].append(f"# allow access to host {host['hostname']}")
-        if ping or rules6:
-            shorewall["rules6"].append(f"# allow access to host {host['hostname']}")
-
-        if ping:
-            output = False
-            output6 = False
-
-            for host_vlan in valid_host_vlans:
-                if host_vlan['ipv4']:
-                    output = True
-                    shorewall["rules"].append(f"Ping(ACCEPT)\t{host_vlan['vlan']}\t{host_vlan['name']}")
-                if host_vlan['ipv4']:
-                    output6 = True
-                    shorewall["rules6"].append(f"Ping(ACCEPT)\t{host_vlan['vlan']}\t{host_vlan['name']}")
-
-            if output:
-                shorewall["rules"].append("")
-            if output6:
-                shorewall["rules6"].append("")
 
         if rules:
             shorewall["rules"].extend(rules)
@@ -574,12 +545,15 @@ def _parse_firewall_location(cfg: dict, location: dict, ip_version: int,  loc_na
 
     if vlan["name"] == "internet":
         vlan = "inet"  # param name used in Shorewall interfaces file
+    elif vlan["name"] == "all":
+        # host, ipset and ip address are ignored
+        return "all"
     elif vlan["name"] == "firewall":
         # Shorewall firewall zone name
         # host, ipset and ip address are not allowed for firewall vlan
         return "$FW"
     else:
-        vlan = vlan["name"]
+        vlan = vlan["name"] # also handles 'all'
 
     # location from firewall.py has optional hostname, ipset or ip address
     if "hostname" in location:

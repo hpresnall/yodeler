@@ -21,6 +21,3 @@ Trcrt(ACCEPT)	$FW	inet
 
 # firewall can send DNS out so it does not depend on local DNS being up
 DNS(ACCEPT)	$FW	inet
-
-# firewall can ping everything; allow each vlan to ping the firewall
-Ping(ACCEPT)	$FW	all

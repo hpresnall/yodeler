@@ -250,8 +250,8 @@ def _validate_full_site(site_cfg: dict):
 
     _logger.debug("all_aliases=%s", aliases)
 
-    # finally, confirm that all the firewall rules point to valid hostnames / aliases
-    firewall.validate_rule_hostnames(site_cfg)
+    # finally, confirm & clean up and add base firewall rules now that all hosts are known
+    firewall.validate_full_site(site_cfg)
 
 
 def _validate_external_hosts(cfg: dict):

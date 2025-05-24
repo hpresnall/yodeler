@@ -12,6 +12,11 @@ import config.vlan as vlans
 
 _logger = logging.getLogger(__name__)
 
+# fake vlan configs for firewall rule source / destinations
+_all = {"vlan": {"name": "all", "dhcp_reservations": []}}
+_fw = {"vlan": {"name": "firewall", "dhcp_reservations": []}}
+_internet = {"vlan": {"name": "internet", "dhcp_reservations": []}}
+
 
 def validate(cfg: dict):
     """Validate the firewall rules defined for the site.
@@ -149,16 +154,15 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
 
         if "all" == vlan:
             # no need for further processing
-            location_obj = [{"vlan": {"name": "all", "dhcp_reservations": []}}]
-            return location_obj, location_obj
+            return [_all], [_all]
         elif "internet" == vlan:
             # not a valid vlan with a hostname, but continue processing for ipsets which can be external
-            vlan_obj = {"name": "internet", "dhcp_reservations": []}
-            vlan = "internet"
+            vlan_obj = _internet["vlan"]
+            vlan = vlan_obj["name"]
         elif "firewall" == vlan:
             # not a valid vlan with a hostname, but continue processing other locations
-            vlan_obj = {"name": "firewall", "dhcp_reservations": []}
-            vlan = "firewall"
+            vlan_obj = _fw["vlan"]
+            vlan = vlan_obj["name"]
         else:
             vswitch = parse.non_empty_string("vswitch", loc, loc_name)
 
@@ -168,7 +172,7 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
             try:
                 vlan_obj = vlans.lookup(vlan, cfg["vswitches"][vswitch])
             except Exception as e:
-                raise  ValueError(f"{loc_name} invalid vlan '{vlan}'", e)
+                raise ValueError(f"{loc_name} invalid vlan '{vlan}'", e)
 
             vlan = vlan_obj["name"]
 
@@ -259,6 +263,7 @@ def _parse_action(name: str, actions: list, location: str) -> list[dict]:
 
     for i, action in enumerate(actions, start=1):
         location = f"{base}[{i}]"
+
         if isinstance(action, str):
             # named protocol; router role config is responsible for converting the protocol to a valid rule
             action = action.lower()
@@ -320,101 +325,21 @@ def _parse_action(name: str, actions: list, location: str) -> list[dict]:
     return parsed_actions
 
 
-def validate_rule_hostnames(cfg: dict):
+def validate_full_site(cfg: dict):
     """Validates that all hostnames referenced in firewall rules exist.
-    Also ensures that all firewall rules are written with a hostname and not an alias.
+   Converts all aliases to the actual hostname.
+
+    Also adds rules to allow pings to all hosts with more than the common role.
 
     Must be called after all hosts for the site are loaded."""
-
-    # FIXME a lot of this may be unnecessary
-    # add rules regardless of host ifaces; let that get sorted out by the router
-    routable_vlans = []
-
-    for vswitch in cfg["vswitches"].values():
-        for vlan in vswitch["vlans"]:
-            if not vlan["routable"]:
-                continue
-
-            routable_vlans.append(vlan)
-
-    for host in cfg["hosts"].values():
-        # do not add any rules for non infrastructure hosts
-        if len(host["roles"]) == 1:  # i.e. only common role
-            continue
-
-        actions = [{"action": "allow", "type": "named", "protocol": "ping"}]
-        firewall = False
-
-        for role in host["roles"]:
-            if role.name == "router":
-                firewall = True
-
-        hostname = host["hostname"]
-        print("adding host rules for", hostname)
-
-        host_rule = {
-            "comment": f"allow access to host {hostname}",
-            "ipv4": {"sources": [], "destinations": []},
-            "ipv6": {"sources": [], "destinations": []},
-            "actions": actions
-        }
-
-        # use special firewall destination instead of all interfaces
-        if firewall:
-            fw = {"vlan": {"name": "firewall", "dhcp_reservations": []}}
-
-            host_rule["ipv4"]["destinations"].append(fw)
-            host_rule["ipv6"]["destinations"].append(fw)
-
-            for vlan in routable_vlans:
-                source = {"vlan": vlan}
-
-                host_rule["ipv4"]["sources"].append(source)
-                host_rule["ipv6"]["sources"].append(source)
-
-            cfg["firewall"]["rules"].append(host_rule)
-
-            host_rule = {
-                "comment": f"firewall can ping everything",
-                "ipv4": {"sources": [], "destinations": []},
-                "ipv6": {"sources": [], "destinations": []},
-                "actions": actions
-            }
-            all = {"vlan": {"name": "all", "dhcp_reservations": []}}
-            host_rule["ipv4"]["sources"].append(fw)
-            host_rule["ipv6"]["sources"].append(fw)
-            host_rule["ipv4"]["destinations"].append(all)
-            host_rule["ipv6"]["destinations"].append(all)
-
-            cfg["firewall"]["rules"].append(host_rule)
-        else:
-            for iface in host["interfaces"]:
-                if (iface["type"] not in {"std", "vlan"}) or (not iface["vlan"]["routable"]):
-                    continue
-
-                destination = {"vlan": iface["vlan"], "hostname": hostname}
-
-                host_rule["ipv4"]["destinations"].append(destination)
-                if iface["ipv6_address"]:
-                    host_rule["ipv6"]["destinations"].append(destination)
-
-                for vlan in routable_vlans:
-                    if iface["vlan"]["name"] == vlan["name"]:
-                        continue  # no need for rule in same vlan
-
-                    source = {"vlan": vlan}
-
-                    host_rule["ipv4"]["sources"].append(source)
-                    if iface["ipv6_address"]:
-                        host_rule["ipv6"]["sources"].append(source)
-
-            cfg["firewall"]["rules"].append(host_rule)
 
     for i, rule in enumerate(cfg["firewall"]["rules"], start=1):
         _validate_location_hostname(cfg, rule, i, "ipv4", "sources")
         _validate_location_hostname(cfg, rule, i, "ipv4", "destinations")
         _validate_location_hostname(cfg, rule, i, "ipv6", "sources")
         _validate_location_hostname(cfg, rule, i, "ipv6", "destinations")
+
+    _add_ping_rules(cfg)
 
 
 def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str, src_or_dest: str):
@@ -520,3 +445,74 @@ def _validate_host_vlan(cfg: dict, hostname: str, vlan: dict, loc_name: str):
             return
 
     raise ValueError(f"{loc_name} invalid host '{hostname}'; it has no interface defined in vlan '{vlan['name']}'")
+
+# TODO move ping rules to common?
+def _add_ping_rules(cfg: dict):
+    for host in cfg["hosts"].values():
+        # do not add any rules for non infrastructure hosts
+        if len(host["roles"]) == 1:  # i.e. only common role
+            continue
+
+        hostname = host["hostname"]
+
+        if hostname in cfg["roles_to_hostnames"]["router"]:
+            # use special firewall source and destination
+            _add_firewall_ping_rules(host)
+        else:
+            _add_pings_rule_to_host(host)
+
+
+# firewall rule action for ping
+_ping = {"action": "allow", "type": "named", "protocol": "ping"}
+
+
+# allow everything to ping each host's routable interfaces
+def _add_pings_rule_to_host(cfg: dict):
+    hostname = cfg["hostname"]
+    _logger.info("adding firewall ping rules for %s", hostname)
+
+    host_rule = {
+        "comment": f"allow pings to host {hostname}",
+        "ipv4": {"sources": [_all], "destinations": []},
+        "ipv6": {"sources": [_all], "destinations": []},
+        "actions": [_ping]
+    }
+
+    for iface in cfg["interfaces"]:
+        if (iface["type"] not in {"std", "vlan"}) or (not iface["vlan"]["routable"]):
+            continue
+
+        # other hosts on the same non-routable vlan will be able to ping regardless
+        if not iface["vlan"]["routable"]:
+            continue
+
+        destination = {"vlan": iface["vlan"], "hostname": hostname}
+
+        host_rule["ipv4"]["destinations"].append(destination)
+        if iface["ipv6_address"]:
+            host_rule["ipv6"]["destinations"].append(destination)
+
+    cfg["firewall"]["rules"].append(host_rule)
+
+# allow pings to and from the firewall
+def _add_firewall_ping_rules(cfg: dict):
+    hostname = cfg["hostname"]
+    _logger.info("adding ping rules for firewall (%s)", hostname)
+
+    host_rule = {
+        "comment": f"allow pings to the firewall ({hostname})",
+        "ipv4": {"sources": [_all], "destinations": [_fw]},
+        "ipv6": {"sources": [_all], "destinations": [_fw]},
+        "actions": [_ping]
+    }
+
+    cfg["firewall"]["rules"].append(host_rule)
+
+    host_rule = {
+        "comment": f"firewall ({hostname}) can ping everything",
+        "ipv4": {"sources": [_fw], "destinations": [_all, _internet]},
+        "ipv6": {"sources": [_fw], "destinations": [_all, _internet]},
+        "actions": [_ping]
+    }
+
+    cfg["firewall"]["rules"].append(host_rule)
