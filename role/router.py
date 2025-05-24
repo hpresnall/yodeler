@@ -12,7 +12,7 @@ import script.shell as shell
 import script.sysctl as sysctl
 
 import config.interfaces as interfaces
-
+import config.firewall as fw
 
 class Router(Role):
     """Router defines the configuration needed to setup a system that can route from the configured
@@ -111,6 +111,18 @@ class Router(Role):
     def additional_configuration(self):
         # router will use Shorewall instead
         self._cfg["local_firewall"] = False
+
+        hostname = self._cfg["hostname"]
+
+        # allow pings to and from the firewall
+        ping = fw.allow_service("ping")
+
+        fw.add_rule(self._cfg, [fw.location_firewall()], [fw.location_all(), fw.location_internet()], [ping], f"firewall ({hostname}) can ping everything")
+        fw.add_rule(self._cfg, [fw.location_all()], [fw.location_firewall()], [ping], f"allow pings to the firewall ({hostname})")
+
+        # allow other services
+        fw.add_rule(self._cfg, [fw.location_firewall()], [fw.location_internet()], [fw.allow_service("traceroute")], f"allow traceroute from the firewall ({hostname})")
+        fw.add_rule(self._cfg, [fw.location_firewall()], [fw.location_internet()], [fw.allow_service("dns")], f"firewall ({hostname}) can send DNS out so it does not depend on local DNS being up")
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -389,27 +401,6 @@ def _add_shorewall_host_config(cfg: dict, shorewall: dict, routable_vlans: list[
                 ipv4 = host_vlan['ipv4']
                 ipv6 = host_vlan['ipv4']
 
-                if role.name == "dns":
-                    # DNS and nsupdate
-                    rule = f"DNS(ACCEPT)\t{vlan}\t{name}\n"
-                    rule += f"ACCEPT\t{vlan}\t{name}\ttcp\t553\n"
-                    rule += f"ACCEPT\t{vlan}\t{name}\tudp\t553"
-                    if idx == 0:
-                        rule = f"# {role.name.upper()} role for {host['hostname']}\nDNS(ACCEPT)\t$FW\t{name}\n{rule}"
-                    if ipv4:
-                        rules.append(rule)
-                    if ipv6:
-                        rules6.append(rule)
-
-                if role.name == "ntp":
-                    rule = f"NTP(ACCEPT)\t{vlan}\t{name}"
-                    if idx == 0:
-                        rule = f"# {role.name.upper()} role for {host['hostname']}\nNTP(ACCEPT)\t$FW\t{name}\n{rule}"
-                    if ipv4:
-                        rules.append(rule)
-                    if ipv6:
-                        rules6.append(rule)
-
                 if role.name == "dhcp":
                     if ipv4:
                         if idx == 0:
@@ -481,6 +472,8 @@ def _add_shorewall_host_config(cfg: dict, shorewall: dict, routable_vlans: list[
                     f"{hostname}_INET=inet:{host['ipv6_address']}")
 
 
+# FIXME all roles need some checks here WRT interfaces and addresses
+# FIXME need a way to add shorewall params when router is not adding rules for each role
 def _find_valid_vlans_for_host(host: dict, routable_vlans: list[dict], shorewall: dict) -> list[dict]:
     # find all routable vlans for the host that need firewall rules for each role
     valid_host_vlans = []
@@ -525,6 +518,7 @@ def _find_valid_vlans_for_host(host: dict, routable_vlans: list[dict], shorewall
 # map firewall keywords to shorwall macro names
 _allowed_macros = {
     "ping": "Ping",
+    "traceroute": "Trcrt",
     "ssh": "SSH",
     "telnet": "Telnet",
     "dns": "DNS",
@@ -538,6 +532,10 @@ _allowed_macros = {
     "imap": "IMAP",
     "imaps": "IMAPS"
 }
+
+for service in fw.named_services:
+    if service not in _allowed_macros:
+        raise KeyError(f"firewall service '{service}' has no Shorewall macro defined")
 
 
 def _parse_firewall_location(cfg: dict, location: dict, ip_version: int,  loc_name: str) -> str:

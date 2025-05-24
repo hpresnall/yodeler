@@ -6,6 +6,7 @@ from role.roles import Role
 import script.shell as shell
 
 import config.interfaces as interfaces
+import config.firewall as fw
 
 _logger = logging.getLogger(__name__)
 
@@ -18,6 +19,24 @@ class NTP(Role):
 
     def additional_aliases(self) -> list[str]:
         return ["time", "sntp"]
+
+    def additional_configuration(self):
+        hostname = self._cfg["hostname"]
+        destinations = []
+
+        # allow all routable vlans DNS access to this host on all its interfaces
+        for iface in self._cfg["interfaces"]:
+            if (iface["type"] not in {"std", "vlan"}) or (not iface["vlan"]["routable"]):
+                continue
+
+            # other hosts on the same non-routable vlan will be able to access regardless
+            if not iface["vlan"]["routable"]:
+                continue
+
+            destinations.append(fw.location(iface["vlan"], hostname))
+
+        fw.add_rule(self._cfg, [fw.location_all()], destinations, [fw.allow_service("ntp")], f"NTP for {hostname}")
+
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

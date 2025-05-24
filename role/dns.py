@@ -8,7 +8,7 @@ import script.shell as shell
 import script.sysctl as sysctl
 
 import config.interfaces as interfaces
-
+import config.firewall as fw
 
 class Dns(Role):
     """DNS defines the configuration needed to setup PowerDNS. Configures both the DNS server and a recursor to
@@ -17,6 +17,30 @@ class Dns(Role):
     def additional_packages(self):
         return {"pdns", "pdns-recursor", "pdns-backend-sqlite3", "pdns-doc", "pdns-openrc", "bind-tools"}
 
+    def additional_configuration(self):
+        hostname = self._cfg["hostname"]
+        destinations = []
+
+        # allow all routable vlans DNS access to this host on all its interfaces
+        for iface in self._cfg["interfaces"]:
+            if (iface["type"] not in {"std", "vlan"}) or (not iface["vlan"]["routable"]):
+                continue
+
+            # other hosts on the same non-routable vlan will be able to access regardless
+            if not iface["vlan"]["routable"]:
+                continue
+
+            destinations.append(fw.location(iface["vlan"], hostname))
+
+        actions = [ 
+            fw.allow_service("dns"), 
+            fw.allow_proto_port({"proto": "tcp", "port": 553}),
+            fw.allow_proto_port({"proto": "udp", "port": 553})
+        ]
+
+        fw.add_rule(self._cfg, [fw.location_all()], destinations, actions, f"DNS and nsupdate for {hostname}")
+
+    
     def validate(self):
         if len(self._cfg["external_dns"]) == 0:
             raise KeyError("cannot configure DNS server with no external_dns addresses defined")

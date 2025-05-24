@@ -12,11 +12,7 @@ import config.vlan as vlans
 
 _logger = logging.getLogger(__name__)
 
-# fake vlan configs for firewall rule source / destinations
-_all = {"vlan": {"name": "all", "dhcp_reservations": []}}
-_fw = {"vlan": {"name": "firewall", "dhcp_reservations": []}}
-_internet = {"vlan": {"name": "internet", "dhcp_reservations": []}}
-
+named_services = ["ping", "traceroute", "ssh", "telnet", "dns", "ntp", "samba", "web", "ftp", "mail", "pop3", "imap", "imaps"]
 
 def validate(cfg: dict):
     """Validate the firewall rules defined for the site.
@@ -252,12 +248,8 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> tuple[l
 
     return parsed_locations4, parsed_locations6
 
-
-named_protocols = ["ping", "ssh", "telnet", "dns", "ntp", "samba", "web", "ftp", "mail", "pop3", "imap", "imaps"]
-
-
-def _parse_action(name: str, actions: list, location: str) -> list[dict]:
-    base = location + "." + name
+def _parse_action(action_type: str, actions: list, location: str) -> list[dict]:
+    base = location + "." + action_type
     actions = parse.non_empty_list(location, actions)
     parsed_actions = []
 
@@ -265,59 +257,9 @@ def _parse_action(name: str, actions: list, location: str) -> list[dict]:
         location = f"{base}[{i}]"
 
         if isinstance(action, str):
-            # named protocol; router role config is responsible for converting the protocol to a valid rule
-            action = action.lower()
-
-            if action not in named_protocols:
-                raise ValueError(f"invalid {name} '{action}' for {location}; it is not a valid protocol name")
-
-            parsed_actions.append({"action": name, "type": "named", "protocol": action, "comment": ""})
+            parsed_actions.append(action_service(action_type, action, location))
         elif isinstance(action, dict):
-            # dict of protocol & ports
-            protocol = parse.non_empty_string("proto", action, location)
-
-            if protocol not in ("tcp", "udp"):
-                raise ValueError(f"{location}.proto must be 'tcp' or 'udp'")
-
-            # allow singular and plural
-            if "port" in action:
-                unparsed_ports = action["port"]
-            elif "ports" in action:
-                unparsed_ports = action["ports"]
-            else:
-                raise KeyError(f"no port defined for {location}")
-
-            # port can be an int, a string with ':' or '-' for a range, or a list
-            if isinstance(unparsed_ports, int):
-                if unparsed_ports < 1:
-                    raise ValueError(f"{location}.port must be greater than 0")
-                ports = [str(unparsed_ports)]
-            elif isinstance(unparsed_ports, str):
-                if not unparsed_ports:
-                    raise ValueError(f"{location}.port cannot be empty")
-                ports = [unparsed_ports.replace("-", ":")]
-            elif isinstance(unparsed_ports, list):
-                ports = []
-                for j, port in enumerate(unparsed_ports, start=1):
-                    if isinstance(port, int):
-                        if port < 1:
-                            raise ValueError(f"{location}.port[{j}] must be greater than 0")
-                        ports.append(str(port))
-                    elif isinstance(port, str):
-                        if not port:
-                            raise ValueError(f"{location}.port[{j}] cannot be empty")
-                        ports.append(port.replace("-", ":"))
-                    else:
-                        raise ValueError(
-                            f"{location}.port[{j}] must be a string or int, not {type(port)}")
-            else:
-                raise ValueError(
-                    f"{location}.port must be a string or int, not {type(unparsed_ports)}")
-
-            comment = action.get("comment", "")
-
-            parsed_actions.append({"action": name, "type": "protoport",
-                                  "protocol": protocol, "ports": ports, "comment": comment})
+            parsed_actions.append(action_proto_port(action_type, action, location))
         else:
             raise ValueError(
                 f"{location} must be a string or dict, not {type(action)}")
@@ -338,8 +280,6 @@ def validate_full_site(cfg: dict):
         _validate_location_hostname(cfg, rule, i, "ipv4", "destinations")
         _validate_location_hostname(cfg, rule, i, "ipv6", "sources")
         _validate_location_hostname(cfg, rule, i, "ipv6", "destinations")
-
-    _add_ping_rules(cfg)
 
 
 def _validate_location_hostname(cfg: dict, rule: dict, idx: int, ip_version: str, src_or_dest: str):
@@ -446,73 +386,132 @@ def _validate_host_vlan(cfg: dict, hostname: str, vlan: dict, loc_name: str):
 
     raise ValueError(f"{loc_name} invalid host '{hostname}'; it has no interface defined in vlan '{vlan['name']}'")
 
-# TODO move ping rules to common?
-def _add_ping_rules(cfg: dict):
-    for host in cfg["hosts"].values():
-        # do not add any rules for non infrastructure hosts
-        if len(host["roles"]) == 1:  # i.e. only common role
-            continue
 
-        hostname = host["hostname"]
+# functions to build rules; for use in role.additional_configuration
+def add_rule(cfg: dict, sources: list[dict], destinations: list[dict], actions: list[dict], comment:str=""):
+    rule =   {
+        "comment": comment,
+        "ipv4": {"sources": sources, "destinations":destinations},
+        "ipv6": {"sources": sources, "destinations":destinations},
+        "actions": actions
+    } 
 
-        if hostname in cfg["roles_to_hostnames"]["router"]:
-            # use special firewall source and destination
-            _add_firewall_ping_rules(host)
-        else:
-            _add_pings_rule_to_host(host)
+    cfg["firewall"]["rules"].append(rule)
 
 
-# firewall rule action for ping
-_ping = {"action": "allow", "type": "named", "protocol": "ping"}
+def location_all() -> dict:
+    return _all
 
 
-# allow everything to ping each host's routable interfaces
-def _add_pings_rule_to_host(cfg: dict):
-    hostname = cfg["hostname"]
-    _logger.info("adding firewall ping rules for %s", hostname)
+def location_internet() -> dict:
+    return _internet
 
-    host_rule = {
-        "comment": f"allow pings to host {hostname}",
-        "ipv4": {"sources": [_all], "destinations": []},
-        "ipv6": {"sources": [_all], "destinations": []},
-        "actions": [_ping]
+
+def location_firewall() -> dict:
+    return _fw
+
+
+def location(vlan: dict, hostname:str="") -> dict:
+    parse.non_empty_dict("vlan", vlan)
+
+    location: dict =  {"vlan": vlan}
+
+    if hostname: 
+        location["hostname"] = hostname
+
+    return location
+
+
+def allow_service(service: str, location:str="") -> dict:
+    return action_service("allow", service, location)
+
+
+def action_service(action:str, service:str, location:str="") -> dict:
+    # action is a named service; router role config is responsible for converting the service to a valid proto & port
+    if location:
+        location += " "
+
+    if service not in named_services:
+        raise ValueError(f" {location}invalid {action} service '{service}'; it is not a valid service name")
+
+    return {
+        "action": action, 
+        "type": "named", 
+        "protocol": service, 
+        "comment": ""
     }
 
-    for iface in cfg["interfaces"]:
-        if (iface["type"] not in {"std", "vlan"}) or (not iface["vlan"]["routable"]):
-            continue
 
-        # other hosts on the same non-routable vlan will be able to ping regardless
-        if not iface["vlan"]["routable"]:
-            continue
+def allow_proto_port(proto_port: dict, location="") -> dict:
+    return action_proto_port("allow", proto_port, location)
 
-        destination = {"vlan": iface["vlan"], "hostname": hostname}
 
-        host_rule["ipv4"]["destinations"].append(destination)
-        if iface["ipv6_address"]:
-            host_rule["ipv6"]["destinations"].append(destination)
+def action_proto_port(action: str, proto_port: dict, location="") -> dict:
+    # action is a dict of protocol & ports
+    # port(s) can be an int or a range separated by - or :
+    if not location:
+        location=str(proto_port)
 
-    cfg["firewall"]["rules"].append(host_rule)
+    protocol = parse.non_empty_string("proto", proto_port, location)
 
-# allow pings to and from the firewall
-def _add_firewall_ping_rules(cfg: dict):
-    hostname = cfg["hostname"]
-    _logger.info("adding ping rules for firewall (%s)", hostname)
+    if protocol not in ("tcp", "udp"):
+        raise ValueError(f"{location}.proto must be 'tcp' or 'udp'")
 
-    host_rule = {
-        "comment": f"allow pings to the firewall ({hostname})",
-        "ipv4": {"sources": [_all], "destinations": [_fw]},
-        "ipv6": {"sources": [_all], "destinations": [_fw]},
-        "actions": [_ping]
+    # allow singular and plural
+    if "port" in proto_port:
+        unparsed_ports = proto_port["port"]
+    elif "ports" in proto_port:
+        unparsed_ports = proto_port["ports"]
+    else:
+        raise KeyError(f"no port defined for {location}")
+
+    # port can be an int, a string with ':' or '-' for a range, or a list
+    if isinstance(unparsed_ports, int):
+        if unparsed_ports < 1:
+            raise ValueError(f"{location}.port must be greater than 0")
+        ports = [str(unparsed_ports)]
+    elif isinstance(unparsed_ports, str):
+        if not unparsed_ports:
+            raise ValueError(f"{location}.port cannot be empty")
+        ports = [unparsed_ports.replace("-", ":")]
+    elif isinstance(unparsed_ports, list):
+        ports = []
+        for j, port in enumerate(unparsed_ports, start=1):
+            if isinstance(port, int):
+                if port < 1:
+                    raise ValueError(f"{location}.port[{j}] must be greater than 0")
+                ports.append(str(port))
+            elif isinstance(port, str):
+                if not port:
+                    raise ValueError(f"{location}.port[{j}] cannot be empty")
+                ports.append(port.replace("-", ":"))
+            else:
+                raise ValueError(
+                    f"{location}.port[{j}] must be a string or int, not {type(port)}")
+    else:
+        raise ValueError(
+            f"{location}.port must be a string or int, not {type(unparsed_ports)}")
+
+    comment = proto_port.get("comment", "")
+
+    return {
+        "action": action,
+        "type": "protoport",
+        "protocol": protocol, 
+        "ports": ports, 
+        "comment": comment
     }
 
-    cfg["firewall"]["rules"].append(host_rule)
+# fake vlan configs for firewall rule source / destinations
+_all = {"vlan": {"name": "all", "dhcp_reservations": []}}
+_internet = {"vlan": {"name": "internet", "dhcp_reservations": []}}
+_fw = {"vlan": {"name": "firewall", "dhcp_reservations": []}}
 
-    host_rule = {
-        "comment": f"firewall ({hostname}) can ping everything",
-        "ipv4": {"sources": [_fw], "destinations": [_all, _internet]},
-        "ipv6": {"sources": [_fw], "destinations": [_all, _internet]},
-        "actions": [_ping]
-    }
+# TODO add functions for adding rules in additional_config
+# add_rule_to_location - takes locations like _fw, _all
+# add_rule_to_vlan - create vlan location
+# add_rule_to_host - add locations for each interface vlan
+# all take destination as hostname
 
-    cfg["firewall"]["rules"].append(host_rule)
+# maybe have a helper function to create locations then just have a rule function that takes src and dest?
+# location function takes vlan and optional host

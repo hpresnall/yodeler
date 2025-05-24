@@ -14,6 +14,7 @@ import script.resolv as resolv
 import script.shell as shell
 import script.sysctl as sysctl
 
+import config.firewall as fw
 
 class Common(Role):
     """Common setup required for all systems. This role _must_ be run before any other setup."""
@@ -45,6 +46,33 @@ class Common(Role):
                              "lm-sensors", "ethtool"])
 
         return packages
+
+    def additional_configuration(self):
+        # do not add any firewall rules for non infrastructure hosts
+        if len(self._cfg["roles"]) == 1:  # i.e. only common role
+            return
+
+        # different rules for the router / firewall
+        for role in self._cfg["roles"]:
+            if role == "router":
+                return
+
+        # allow all routable vlans to ping this host on all its interfaces
+        hostname = self._cfg["hostname"]
+        destinations = []
+
+        for iface in self._cfg["interfaces"]:
+            if (iface["type"] not in {"std", "vlan"}) or (not iface["vlan"]["routable"]):
+                continue
+
+            # other hosts on the same non-routable vlan will be able to ping regardless
+            if not iface["vlan"]["routable"]:
+                continue
+
+            destinations.append(fw.location(iface["vlan"], hostname))
+
+        fw.add_rule(self._cfg, [fw.location_all()], destinations, [fw.allow_service("ping")], f"allow pings to {hostname}")
+
 
     def validate(self):
         # ensure each vlan is only used once
