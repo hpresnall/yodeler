@@ -10,7 +10,7 @@ import role.roles as roles
 _logger = logging.getLogger(__name__)
 
 
-def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
+def validate(domain: str, vswitch: dict, other_vswitch_vlans: set, other_ipv4_subnets: set, other_ipv6_subnets: set):
     """Validate all the vlans defined in the vswitch."""
     vswitch_name = vswitch["name"]
 
@@ -28,22 +28,22 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
     ipv6_pd_network_count = 1
 
     for i, vlan in enumerate(vlans, start=1):
-        cfg_name = f"vswitch['{vswitch_name}'].vlan[{i}]"
-        parse.non_empty_dict(cfg_name, vlan)
+        location = f"vswitch['{vswitch_name}'].vlan[{i}]"
+        parse.non_empty_dict(location, vlan)
 
         # name is required and must be unique; lowercase for consistency
-        vlan_name = parse.non_empty_string("name", vlan, cfg_name).lower()
+        vlan_name = parse.non_empty_string("name", vlan, location).lower()
         vlan["name"] = vlan_name
 
         if vlan_name in vlans_by_name:
-            raise ValueError(f"duplicate name '{vlan_name}' for {cfg_name}")
+            raise ValueError(f"{location} duplicate name '{vlan_name}'")
         if vlan_name in other_vswitch_vlans:
-            raise ValueError(f"duplicate name '{vlan_name}' for {cfg_name}")
+            raise ValueError(f"{location} duplicate name '{vlan_name}'")
 
         other_vswitch_vlans.add(vlan_name)
         vlans_by_name[vlan_name] = vlan
 
-        cfg_name = f"vswitch['{vswitch_name}'].vlan['{vlan['name']}']"
+        location = f"vswitch['{vswitch_name}'].vlan['{vlan['name']}']"
 
         # vlan id must be unique
         # None is an allowed id and implies no vlan tagging
@@ -51,21 +51,21 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
 
         if vlan_id is not None:
             if not isinstance(vlan_id, int):
-                raise ValueError(f"non-integer id '{vlan_id}' for {cfg_name}")
+                raise ValueError(f"{location} non-integer id '{vlan_id}'")
             if (vlan_id < 1) or (vlan_id > 4094):
-                raise ValueError(f"invalid id '{vlan_id}' for {cfg_name}")
+                raise ValueError(f"{location} invalid id '{vlan_id}'")
 
         if vlan_id in vlans_by_id:
-            raise ValueError(f"duplicate id '{vlan_id}' for {cfg_name}")
+            raise ValueError(f"{location} duplicate id '{vlan_id}'")
 
         vlans_by_id[vlan_id] = vlan
 
-        parse.configure_defaults(cfg_name, DEFAULT_VLAN_CONFIG, _DEFAULT_VLAN_CONFIG_TYPES, vlan)
+        parse.configure_defaults(location, DEFAULT_VLAN_CONFIG, _DEFAULT_VLAN_CONFIG_TYPES, vlan)
 
         vlan["known_aliases"] = set()  # track for easier ducplicate checking of hosts/aliases
 
-        _validate_subnet(vswitch_name, vlan, "ipv4")
-        _validate_subnet(vswitch_name, vlan, "ipv6")
+        _validate_subnet(vswitch_name, vlan, "ipv4", other_ipv4_subnets)
+        _validate_subnet(vswitch_name, vlan, "ipv6", other_ipv6_subnets)
         _validate_dhcp_reservations(vswitch_name, vlan)
         _validate_static_hosts(vswitch_name, vlan)
         _validate_ipv6_pd_network(vlan, ipv6_pd_networks, ipv6_pd_network_count)
@@ -86,20 +86,20 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set):
     _configure_default_vlan(vswitch)
 
 
-def _validate_subnet(vswitch_name: str, vlan: dict, ip_version: str):
+def _validate_subnet(vswitch_name: str, vlan: dict, ip_version: str, other_subnets: set):
     # ipv4 subnet is required
     # ipv6 subnet is optional; this does not preclude addresses from a prefix assignment
     subnet = vlan.get(ip_version + "_subnet")
-    vlan_name = vlan["name"]
-    cfg_name = f"vswitch['{vswitch_name}'].vlan['{vlan['name']}']"
+    location = f"vswitch['{vswitch_name}'].vlan['{vlan['name']}']"
 
     if subnet is None:
         if ip_version == "ipv4":
-            raise KeyError(f"no {ip_version}_subnet for {cfg_name}")
+            raise KeyError(f"{location} no {ip_version}_subnet")
         if ip_version == "ipv6":
             vlan["ipv6_subnet"] = None
             return
-    subnet = str(subnet)
+    elif not isinstance(subnet, str):
+        raise ValueError(f"{location} invalid subnet '{subnet}'; it must be a string")
 
     # remove the subnet if the vlan disables ipv6
     if (ip_version == "ipv6") and (vlan["ipv6_disabled"]):
@@ -107,12 +107,16 @@ def _validate_subnet(vswitch_name: str, vlan: dict, ip_version: str):
         return
 
     try:
-        vlan[ip_version + "_subnet"] = subnet = ipaddress.ip_network(subnet)
+        vlan[ip_version + "_subnet"] = subnet = ipaddress.ip_network(str(subnet))
     except ValueError as ve:
-        raise ValueError(f"invalid {ip_version}_subnet for {cfg_name}") from ve
+        raise ValueError(f"{location} invalid {ip_version}_subnet") from ve
 
     if (ip_version == "ipv6") and (subnet.prefixlen > 64):
-        raise ValueError(f"invalid {ip_version}_subnet for {cfg_name}; the prefix length cannot be greater than 64")
+        raise ValueError(f"{location} invalid {ip_version}_subnet; the prefix length cannot be greater than 64")
+
+    if subnet in other_subnets:
+        raise ValueError(f"{location} {ip_version}_subnet {subnet} already in use")
+    other_subnets.add(subnet)
 
     # default to DHCP range over all addresses except the router
     min_key = "dhcp_min_address_" + ip_version
@@ -125,22 +129,22 @@ def _validate_subnet(vswitch_name: str, vlan: dict, ip_version: str):
     dhcp_max = subnet.network_address + dhcp_max
 
     if dhcp_min not in subnet:
-        raise ValueError(f"invalid {min_key} '{dhcp_min}' for vlan '{vlan_name}' for vswitch '{vswitch_name}'")
+        raise ValueError(f"{location} invalid {min_key} '{dhcp_min}'")
     if dhcp_max not in subnet:
-        raise ValueError(f"invalid {max_key} '{dhcp_max}' for vlan '{vlan_name}' for vswitch '{vswitch_name}'")
+        raise ValueError(f"{location} invalid {max_key} '{dhcp_max}'")
     if dhcp_min > dhcp_max:
-        raise ValueError(f"{min_key} > {max_key} for vlan '{vlan_name}' for vswitch '{vswitch_name}'")
+        raise ValueError(f"{location} {min_key} > {max_key}")
 
 
 def _validate_dhcp_reservations(vswitch_name: str, vlan: dict):
     reservations = vlan.setdefault("dhcp_reservations", [])
-    location = f"vswitch['{vswitch_name}'].vlan['{vlan['name']}']"
+    vlan_path = f"vswitch['{vswitch_name}'].vlan['{vlan['name']}']"
 
     if not isinstance(reservations, list):
-        raise KeyError(f"dhcp_reservations in {location} must be an array")
+        raise KeyError(f"{vlan_path} dhcp_reservations must be an array")
 
     for i, res in enumerate(reservations, start=1):
-        location = f"{location}.dhcp_reservations[{i}]"
+        location = f"{vlan_path}.dhcp_reservations[{i}]"
         parse.non_empty_dict(location, res)
 
         # hostname & mac address required; ip addresses are not
@@ -149,7 +153,7 @@ def _validate_dhcp_reservations(vswitch_name: str, vlan: dict):
         if "mac_address" in res:
             parse.validate_mac_address(res["mac_address"], location)
         else:
-            raise ValueError(f"no mac_address defined for {location}")
+            raise ValueError(f"{location} no mac_address defined")
 
         # no ip addresses specified => reservation of hostname only
         _validate_ipaddress("ipv4", vlan, res, location)
@@ -163,7 +167,7 @@ def _validate_static_hosts(vswitch_name: str, vlan: dict):
     location = f"vswitch['{vswitch_name}'].vlan['{vlan['name']}']"
 
     if not isinstance(hosts, list):
-        raise KeyError(f"static_hosts in {location} must be an array")
+        raise KeyError(f"{location} static_hosts must be an array")
 
     for i, host in enumerate(hosts, start=1):
         location = f"{location}.static_hosts[{i}]"
@@ -186,17 +190,18 @@ def _validate_ipv6_pd_network(vlan: dict, ipv6_pd_networks: set, ipv6_pd_network
 
     ipv6_pd_network = vlan.get("ipv6_pd_network", None)
     vlan_name = vlan["name"]
+    location = f"vlan['{vlan_name}'].ipv6_pd_network '{ipv6_pd_network}'"
 
     if ipv6_pd_network is not None:
         if not isinstance(ipv6_pd_network, int):
-            raise ValueError(f"vlan['{vlan_name}'].ipv6_pd_network '{ipv6_pd_network}' must be an integer")
+            raise ValueError(f"{location} must be an integer")
         if ipv6_pd_network < 1:
-            raise ValueError(f"vlan['{vlan_name}'].ipv6_pd_network '{ipv6_pd_network}' must be greater than 0")
+            raise ValueError(f"{location} must be greater than 0")
     else:
         vlan["ipv6_pd_network"] = ipv6_pd_network = ipv6_pd_network_count
 
     if ipv6_pd_network in ipv6_pd_networks:
-        raise ValueError(f"vlan['{vlan_name}'].ipv6_pd_network '{ipv6_pd_network}' already used for this vlan")
+        raise ValueError(f"{location} already used for this vlan")
 
     ipv6_pd_networks.add(ipv6_pd_network)
 

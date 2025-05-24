@@ -44,14 +44,14 @@ class TestVlan(base.TestCfgBase):
         self.build_error()
 
     def test_duplicate_vlan_name(self):
-        vlan2 = {"name": "pub_test", "id": 20, "ipv4_subnet": "192.168.2.0/24",
-                 "ipv6_subnet": "2001:db8:0:2::/64"}
+        vlan2 = {"name": "pub_test", "id": 30, "ipv4_subnet": "192.168.3.0/24",
+                 "ipv6_subnet": "2001:db8:0:3::/64"}
         self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
         self.build_error()
 
     def test_duplicate_vlan_id(self):
-        vlan2 = {"name": "test2", "id": 10, "ipv4_subnet": "192.168.2.0/24",
-                 "ipv6_subnet": "2001:db8:0:2::/64"}
+        vlan2 = {"name": "test2", "id": 10, "ipv4_subnet": "192.168.3.0/24",
+                 "ipv6_subnet": "2001:db8:0:3::/64"}
         self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
         self.build_error()
 
@@ -91,8 +91,8 @@ class TestVlan(base.TestCfgBase):
         self.build_error()
 
     def test_default_vlan(self):
-        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
-                 "ipv6_subnet": "2001:db8:0:2::/64", "default": True}
+        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.3.0/24",
+                 "ipv6_subnet": "2001:db8:0:3::/64", "default": True}
         self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
         cfg = self.build_cfg()
 
@@ -104,15 +104,15 @@ class TestVlan(base.TestCfgBase):
         self.assertTrue(vswitch["vlans_by_id"][20]["default"])
 
     def test_multiple_default_vlans(self):
-        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
-                 "ipv6_subnet": "2001:db8:0:2::/64", "default": True}
+        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.3.0/24",
+                 "ipv6_subnet": "2001:db8:0:3::/64", "default": True}
         self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
         self._site_yaml["vswitches"][0]["vlans"][0]["default"] = True
         self.build_error()
 
     def test_multiple_vlans_no_default(self):
-        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
-                 "ipv6_subnet": "2001:db8:0:2::/64"}
+        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.3.0/24",
+                 "ipv6_subnet": "2001:db8:0:3::/64"}
         self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
         cfg = self.build_cfg()
 
@@ -124,11 +124,23 @@ class TestVlan(base.TestCfgBase):
         self.assertFalse(vswitch["vlans_by_id"][20]["default"])
 
     def test_multiple_vlans_no_default_no_iface_vlan(self):
-        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
-                 "ipv6_subnet": "2001:db8:0:2::/64"}
+        vlan2 = {"name": "test2", "id": 30, "ipv4_subnet": "192.168.3.0/24",
+                 "ipv6_subnet": "2001:db8:0:3::/64"}
         self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
         # interface must set a vlan if there is no default
         del self._host_yaml["interfaces"][0]["vlan"]
+        self.build_error()
+
+    def test_duplicate_vlan_subnets(self):
+        # test ipv4 and ipv6
+        vlan2 = {"name": "test2", "id": 30, "ipv4_subnet": "192.168.2.0/24",
+                 "ipv6_subnet": "2001:db8:0:3::/64"}
+        self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
+
+        self.build_error()
+
+        vlan2 = {"name": "test2", "id": 30, "ipv4_subnet": "192.168.3.0/24",
+                 "ipv6_subnet": "2001:db8:0:2::/64"}
         self.build_error()
 
     def test_invalid_domain_vlan(self):
