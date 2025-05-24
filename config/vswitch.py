@@ -14,7 +14,13 @@ def validate(cfg: dict):
 
     # list of vswitches in yaml => dict of names to vswitches
     vswitches_by_name = cfg["vswitches"] = {}
+
+    # vlan names & subnets must be unique across all vswitches
     all_vlans = set()
+    all_ipv4_subnets = set()
+    all_ipv6_subnets = set()
+
+    # vswitches cannot share an uplink
     uplinks = set()
 
     # read uplink overrides first
@@ -30,7 +36,7 @@ def validate(cfg: dict):
         vswitch["name"] = vswitch_name
 
         if vswitches_by_name.get(vswitch_name) is not None:
-            raise KeyError(f"duplicate name {vswitch_name} defined for {location}")
+            raise KeyError(f"{location} duplicate vswitch '{vswitch_name}' defined")
         vswitches_by_name[vswitch_name] = vswitch
 
         vswitch_uplinks = parse.read_string_list_plurals({"uplink", "uplinks"}, vswitch, location + ".uplinks")
@@ -50,7 +56,7 @@ def validate(cfg: dict):
 
         vswitch["uplinks"] = vswitch_uplinks
 
-        vlan.validate(cfg["domain"], vswitch, all_vlans)
+        vlan.validate(cfg["domain"], vswitch, all_vlans, all_ipv4_subnets, all_ipv6_subnets)
 
 
 def _configure_overrides(cfg: dict) -> dict[str, dict]:

@@ -59,12 +59,12 @@ class TestInterface(base.TestCfgBase):
         self.assertEqual("pub_test", cfg["interfaces"][0]["vlan"]["name"])
 
     def test_none_interface_vlan_no_pvid_vswitch(self):
-        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
-                 "ipv6_subnet": "2001:db8:0:2::/64", "default": True}
+        vlan2 = {"name": "test2", "id": 30, "ipv4_subnet": "192.168.3.0/24",
+                 "ipv6_subnet": "2001:db8:0:3::/64", "default": True}
         self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
         self._host_yaml["interfaces"][0]["vlan"] = None
-        self._host_yaml["interfaces"][0]["ipv4_address"] = "192.168.2.1"
-        self._host_yaml["interfaces"][0]["ipv6_address"] = "2001:db8:0:2::1"
+        self._host_yaml["interfaces"][0]["ipv4_address"] = "192.168.3.1"
+        self._host_yaml["interfaces"][0]["ipv6_address"] = "2001:db8:0:3::1"
         cfg = self.build_cfg()
 
         # no interface vlan; should still be set to valid vlan in config
@@ -73,8 +73,8 @@ class TestInterface(base.TestCfgBase):
         self.assertEqual("test2", cfg["interfaces"][0]["vlan"]["name"])
 
     def test_none_interface_vlan_pvid_vswitch(self):
-        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
-                 "ipv6_subnet": "2001:db8:0:2::/64", "default": True}
+        vlan2 = {"name": "test2", "id": 30, "ipv4_subnet": "192.168.3.0/24",
+                 "ipv6_subnet": "2001:db8:0:3::/64", "default": True}
         self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
         self._site_yaml["vswitches"][0]["vlans"][0]["id"] = None
         del self._host_yaml["interfaces"][0]["vlan"]
@@ -86,12 +86,12 @@ class TestInterface(base.TestCfgBase):
         self.assertEqual("pub_test", cfg["interfaces"][0]["vlan"]["name"])
 
     def test_none_interface_vlan_no_default(self):
-        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.2.0/24",
-                 "ipv6_subnet": "2001:db8:0:2::/64"}
+        vlan2 = {"name": "test2", "id": 20, "ipv4_subnet": "192.168.3.0/24",
+                 "ipv6_subnet": "2001:db8:0:3::/64"}
         self._site_yaml["vswitches"][0]["vlans"].append(vlan2)
         self._host_yaml["interfaces"][0]["vlan"] = None
-        self._host_yaml["interfaces"][0]["ipv4_address"] = "192.168.2.1"
-        self._host_yaml["interfaces"][0]["ipv6_address"] = "2001:db8:0:2::1"
+        self._host_yaml["interfaces"][0]["ipv4_address"] = "192.168.3.1"
+        self._host_yaml["interfaces"][0]["ipv6_address"] = "2001:db8:0:3::1"
 
         self.build_error()
         # no PVID vlan defined in vswitch, no default vlan; should error
