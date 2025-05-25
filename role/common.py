@@ -54,7 +54,7 @@ class Common(Role):
 
         # different rules for the router / firewall
         for role in self._cfg["roles"]:
-            if role == "router":
+            if role.name == "router":
                 return
 
         # allow all routable vlans to ping this host on all its interfaces
