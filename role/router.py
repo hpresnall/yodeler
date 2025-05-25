@@ -442,6 +442,7 @@ _allowed_macros = {
     "ssh": "SSH",
     "telnet": "Telnet",
     "dns": "DNS",
+    "dhcp": "DHCPfwd",
     "ntp": "NTP",
     "smb": "SMB",
     "samba": "SMB",
@@ -542,10 +543,14 @@ def _create_shorewall_rule(rule: dict, rule_idx: int, shorewall: dict):
                         raise ValueError(
                             f"invalid firewall rule {rule_idx}; {action['protocol']} is not a valid protocol")
 
+                    comment = ""
+                    if action["comment"]:
+                        comment = "\t# " + action["comment"]
+
                     if ipv4:
-                        actions4.append(a + '\t' + s4 + '\t' + d4)
+                        actions4.append(a + '\t' + s4 + '\t' + d4 + comment)
                     if ipv6:
-                        actions6.append(a + '\t' + s6 + '\t' + d6)
+                        actions6.append(a + '\t' + s6 + '\t' + d6 + comment)
                 elif action["type"] == "protoport":
                     protocol = action["protocol"]
                     n = len(action["ports"])
@@ -559,7 +564,7 @@ def _create_shorewall_rule(rule: dict, rule_idx: int, shorewall: dict):
 
                     for i, port in enumerate(action["ports"]):
                         if (i == 0) and (n == 1) and action["comment"]:
-                            comment = '\t' + "# " + action["comment"]
+                            comment = "\t# " + action["comment"]
                         else:
                             comment = ""
 

@@ -593,7 +593,7 @@ def action_proto_port(action: str, proto_port: dict, location="", ipv4:bool=True
         "comment": comment
     }
 
-named_services = ["ping", "traceroute", "ssh", "telnet", "dns", "ntp", "samba", "web", "ftp", "mail", "pop3", "imap", "imaps"]
+named_services = ["ping", "traceroute", "ssh", "telnet", "dns", "dhcp", "ntp", "samba", "web", "ftp", "mail", "pop3", "imap", "imaps"]
 
 # fake vlan configs for firewall rule source / destinations
 _all = {"vlan": {"name": "all", "dhcp_reservations": []}, "ipv4": True, "ipv6": True}
