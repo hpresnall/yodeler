@@ -13,8 +13,6 @@ import config.vlan as vlans
 
 _logger = logging.getLogger(__name__)
 
-named_services = ["ping", "traceroute", "ssh", "telnet", "dns", "ntp", "samba", "web", "ftp", "mail", "pop3", "imap", "imaps"]
-
 def validate(cfg: dict):
     """Validate the firewall rules defined for the site.
 
@@ -40,6 +38,7 @@ def validate(cfg: dict):
 
     # parse rules last since they need ipset and hosts configuration
     cfg["firewall"]["rules"] = _parse_rules(cfg, firewall)  # type: ignore
+
 
 def _parse_ipsets(firewall: dict) -> tuple[dict, dict]:
     if not "ipsets" in firewall:
@@ -78,6 +77,7 @@ def _parse_ipsets(firewall: dict) -> tuple[dict, dict]:
         }
 
     return ipsets4, ipsets6
+
 
 def _parse_rules(cfg: dict, firewall: dict) -> list[dict]:
     if not "rules" in firewall:
@@ -124,6 +124,7 @@ def _parse_rules(cfg: dict, firewall: dict) -> list[dict]:
 
     return parsed_rules
 
+
 def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[dict]:
     parsed_locations = []
 
@@ -157,7 +158,7 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
             vlan_obj = _fw["vlan"]
             vlan = vlan_obj["name"]
         else:
-            vswitch = parse.non_empty_string("vswitch", loc, loc_name)
+            vswitch = parse.non_empty_string("vswitch", loc, loc_name + f" for vlan '{vlan}'")
 
             if vswitch not in cfg["vswitches"]:
                 raise ValueError(f"{loc_name} invalid vswitch '{vswitch}'")
@@ -179,14 +180,21 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
         if "hostname" in loc:
             if vlan == "firewall":
                 raise KeyError(f"{loc_name} cannot set hostname when vlan is 'firewall'")
-            elif vlan == "internet":
-                raise KeyError(f"{loc_name} cannot set hostname when vlan is 'internet'")
             elif "ipset" in loc:
                 raise KeyError(f"{loc_name} cannot set hostname and ipset")
             elif ("ipv4_address" in loc) or ("ipv6_address" in loc):
                 raise KeyError(f"{loc_name} cannot set hostname and ip address")
 
             hostname = parse.non_empty_string("hostname", loc, loc_name).lower()
+
+            if (vlan == "internet"):
+                found = False
+                for ext in cfg["external_hosts"]:
+                    if hostname in ext["hostnames"]:
+                        found = True
+                        break
+                if not found:
+                    raise ValueError(f"{location} hostname '{hostname}' is not defined in external_hosts")
 
             # cannot validate against cfg["hosts"] here since hosts have not yet been defined
             parsed_location["hostname"] = hostname
@@ -219,7 +227,11 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
                     raise ValueError(f"{loc_name} invalid ipv4 address '{loc['ipv4_address']}'") from ve
                 if not isinstance(address, ipaddress.IPv4Address):
                     raise ValueError(f"{loc_name} invalid ipv4 address '{loc['ipv4_address']}'")
-                if vlan_obj and (address not in vlan_obj["ipv4_subnet"]):
+
+                # address must be in the vlan or not in any vlans
+                if vlan == "internet":
+                    _check_internet_address(cfg, address, location)
+                elif address not in vlan_obj["ipv4_subnet"]:
                     raise ValueError(
                         f"{loc_name} invalid ipv4 address '{loc['ipv4_address']}'; it is not in vlan '{vlan}'")
                 parsed_location["ipv4_address"] = str(address)
@@ -235,7 +247,11 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
                     raise ValueError(f"{loc_name} invalid ipv6 address '{loc['ipv6_address']}'") from ve
                 if not isinstance(address, ipaddress.IPv6Address):
                     raise ValueError(f"{loc_name} invalid ipv6 address '{loc['ipv6_address']}'")
-                if vlan_obj and vlan_obj["ipv6_subnet"] and (address not in vlan_obj["ipv6_subnet"]):
+
+                # address must be in the vlan or not in any vlans
+                if vlan == "internet":
+                    _check_internet_address(cfg, address, location)
+                elif vlan_obj["ipv6_subnet"] and (address not in vlan_obj["ipv6_subnet"]):
                     raise ValueError(
                         f"{loc_name} invalid ipv6 address '{loc['ipv6_address']}'; it is not in vlan '{vlan}'")
                 parsed_location["ipv6_address"] = str(address)
@@ -248,8 +264,17 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
 
     return parsed_locations
 
-def _parse_action(action_type: str, actions: list, location: str) -> list[dict]:
+
+def _parse_action(action_type: str, actions: str|dict|list, location: str) -> list[dict]:
     base = location + "." + action_type
+
+    # accept single string or obj
+    if isinstance(actions, str):
+        return [action_service(action_type, actions, base)]
+    elif isinstance(actions, dict):
+        return [action_proto_port(action_type, actions, base)]
+    # else assume list
+
     actions = parse.non_empty_list(location, actions)
     parsed_actions = []
 
@@ -265,6 +290,7 @@ def _parse_action(action_type: str, actions: list, location: str) -> list[dict]:
                 f"{location} must be a string or dict, not {type(action)}")
 
     return parsed_actions
+
 
 def validate_full_site(cfg: dict):
     """Validates that all hostnames referenced in firewall rules exist. Converts all aliases to the actual hostname.
@@ -284,7 +310,8 @@ def validate_full_site(cfg: dict):
     rules_to_delete.reverse()
 
     for rule in rules_to_delete:
-        cfg["firewall"].pop(rule)
+        cfg["firewall"]["rules"].pop(rule)
+
 
 def _validate_location_hostname(cfg: dict, rule: dict, idx: int, src_or_dest: str):
     # allow 'hostname' in firewall rules to be an alias, static hostname mapping or DHCP reserved name
@@ -294,7 +321,6 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, src_or_dest: st
     locations_to_remove = []
 
     for i, location in enumerate(rule[src_or_dest], start=1):
-        # TODO check ipaddress and replace with hostname if possible; error if ipv4 and ipv4 do not match
         if not "hostname" in location:
             continue
 
@@ -305,9 +331,9 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, src_or_dest: st
         found = hostname in cfg["hosts"]
 
         if found:
-            if _validate_host_vlan(cfg, hostname, vlan, loc_name, location):
-                _logger.debug("%s found '%s' as a top-level host", loc_name, hostname)
-            else:
+            _logger.debug("%s found '%s' as a top-level host", loc_name, hostname)
+
+            if not _validate_host_vlan(cfg, hostname, vlan, loc_name, location):
                 locations_to_remove.append(i-1)
                 _logger.debug("%s removing rule for host '%s' without any ip addresses", loc_name, hostname)
             continue
@@ -333,7 +359,7 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, src_or_dest: st
                 # external hosts must have an ipv4 address; ipv6 is optional
                 _logger.debug("%s found '%s' as an external hosts", loc_name, hostname)
                 if not ext["ipv6_address"]:
-                    _logger.debug("%s external host '%s' has no ipv6 address", loc_name, hostname)
+                    _logger.debug("%s external host '%s' has no ipv6 address; disabling ipv6 rule", loc_name, hostname)
                     location["ipv6"] = False
                 break
 
@@ -347,36 +373,38 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, src_or_dest: st
 
         if hostname not in vlan["known_aliases"]:
             raise ValueError(
-                f"{loc_name} invalid hostname '{hostname}'; could not find a site-level host or alias, DHCP reservation or static host in vlan '{vlan['name']}', or an external host")
+                f"{loc_name} invalid hostname '{hostname}'; could not find as a DHCP reservation or static host in vlan '{vlan['name']}', or as an external host")
+        # else vlan defines hostname; now find it
 
         for vlan_host in vlan["dhcp_reservations"] + vlan["static_hosts"]:
             if (hostname == vlan_host["hostname"]):
-                _logger.debug("%s found '%s' as an DHCP reservation in vlan '%s'", loc_name, hostname, vlan["name"])
+                _logger.debug("%s found '%s' as a host in vlan '%s'", loc_name, hostname, vlan["name"])
                 found = True
             elif hostname in vlan_host["aliases"]:
-                _logger.debug("%s found '%s' as DHCP reservation alias for '%s' in vlan '%s'", loc_name, hostname, vlan_host["hostname"], vlan["name"])
+                _logger.debug("%s found '%s' as a host alias for '%s' in vlan '%s'", loc_name, hostname, vlan_host["hostname"], vlan["name"])
                 location["hostname"] = hostname = vlan_host["hostname"] # update alias to actual hostname
                 found = True
 
             if found:
-
                 # reservation address must be in vlan; no need to recheck here
                 # but, reservation could be for hostname only; remove location if no address defined
                 if not vlan_host["ipv4_address"]:
+                    _logger.debug("%s vlan host '%s' has no ipv4 address; disabling ipv4 rule", loc_name, hostname)
                     location["ipv4"] = False
                 if not vlan_host["ipv6_address"]:
+                    _logger.debug("%s vlan host '%s' has no ipv6 address; disabling ipv6 rule", loc_name, hostname)
                     location["ipv6"] = False
                     # reservation address must be in vlan; no need to recheck here
 
                 if not location["ipv4"] and not location["ipv6"] :
                     locations_to_remove.append(i-1)
-                    _logger.debug("%s removing rule for DHCP reservation '%s' without any ip addresses", loc_name, hostname)
+                    _logger.debug("%s removing rule for vlan host '%s' without any ip addresses", loc_name, hostname)
                 break
 
         if not found:
             # if this happens, vlan["known_aliases"] does not line up with the rest of the vlan config
             raise ValueError(
-                f"{loc_name} invalid hostname '{hostname}'; could not find a site-level host or alias, DHCP reservation or static host in vlan '{vlan['name']}', or an external host")
+                f"{loc_name} invalid hostname '{hostname}'; could not find as a DHCP reservation or static host in vlan '{vlan['name']}', or as an external host")
     # for locations
 
     # reverse so pop() does not cause reordering
@@ -385,20 +413,38 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, src_or_dest: st
     for location in locations_to_remove:
         rule[src_or_dest].pop(location)
 
+
+def _check_internet_address(cfg: dict, address: ipaddress.IPv4Address | ipaddress.IPv6Address, location:str):
+    # confirm ip address is not in any internal vlan
+    for vswitch in cfg["vswitches"].values():
+        for vlan in vswitch["vlans"]:
+            if isinstance(address, ipaddress.IPv4Address):
+                subnet_key = "ipv4_subnet"
+            elif isinstance(address, ipaddress.IPv6Address):
+                subnet_key = "ipv6_subnet"
+
+            if address in vlan[subnet_key]:
+                raise ValueError(f"{location} ip address '{address}' is in vlan {vlan['name']}, not on the internet")
+
+
 def _validate_host_vlan(cfg: dict, hostname: str, vlan: dict, loc_name: str, location: dict) -> bool:
+    # ensure host has an interface on the rule's vlan
+    # disable location for ip versions if DHCP or no ipv6
     for iface in cfg["hosts"][hostname]["interfaces"]:
         if iface["vlan"]["name"] == vlan["name"]:
             if iface["ipv4_address"] == "dhcp":
-                _logger.debug("%s host '%s' has a DHCP ipv4 address on interface '%s' for vlan '%s'; removing it", loc_name, hostname, iface["name"], vlan["name"])
+                _logger.debug("%s host '%s' has a DHCP ipv4 address on interface '%s' for vlan '%s'; disabling ipv4 rule", loc_name, hostname, iface["name"], vlan["name"])
                 location["ipv4"] = False
 
             if not iface["ipv6_address"]:
-                _logger.debug("%s host '%s' does not have an ipv6 address on interface '%s' for vlan '%s'; removing it", loc_name, hostname, iface["name"], vlan["name"])
+                _logger.debug("%s host '%s' does not have an ipv6 address on interface '%s' for vlan '%s'; disabling ipv6 rule", loc_name, hostname, iface["name"], vlan["name"])
                 location["ipv6"] = False
 
-            return location["ipv4"] and location["ipv6"]
+            # true if any ip address
+            return location["ipv4"] or location["ipv6"]
 
     raise ValueError(f"{loc_name} invalid host '{hostname}'; it has no interface defined in vlan '{vlan['name']}'")
+
 
 # functions to build rules; for use in role.additional_configuration
 def add_rule(cfg: dict, sources: list[dict], destinations: list[dict], actions: list[dict], comment:str=""):
@@ -418,14 +464,18 @@ def add_rule(cfg: dict, sources: list[dict], destinations: list[dict], actions: 
 
     cfg["firewall"]["rules"].append(rule)
 
+
 def location_all() -> dict:
     return _all
+
 
 def location_internet() -> dict:
     return _internet
 
+
 def location_firewall() -> dict:
     return _fw
+
 
 def location(vlan: dict, hostname:str="", ipv4:bool=True,  ipv6:bool=True) -> dict:
     parse.non_empty_dict("vlan", vlan)
@@ -441,19 +491,26 @@ def location(vlan: dict, hostname:str="", ipv4:bool=True,  ipv6:bool=True) -> di
 
     return location
 
+
 def allow_service(service: str, location:str="", ipv4:bool=True,  ipv6:bool=True) -> dict:
     return action_service("allow", service, location, ipv4, ipv6)
+
 
 def action_service(action:str, service:str, location:str="", ipv4:bool=True,  ipv6:bool=True) -> dict:
     # action is a named service; router role config is responsible for converting the service to a valid proto & port
     if location:
         location += " "
 
+    if not action:
+        raise ValueError(f"{location}action must be specified")
+    if not service:
+        raise ValueError(f"{location}service must be specified")
     if not ipv4 and not ipv6:
         raise ValueError(f"{location}ipv4 and ipv6 cannot both be false")
-
     if service not in named_services:
         raise ValueError(f"{location}invalid {action} service '{service}'; it is not a valid service name")
+    if action not in ["allow", "forward"]:
+        raise ValueError(f"{location} action must be 'allow' or 'forward'")
 
     return {
         "action": action, 
@@ -464,8 +521,10 @@ def action_service(action:str, service:str, location:str="", ipv4:bool=True,  ip
         "comment": ""
     }
 
+
 def allow_proto_port(proto_port: dict, location="", ipv4:bool=True,  ipv6:bool=True) -> dict:
     return action_proto_port("allow", proto_port, location, ipv4, ipv6)
+
 
 def action_proto_port(action: str, proto_port: dict, location="", ipv4:bool=True,  ipv6:bool=True) -> dict:
     # action is a dict of protocol & ports
@@ -473,8 +532,14 @@ def action_proto_port(action: str, proto_port: dict, location="", ipv4:bool=True
     if not location:
         location=str(proto_port)
 
+    if not action:
+        raise ValueError(f"{location}action must be specified")
     if not ipv4 and not ipv6:
         raise ValueError(f"{location} ipv4 and ipv6 cannot both be false")
+    if action not in ["allow", "forward"]:
+        raise ValueError(f"{location} action must be 'allow' or 'forward'")
+
+    parse.non_empty_dict("proto_port" if location == "{}" else location, proto_port)
 
     protocol = parse.non_empty_string("proto", proto_port, location)
 
@@ -528,7 +593,9 @@ def action_proto_port(action: str, proto_port: dict, location="", ipv4:bool=True
         "comment": comment
     }
 
+named_services = ["ping", "traceroute", "ssh", "telnet", "dns", "ntp", "samba", "web", "ftp", "mail", "pop3", "imap", "imaps"]
+
 # fake vlan configs for firewall rule source / destinations
 _all = {"vlan": {"name": "all", "dhcp_reservations": []}, "ipv4": True, "ipv6": True}
-_internet = {"vlan": {"name": "internet", "dhcp_reservations": []}, "ipv4": True, "ipv6": True}
+_internet = {"vlan": {"name": "internet", "dhcp_reservations": [], "known_aliases": []}, "ipv4": True, "ipv6": True}
 _fw = {"vlan": {"name": "firewall", "dhcp_reservations": []}, "ipv4": True, "ipv6": True}

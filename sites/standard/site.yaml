@@ -136,5 +136,4 @@ firewall:
       destination:
         vswitch: public
         vlan: server
-      allow:
-        - ssh
+      allow: ssh # allow single string or proto / port instead of an array

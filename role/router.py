@@ -266,6 +266,7 @@ def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):
             raise KeyError((f"pd network {ipv6_pd_network} is larger than the {maxnetworks} " +
                             f" networks available with the 'ipv6_pd_prefixlen' of {prefixlen}"))
 
+
 def _write_dhcrelay_config(cfg: dict, setup: shell.ShellScript, dhrelay4_ifaces: list, dhrelay6_ifaces: list, shorewall: dict):
     dhcp_server = cfg["hosts"][cfg["roles_to_hostnames"]["dhcp"][0]]
     dhcp_addresses = interfaces.find_ips_to_interfaces(cfg, dhcp_server["interfaces"], first_match_only=False)
@@ -328,6 +329,7 @@ def _write_dhcrelay_config(cfg: dict, setup: shell.ShellScript, dhrelay4_ifaces:
         setup.service("dhcrelay6")
         setup.blank()
 
+
 def _init_shorewall(cfg: dict):
     # dict of shorewall config files; will be appended for each vswitch / vlan
     shorewall = {}
@@ -344,6 +346,7 @@ def _init_shorewall(cfg: dict):
     shorewall["rules6"] = [file.read_template("router/shorewall", "rules6")]
 
     return shorewall
+
 
 def _configure_shorewall_vlan(shorewall, vswitch_name, vlan):
     vlan_name = vlan["name"]
@@ -365,6 +368,7 @@ def _configure_shorewall_vlan(shorewall, vswitch_name, vlan):
 
     # snat only on ipv4; ipv6 will be routable
     shorewall["snat"].append(f"MASQUERADE\t{vlan['ipv4_subnet']}\t$INTERNET")
+
 
 def _add_shorewall_host_params(cfg: dict, shorewall: dict):
     # add a param for each host interface if it is on a routable vlan and has an address
@@ -430,6 +434,7 @@ def _add_shorewall_host_params(cfg: dict, shorewall: dict):
                 shorewall["params6"].append(
                     f"{hostname}_INET=inet:{host['ipv6_address']}")
 
+
 # map firewall keywords to shorwall macro names
 _allowed_macros = {
     "ping": "Ping",
@@ -451,6 +456,7 @@ _allowed_macros = {
 for service in fw.named_services:
     if service not in _allowed_macros:
         raise KeyError(f"firewall service '{service}' has no Shorewall macro defined")
+
 
 def _build_shorewall_location(location: dict) -> str:
     vlan = location["vlan"]
@@ -479,6 +485,7 @@ def _build_shorewall_location(location: dict) -> str:
     else:
         return vlan
 
+
 def _add_ipadress_to_shorewall_location(location:dict, shorewall_loc: str, ip_version:int) -> str:
     key = f"ip{ip_version}_version"
 
@@ -488,6 +495,7 @@ def _add_ipadress_to_shorewall_location(location:dict, shorewall_loc: str, ip_ve
         return f"{shorewall_loc}:{address}"
     
     return shorewall_loc
+
 
 def _create_shorewall_rule(rule: dict, rule_idx: int, shorewall: dict):
     loc = f"firewall.rules[{rule_idx}]"
@@ -573,6 +581,7 @@ def _create_shorewall_rule(rule: dict, rule_idx: int, shorewall: dict):
             shorewall["rules6"].append("# " + rule["comment"])
         shorewall["rules6"].extend(actions6)
         shorewall["rules6"].append("")
+
 
 def _write_shorewall_config(cfg: dict, shorewall: dict, setup: shell.ShellScript, output_dir: str):
     shorewall4 = os.path.join(output_dir, "shorewall")
