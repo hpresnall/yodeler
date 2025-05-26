@@ -23,7 +23,7 @@ class TestVswitch(base.TestCfgBase):
         self.build_error()
 
     def test_nonobject_vswitch(self):
-        self._site_yaml["vswitches"] = [ "invalid" ]
+        self._site_yaml["vswitches"] = ["invalid"]
         self.build_error()
 
     def test_no_vswitch_name(self):
@@ -54,7 +54,7 @@ class TestVswitch(base.TestCfgBase):
         self.build_error()
 
     def test_multi_uplink(self):
-        del self._site_yaml["vswitches"][0]["uplink"] 
+        del self._site_yaml["vswitches"][0]["uplink"]
         self._site_yaml["vswitches"][0]["uplinks"] = ["eth0", "eth1"]
         cfg = self.build_cfg()
 

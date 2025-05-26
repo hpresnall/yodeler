@@ -66,12 +66,13 @@ def load(site_dir: str | None, profile_name: str | None = None) -> dict:
 
     return site_cfg
 
-# exposed for testing
+
 def validate(site_yaml: dict | str | None) -> dict:
     """Validate the given YAML formatted site configuration.
 
     This configuration _is not_ valid for creating a set of scripts for a specific host.
     Instead, this configuration must be used as the base for loading host YAML files.
+    Exposed for testing. In normal usage this will be called as part of building the site.
     """
     site_yaml = parse.non_empty_dict("site_yaml", site_yaml)
 
@@ -250,8 +251,8 @@ def _validate_full_site(site_cfg: dict):
 
     _logger.debug("all_aliases=%s", aliases)
 
-    # finally, confirm that all the firewall rules point to valid hostnames / aliases
-    firewall.validate_rule_hostnames(site_cfg)
+    # finally, confirm & clean up and add base firewall rules now that all hosts are known
+    firewall.validate_full_site(site_cfg)
 
 
 def _validate_external_hosts(cfg: dict):

@@ -8,6 +8,7 @@ import script.shell as shell
 import script.sysctl as sysctl
 
 import config.interfaces as interfaces
+import config.firewall as fw
 
 
 class Dns(Role):
@@ -16,6 +17,19 @@ class Dns(Role):
 
     def additional_packages(self):
         return {"pdns", "pdns-recursor", "pdns-backend-sqlite3", "pdns-doc", "pdns-openrc", "bind-tools"}
+
+    def additional_configuration(self):
+        # allow all routable vlans DNS access to this host on all its interfaces
+        hostname = self._cfg["hostname"]
+        destinations = fw.destinations_from_interfaces(self._cfg["interfaces"], hostname)
+
+        actions = [
+            fw.allow_service("dns"),
+            fw.allow_proto_port({"proto": "tcp", "port": 553}),
+            fw.allow_proto_port({"proto": "udp", "port": 553})
+        ]
+
+        fw.add_rule(self._cfg, [fw.location_all()], destinations, actions, f"DNS and nsupdate for {hostname}")
 
     def validate(self):
         if len(self._cfg["external_dns"]) == 0:

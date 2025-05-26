@@ -8,11 +8,30 @@ import script.shell as shell
 
 import config.interfaces as interfaces
 
+import config.firewall as fw
+
+
 class Dhcp(Role):
     """Dhcp defines the configuration needed to setup Kea DHCP."""
 
     def additional_packages(self):
         return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-dhcp-ddns", "kea-admin", "kea-ctrl-agent"}
+
+    def additional_configuration(self):
+        hostname = self._cfg["hostname"]
+
+        actions4 = [fw.allow_service("dhcp", ipv6=False)]
+        actions4[0]["comment"] = "allow direct DHCP renew requests"
+
+        actions6 = [fw.allow_proto_port({"proto": "udp", "port": "546:547"}, ipv4=False)]
+        actions6[0]["comment"] = "allow DHCP relay"
+
+        # allow all routable vlans DHCP access to this host on all its interfaces
+        destinations = fw.destinations_from_interfaces(self._cfg["interfaces"], hostname)
+
+        fw.add_rule(self._cfg, [fw.location_all()], destinations, actions4,
+                    f"DHCP for {hostname}; DHCP broadcast handled by dhcp option in interface config")
+        fw.add_rule(self._cfg, [fw.location_all()], destinations, actions6, f"DHCP for {hostname}")
 
     def validate(self):
         for iface in self._cfg["interfaces"]:

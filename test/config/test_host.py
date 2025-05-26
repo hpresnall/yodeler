@@ -210,8 +210,8 @@ class TestHost(base.TestCfgBase):
             cfg["roles"][0].validate()
 
     def test_duplicate_routable_vlans_on_switch(self):
-        vlan =  {"name": "test2", "id": 30, "ipv4_subnet": "192.168.3.0/24",
-                 "ipv6_subnet": "2001:db8:0:3::/64", "default": True}
+        vlan = {"name": "test2", "id": 30, "ipv4_subnet": "192.168.3.0/24",
+                "ipv6_subnet": "2001:db8:0:3::/64", "default": True}
         vlan["name"] = "test"
         vlan["id"] = 123
         self._site_yaml["vswitches"][0]["vlans"].append(vlan)
