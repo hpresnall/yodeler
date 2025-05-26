@@ -95,6 +95,7 @@ def load(role_name: str, host_cfg: dict) -> Role:
 
 _role_class_by_name = {}
 
+
 def names() -> list[str]:
     return sorted(_role_class_by_name.keys())
 

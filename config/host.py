@@ -45,12 +45,14 @@ def load(site_cfg: dict, host_path: str | None) -> dict:
 
     return host_cfg
 
-# exposed for testing
+
+
 def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     """Validate the given YAML formatted host configuration.
 
     Returns a configuration file that is a combination of the site and host configuration.
     This merged configuration is valid for creating a set of scripts for a specific host.
+    Exposed for testing. In normal usage this will be called as part of building the site.
     """
     site_cfg = parse.non_empty_dict("site_cfg", site_cfg)
     host_yaml = parse.non_empty_dict("host_yaml", host_yaml)

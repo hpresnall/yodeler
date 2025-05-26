@@ -118,12 +118,17 @@ class Router(Role):
         # allow pings to and from the firewall
         ping = fw.allow_service("ping")
 
-        fw.add_rule(self._cfg, [fw.location_firewall()], [fw.location_all(), fw.location_internet()], [ping], f"firewall ({hostname}) can ping everything")
-        fw.add_rule(self._cfg, [fw.location_all()], [fw.location_firewall()], [ping], f"allow pings to the firewall ({hostname})")
+        fw.add_rule(self._cfg, [fw.location_firewall()], [fw.location_all(), fw.location_internet()],
+                    [ping], f"firewall ({hostname}) can ping everything")
+        fw.add_rule(self._cfg, [fw.location_all()], [fw.location_firewall()],
+                    [ping], f"allow pings to the firewall ({hostname})")
 
         # allow other services
-        fw.add_rule(self._cfg, [fw.location_firewall()], [fw.location_internet()], [fw.allow_service("traceroute")], f"allow traceroute from the firewall ({hostname})")
-        fw.add_rule(self._cfg, [fw.location_firewall()], [fw.location_internet()], [fw.allow_service("dns")], f"firewall ({hostname}) can send DNS out so it does not depend on local DNS being up")
+        fw.add_rule(self._cfg, [fw.location_firewall()], [fw.location_internet()],
+                    [fw.allow_service("traceroute")], f"allow traceroute from the firewall ({hostname})")
+        fw.add_rule(self._cfg, [fw.location_firewall()], [fw.location_internet()],
+                    [fw.allow_service("dns")],
+                    f"firewall ({hostname}) can send DNS out so it does not depend on local DNS being up")
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -383,7 +388,7 @@ def _add_shorewall_host_params(cfg: dict, shorewall: dict):
             if iface["vlan"]["routable"]:
                 vlan_name = iface["vlan"]["name"]
                 host_vlan = (host["hostname"] + "_" + vlan_name).upper()
-                
+
                 if iface["ipv4_address"] != "dhcp":
                     shorewall["params"].append(f"{host_vlan}={vlan_name}:{iface['ipv4_address']}")
                 if iface["ipv6_address"]:
@@ -472,7 +477,7 @@ def _build_shorewall_location(location: dict) -> str:
         # host, ipset and ip address are not allowed for firewall vlan
         return "$FW"
     else:
-        vlan = vlan["name"] # also handles 'all'
+        vlan = vlan["name"]  # also handles 'all'
 
     # location from firewall.py has optional hostname, ipset or ip address
     if "hostname" in location:
@@ -487,14 +492,14 @@ def _build_shorewall_location(location: dict) -> str:
         return vlan
 
 
-def _add_ipadress_to_shorewall_location(location:dict, shorewall_loc: str, ip_version:int) -> str:
+def _add_ipadress_to_shorewall_location(location: dict, shorewall_loc: str, ip_version: int) -> str:
     key = f"ip{ip_version}_version"
 
     if key in location:
-        address  = location["key"]
+        address = location["key"]
         # assume firewall config already confirmed address matches ip version
         return f"{shorewall_loc}:{address}"
-    
+
     return shorewall_loc
 
 

@@ -21,22 +21,11 @@ class NTP(Role):
         return ["time", "sntp"]
 
     def additional_configuration(self):
+        # allow all routable vlans NTP access to this host on all its interfaces
         hostname = self._cfg["hostname"]
-        destinations = []
-
-        # allow all routable vlans DNS access to this host on all its interfaces
-        for iface in self._cfg["interfaces"]:
-            if (iface["type"] not in {"std", "vlan"}) or (not iface["vlan"]["routable"]):
-                continue
-
-            # other hosts on the same non-routable vlan will be able to access regardless
-            if not iface["vlan"]["routable"]:
-                continue
-
-            destinations.append(fw.location(iface["vlan"], hostname))
+        destinations = fw.destinations_from_interfaces(self._cfg["interfaces"], hostname)
 
         fw.add_rule(self._cfg, [fw.location_all()], destinations, [fw.allow_service("ntp")], f"NTP for {hostname}")
-
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

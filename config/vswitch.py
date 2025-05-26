@@ -47,7 +47,7 @@ def validate(cfg: dict):
             old_uplinks = vswitch_uplinks
             vswitch_uplinks = overrides[vswitch_name]["uplinks"]
             _logger.debug(f"profile['{cfg['profile']['name']}'] overriding uplinks for vswitch "
-                         f"'{vswitch_name}': {old_uplinks} -> {vswitch_uplinks}")
+                          f"'{vswitch_name}': {old_uplinks} -> {vswitch_uplinks}")
 
         for j, uplink in enumerate(vswitch_uplinks, start=1):
             if uplink in uplinks:

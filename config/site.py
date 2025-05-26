@@ -67,6 +67,8 @@ def load(site_dir: str | None, profile_name: str | None = None) -> dict:
     return site_cfg
 
 # exposed for testing
+
+
 def validate(site_yaml: dict | str | None) -> dict:
     """Validate the given YAML formatted site configuration.
 
