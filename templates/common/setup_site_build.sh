@@ -14,7 +14,7 @@ if [ -z $$SITE_DIR ]; then
 fi;
 
 # configure build environment for any setup that requires non-apk packages or additional work to configure
-# this images file will be will be shared at the site level
+# this image file will be will be shared at the site level
 # it will be mounted so that setup can copy files and chroot into it, if needed
 SITE_BUILD_DIR=$$SITE_DIR/site_build
 mkdir -p $$SITE_BUILD_DIR
@@ -39,7 +39,7 @@ if [ ! -f "$$SITE_BUILD_DIR/site_build.img" ]; then
   $$SITE_BUILD_DIR/alpine-make-vm-image/alpine-make-vm-image \
   --image-format raw \
   --serial-console \
-  --image-size 2048M \
+  --image-size 4096M \
   --repositories-file /etc/apk/repositories \
   "$$SITE_BUILD_DIR/site_build.img"
 else

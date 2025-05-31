@@ -193,6 +193,15 @@ class Common(Role):
             if self._cfg["host_backup"]:
                 setup.comment("mount /backup at boot")
                 setup.append("echo -e \"backup\\t/backup\\tvirtiofs\\trw,relatime\\t0\\t0\" >> /etc/fstab")
+                setup.blank()
+
+            # backup dir already available in /tmp/backup via create_vm.sh's contributions to yodel.sh
+            setup.comment("backup was copied to /tmp via fs-skel-dir in yodel.sh")
+            setup.append("export BACKUP=/tmp/backup")
+        else:
+            # backup dir copied into host's site dir via create_physical.sh's contributions to yodel.sh
+            setup.substitute("physical", "setup_backup.sh", self._cfg)
+            setup.append("export BACKUP=/backup")
 
 
 def _setup_repos(cfg: dict, setup: shell.ShellScript):

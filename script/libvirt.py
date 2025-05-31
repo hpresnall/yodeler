@@ -86,7 +86,7 @@ def _disk_passthrough(disk_cfg: dict) -> xml.Element:
     </hostdev>
     """
     disk = xml.Element("hostdev", {"mode": "subsystem", "type": "pci", "managed": "yes"})
-    disk.insert(0, xml.Comment(f"PCI passthrough of {disk_cfg['host_path']} for {disk_cfg['name']}"))
+    disk.insert(0, xml.Comment(f"PCI passthrough of {disk_cfg['host_path']} for {disk_cfg['name']}"))  # type: ignore
     source = xml.SubElement(disk, "source")
     xml.SubElement(source, "address", {
         "domain": "0x0000",  # domain is always 0
@@ -150,7 +150,7 @@ def passthrough_interface(passthrough: dict, mac_address: str) -> xml.Element:
     </interface>
     """
     interface = xml.Element("interface", {"type": "hostdev", "managed": "yes"})
-    interface.insert(0, xml.Comment(f"PCI passthrough of {passthrough['name']}"))
+    interface.insert(0, xml.Comment(f"PCI passthrough of {passthrough['name']}")) # type: ignore
     source = xml.SubElement(interface, "source")
     xml.SubElement(source, "address",
                    {"type": "pci",

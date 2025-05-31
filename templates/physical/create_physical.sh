@@ -44,7 +44,8 @@ mount ${SYSTEM_DEV}${SYSTEM_PARTITION} "$$INSTALLED"
 
 log "Copying Yodeler site '$SITE_NAME' to $$INSTALLED/root/" 
 # do not include logs dir as that will stop output for this script
-# includes existing build image
+# includes existing site build image and backups for this host and all VMs
+# also includes APK cache from Alpine install
 rsync -r --exclude logs "$$SITE_DIR" "$$INSTALLED/root"
 INSTALLED_SITE_DIR=$$INSTALLED/root/$SITE_NAME
 
@@ -74,10 +75,10 @@ rm -f $$SETUP_TMP/envvars
 # export START_TIME in chroot to use the same LOG_DIR this script is already using
 echo "export START_TIME=$$START_TIME" > $$SETUP_TMP/envvars
 
-$BEFORE_CHROOT
-
 # copy files into the installed system
 cp -r $$SETUP_TMP/* "$$INSTALLED"/tmp
+
+$BEFORE_CHROOT
 
 log "Chrooting to installed system"
 mkdir -p "$$INSTALLED"/proc "$$INSTALLED"/dev "$$INSTALLED"/sys

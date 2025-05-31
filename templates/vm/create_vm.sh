@@ -16,6 +16,14 @@ rm -f $$SETUP_TMP/envvars
 # export START_TIME in chroot to use the same LOG_DIR this script is already using
 echo "export START_TIME=$$START_TIME" > $$SETUP_TMP/envvars
 
+# expose any backups to the VM
+if [ -d $$SITE_DIR/backup/$HOSTNAME]; then
+  log "Copying backup into VM"
+  mkdir $$SETUP_TMP/backup
+  cp -r $$SITE_DIR/backup/$HOSTNAME/* $$SETUP_TMP/backup
+  # note $$SITE_DIR/backup/$HOSTNAME still exists but will not be current!
+fi
+
 $BEFORE_CHROOT
 
 # temporarily change the umask
@@ -61,7 +69,6 @@ log "Creating VM definition"
 virsh define $$DIR/$HOSTNAME.xml
 
 # set the image perms & create the share & backup directories
-# (auto)start the VM if configured
 chown qemu:kvm $VM_IMAGES_PATH/$HOSTNAME.img
 chmod 660 $VM_IMAGES_PATH/$HOSTNAME.img
 
@@ -72,6 +79,7 @@ if [ "$$HOST_BACKUP" = "True" ]; then
   chmod 750 $VM_IMAGES_PATH/backup/$HOSTNAME
 fi
 
+# (auto)start the VM if configured
 if [ "$$AUTOSTART" = "True" ]; then
   log "Setting autostart"
   virsh autostart $HOSTNAME

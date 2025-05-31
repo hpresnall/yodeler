@@ -46,7 +46,6 @@ def load(site_cfg: dict, host_path: str | None) -> dict:
     return host_cfg
 
 
-
 def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     """Validate the given YAML formatted host configuration.
 
@@ -161,7 +160,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.append("SETUP_TMP=/tmp")
     setup.blank()
 
-    setup.comment("load any envvars passed in from yodeler.sh")
+    setup.comment("load any envvars passed in from yodel.sh")
     setup.append("source $SETUP_TMP/envvars")
     setup.blank()
 
