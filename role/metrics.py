@@ -192,8 +192,8 @@ class Metrics(Role):
 
         if self._cfg["backup"]:
             setup.blank()
-            setup.comment("restore Prometheus DB")
             setup.append("if [ -f $BACKUP/prometheus_backup.tar.gz ]; then")
+            setup.log("Restoring Prometheus TSDB", indent="  ")
             setup.append("  cd /var/lib/prometheus/data")
             setup.append("  tar xvz $BACKUP/prometheus_backup.tar.gz")
             setup.append("fi")

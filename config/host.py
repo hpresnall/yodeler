@@ -180,11 +180,11 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
             # backup dir will be available in /tmp/backup via create_vm.sh's contributions to yodel.sh
             setup.comment("backup was copied to /tmp via fs-skel-dir in yodel.sh")
-            setup.append("export BACKUP=/tmp/backup")
+            setup.append("BACKUP=/tmp/backup")
         else:
             # backup dir will be copied into host's site dir via create_physical.sh's contributions to yodel.sh
             setup.substitute("physical", "setup_backup.sh", host_cfg)
-            setup.append("export BACKUP=/backup")
+            setup.append("BACKUP=/backup")
 
         setup.blank()
         setup.comment("run daily backups")

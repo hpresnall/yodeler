@@ -1,6 +1,13 @@
 IS_VM=$IS_VM
 INSTALL_PRIVATE_SSH_KEY=$INSTALL_PRIVATE_SSH_KEY
 
+# avoid errors starting OpenRC based services
+mkdir -p /run/openrc/started
+mkdir -p /run/openrc/exclusive
+
+# make it look like the system booted
+echo default > /run/openrc/softlevel
+
 # basic config
 echo "$MOTD" > /etc/motd
 setup-timezone -z $TIMEZONE

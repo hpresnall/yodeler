@@ -195,8 +195,8 @@ class Common(Role):
 
         if self._cfg["backup"]:
             setup.blank()
-            setup.comment("restore auth log backups")
             setup.append("if [ -f $BACKUP/auth ]; then")
+            setup.log("Restoring auth log backups", indent="  ")
             setup.append("  cp $BACKUP/auth* /var/log")
             setup.append("  chown root:wheel /var/log/auth*")
             setup.append("  chmod 640 /var/log/auth*")

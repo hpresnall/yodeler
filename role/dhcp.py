@@ -263,10 +263,10 @@ class Dhcp(Role):
             setup.blank()
 
         if self._cfg["backup"]:
-            setup.comment("restore Kea backups")
             setup.append("if [ -f $BACKUP/var_lib_kea.tar.gz ]; then")
+            setup.log("Restoring Kea state & logs", indent="  ")
             setup.append("  mkdir -p /var/lib/kea")
-            setup.append("  cd /var/lib/kea");
+            setup.append("  cd /var/lib/kea")
             setup.append("  tar xfz /$BACKUP/var_lib_kea.tar.gz")
             setup.append("  chown -R kea:kea /var/lib/kea")
             setup.append("  chmod  750 /var/lib/kea")

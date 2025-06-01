@@ -270,8 +270,8 @@ class Router(Role):
 
         if self._cfg["backup"]:
             setup.blank()
-            setup.comment("restore firewall log backups")
             setup.append("if [ -f $BACKUP/firewall ]; then")
+            setup.log("Restoring firewall log backups", indent="  ")
             setup.append("  mkdir -p /var/log/firewall")
             setup.append("  cp $BACKUP/firewall/* /var/log/firewall")
             setup.append("  chown root:wheel /var/log/firewall")

@@ -17,10 +17,10 @@ rm -f $$SETUP_TMP/envvars
 echo "export START_TIME=$$START_TIME" > $$SETUP_TMP/envvars
 
 # expose any backups to the VM
-if [ -d $$SITE_DIR/backup/$HOSTNAME]; then
-  log "Copying backup into VM"
-  mkdir $$SETUP_TMP/backup
-  cp -r $$SITE_DIR/backup/$HOSTNAME/* $$SETUP_TMP/backup
+if [ -d $$SITE_DIR/backup/$HOSTNAME ]; then
+  log "Copying backups into VM"
+  mkdir -p $$SETUP_TMP/backup
+  cp -r $$SITE_DIR/backup/$HOSTNAME/* $$SETUP_TMP/backup || : # allow empty
   # note $$SITE_DIR/backup/$HOSTNAME still exists but will not be current!
 fi
 
