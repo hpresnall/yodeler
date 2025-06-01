@@ -16,20 +16,8 @@ fi;
 # configure build environment for any setup that requires non-apk packages or additional work to configure
 # this image file will be will be shared at the site level
 # it will be mounted so that setup can copy files and chroot into it, if needed
-SITE_BUILD_DIR=$$SITE_DIR/site_build
-mkdir -p $$SITE_BUILD_DIR
 
-if [ ! -d "$$SITE_BUILD_DIR/alpine-make-vm-image" ]; then
-  # add alpine-make-vm-images for creating new VMs
-  log "Installing alpine-make-vm-image"
-  cd $$SITE_BUILD_DIR
-  apk -q --no-progress add git
-  git clone --depth=1 --single-branch --branch=master https://github.com/alpinelinux/alpine-make-vm-image.git
-  cd alpine-make-vm-image
-  if [ -f $$SITE_BUILD_DIR/make-vm-image-patch ]; then
-      git apply $$SITE_BUILD_DIR/make-vm-image-patch
-  fi
-fi
+$ALPINE_MAKE_VM_IMAGE
 
 # reuse existing image
 # build scripts should check for existing builds and handle as needed
@@ -72,6 +60,5 @@ else
   mount --bind "$$(realpath /etc/apk/cache)" tmp/apk_cache
   log "Build image mounted at $$SITE_BUILD_MOUNT"
 
+  cd -
 fi
-
-cd $$DIR

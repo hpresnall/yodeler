@@ -164,24 +164,45 @@ def write_host_scripts(site_cfg: dict, output_dir: str):
         else:
             raise ose
 
+    # create site build image if required
     needs_site_build = False
+
+    # configure vmhosts last so they have access to all their vm's chroot scripts
     vmhosts = []
 
     for host_cfg in site_cfg["hosts"].values():
         needs_site_build |= host_cfg["needs_site_build"]
 
-        # configure vmhosts last so they have access to all their vm's chroot scripts
+        # load the script to ensure alpine_make_vm_image is available once
+        # assign to all vms for substitution into create_vm.sh
+        if host_cfg["is_vm"] or host_cfg["needs_site_build"]:
+            if "alpine_make_vm_image" not in site_cfg:
+                site_cfg["alpine_make_vm_image"] = file.read_template("common", "setup_alpine_make_vm_image.sh")
+
+            host_cfg["alpine_make_vm_image"] = site_cfg["alpine_make_vm_image"]
+
+        # write config for non-vmhosts
         if (host_cfg["hostname"] in site_cfg["roles_to_hostnames"]["vmhost"]):
             vmhosts.append(host_cfg)
             continue
 
         host.write_scripts(host_cfg, output_dir)
 
+    # vm configs written, now write configs for vmhosts
     for host_cfg in vmhosts:
         host.write_scripts(host_cfg, output_dir)
 
+    if ("alpine_make_vm_image" in site_cfg) or needs_site_build:
+        build_dir = os.path.join(output_dir, "build")
+        os.makedirs(build_dir, exist_ok=True)
+
+        # patch for alpine-make-vm-image if it exists
+        # vms do not need this since they will use an already configured build image
+        if os.path.isfile("templates/physical/make-vm-image-patch"):
+            file.copy_template("physical", "make-vm-image-patch", build_dir)
+
     if needs_site_build:
-        _setup_site_build_scripts(site_cfg, output_dir)
+        _setup_site_build_scripts(site_cfg, build_dir)
 
 
 def _validate_full_site(site_cfg: dict):
@@ -294,15 +315,7 @@ def _validate_external_hosts(cfg: dict):
             entry["ipv6_address"] = None
 
 
-def _setup_site_build_scripts(cfg: dict, output_dir: str):
-    build_dir = os.path.join(output_dir, "site_build")
-    os.makedirs(build_dir, exist_ok=True)
-
-    # patch for alpine-make-vm-image if it exists
-    # vms do not need this since they will use an already configured build image
-    if os.path.isfile("templates/physical/make-vm-image-patch"):
-        file.copy_template("physical", "make-vm-image-patch", build_dir)
-
+def _setup_site_build_scripts(cfg: dict, build_dir: str):
     file.substitute_and_write("common", "setup_site_build.sh", cfg, build_dir)
 
     # helper script to unmount the build_image

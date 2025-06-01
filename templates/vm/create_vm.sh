@@ -18,11 +18,13 @@ echo "export START_TIME=$$START_TIME" > $$SETUP_TMP/envvars
 
 # expose any backups to the VM
 if [ -d $$SITE_DIR/backup/$HOSTNAME ]; then
-  log "Copying backups into VM"
+  log "Supplying backups to the VM"
   mkdir -p $$SETUP_TMP/backup
   cp -r $$SITE_DIR/backup/$HOSTNAME/* $$SETUP_TMP/backup || : # allow empty
   # note $$SITE_DIR/backup/$HOSTNAME still exists but will not be current!
 fi
+
+$ALPINE_MAKE_VM_IMAGE
 
 $BEFORE_CHROOT
 
@@ -38,7 +40,7 @@ set +o errexit
 log "Building VM image"
 # create the virtual machine
 # run setup.sh inside a chroot of the VM's filesystem
-$$SITE_DIR/site_build/alpine-make-vm-image/alpine-make-vm-image \
+$$SITE_BUILD_DIR/alpine-make-vm-image/alpine-make-vm-image \
   --image-format raw \
   --serial-console \
   --image-size ${DISK_SIZE_MB}M \
