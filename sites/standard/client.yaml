@@ -3,3 +3,4 @@ interfaces:
   - ipv4_address: dhcp
     vswitch: public
     vlan: 20 # vlan can be name or id
+backup: false # do not create & mount a backup dir from the vm host

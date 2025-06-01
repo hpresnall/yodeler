@@ -35,7 +35,7 @@ def write_vm_xml(cfg: dict, output_dir: str) -> None:
 
     if cfg["host_share"]:
         devices.append(_create_host_share(cfg["vm_images_path"] + "/shared", "shared"))
-    if cfg["host_backup"]:
+    if cfg["backup"]:
         devices.append(_create_host_share(cfg["vm_images_path"] + "/backup/" + cfg["hostname"], "backup"))
 
     xml.indent(template, space="  ")

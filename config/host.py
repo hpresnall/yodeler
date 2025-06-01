@@ -112,6 +112,12 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     metrics.validate(host_cfg)
     aliases.validate(host_cfg)
 
+    # backup script all roles can contribute to
+    if host_cfg["backup"]:
+        host_cfg["backup_script"] = shell.ShellScript("backup.sh", errexit=False)
+    else:
+        host_cfg["backup_script"] = None
+
     needs_site_build = False
 
     # all other config is valid, now add additional config and packages
@@ -146,14 +152,15 @@ def write_scripts(host_cfg: dict, output_dir: str):
         shutil.rmtree(host_dir)
     os.mkdir(host_dir)
 
-    # create a setup script that sources all the other scripts
+    # create the base setup script used by all roles
+    # this is the script that is run via chroot in yodel.sh
     setup = shell.ShellScript("setup.sh")
     setup.comment("DO NOT run this script directly! It will be run in a chrooted environment _after_ installing Alpine.")
     setup.comment("Run yodel.sh instead!")
     setup.blank()
 
     setup.append_self_dir()
-    setup.add_log_function()
+    setup.add_log_function()  # setup_logging() added to yodel.sh
     setup.append_rootinstall()
 
     setup.comment("map SETUP_TMP from yodel.sh into this chroot")
@@ -164,7 +171,29 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.append("source $SETUP_TMP/envvars")
     setup.blank()
 
-    # add all scripts from each role
+    # expose backups to roles; add backup script to cron
+    if host_cfg["backup"]:
+        if host_cfg["is_vm"]:
+            setup.comment("mount /backup at boot")
+            setup.append("echo -e \"backup\\t/backup\\tvirtiofs\\trw,relatime\\t0\\t0\" >> /etc/fstab")
+            setup.blank()
+
+            # backup dir will be available in /tmp/backup via create_vm.sh's contributions to yodel.sh
+            setup.comment("backup was copied to /tmp via fs-skel-dir in yodel.sh")
+            setup.append("export BACKUP=/tmp/backup")
+        else:
+            # backup dir will be copied into host's site dir via create_physical.sh's contributions to yodel.sh
+            setup.substitute("physical", "setup_backup.sh", host_cfg)
+            setup.append("export BACKUP=/backup")
+
+        setup.blank()
+        setup.comment("run daily backups")
+        setup.append("rootinstall backup.sh /usr/local/bin")
+        setup.append("chmod +x /usr/local/bin/backup.sh")
+        setup.append("ln -s /usr/local/bin/backup.sh /etc/periodic/daily/backup")
+        setup.blank()
+
+    # append setup for each role
     for role in host_cfg["roles"]:
         name = role.name.upper()
 
@@ -190,6 +219,10 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
     setup.write_file(host_dir)
 
+    if host_cfg["backup"]:
+        host_cfg["backup_script"].write_file(host_dir)
+
+    # create yodel.sh after formatting chroot scripts
     _configure_before_and_after_chroot(host_cfg)
 
     if host_cfg["is_vm"]:
@@ -549,7 +582,7 @@ DEFAULT_CONFIG = {
     "is_vm": True,
     "autostart": True,
     "host_share": True,
-    "host_backup": True,
+    "backup": True,
     "vcpus": 1,
     "memory_mb": 128,
     "disk_size_mb": 256,
@@ -579,8 +612,8 @@ DEFAULT_CONFIG = {
 _DEFAULT_CONFIG_TYPES = {
     "is_vm": bool,
     "autostart": bool,
-    "host_share": bool,
-    "host_backup": bool,
+    "host_share": bool,  # on VMs, exposed shared drive from KVM host?
+    "backup": bool,
     "vcpus": int,
     "memory_mb": int,
     "disk_size_mb": int,

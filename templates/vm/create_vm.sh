@@ -1,5 +1,5 @@
 VMHOST=$VMHOST
-HOST_BACKUP=$HOST_BACKUP
+BACKUP=$BACKUP
 AUTOSTART=$AUTOSTART
 
 if [ "$$VMHOST" != "$$(hostname)" ]; then
@@ -72,7 +72,7 @@ virsh define $$DIR/$HOSTNAME.xml
 chown qemu:kvm $VM_IMAGES_PATH/$HOSTNAME.img
 chmod 660 $VM_IMAGES_PATH/$HOSTNAME.img
 
-if [ "$$HOST_BACKUP" = "True" ]; then
+if [ "$$BACKUP" = "True" ]; then
   log "Creating backup directory on the vmhost"
   mkdir -p $VM_IMAGES_PATH/backup/$HOSTNAME
   chown nobody:libvirt $VM_IMAGES_PATH/backup/$HOSTNAME

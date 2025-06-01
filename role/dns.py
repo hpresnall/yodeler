@@ -31,6 +31,12 @@ class Dns(Role):
 
         fw.add_rule(self._cfg, [fw.location_all()], destinations, actions, f"DNS and nsupdate for {hostname}")
 
+        if self._cfg["backup"]:
+            self._cfg["backup_script"].comment("backup PDNS database")
+            self._cfg["backup_script"].append(
+                "sqlite3 -readonly /var/lib/pdns/pdns.sqlite3 \".backup /backup/pdns.bak\"")
+            self._cfg["backup_script"].blank()
+
     def validate(self):
         if len(self._cfg["external_dns"]) == 0:
             raise KeyError("cannot configure DNS server with no external_dns addresses defined")
@@ -94,6 +100,11 @@ class Dns(Role):
         setup.service("pdns")
         setup.service("pdns-recursor")
         setup.blank()
+
+        if self._cfg["backup"]:
+            setup.comment("not restoring PDNS database from backups to avoid calculating config diffs or adding duplicate records")
+            setup.comment("let dynamic DNS re-add DHCP records as they are requested")
+            setup.blank()
 
         setup.comment("create SQLite DB")
         setup.append("mkdir /var/lib/pdns")

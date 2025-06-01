@@ -22,7 +22,8 @@ class ShellScript():
 
         if errexit:
             self._script_fragments.append("set -o errexit")
-            self._script_fragments.append("")
+
+        self._script_fragments.append("")
 
     def blank(self) -> None:
         """Add a blank line to the script."""

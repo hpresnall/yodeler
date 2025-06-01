@@ -130,6 +130,11 @@ class Router(Role):
                     [fw.allow_service("dns")],
                     f"firewall ({hostname}) can send DNS out so it does not depend on local DNS being up")
 
+        if self._cfg["backup"]:
+            self._cfg["backup_script"].comment("backup firewall logs")
+            self._cfg["backup_script"].append("mkdir -p /backup/firewall; cp /var/log/firewall/* /backup/firewall")
+            self._cfg["backup_script"].blank()
+
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
         # router needed if there are routable vlans
@@ -262,6 +267,18 @@ class Router(Role):
 
         # add sysctl params for performance
         setup.append("echo \"net.ipv6.route.max_size = 16384\" >> /etc/sysctl.conf")
+
+        if self._cfg["backup"]:
+            setup.blank()
+            setup.comment("restore firewall log backups")
+            setup.append("if [ -f $BACKUP/firewall ]; then")
+            setup.append("  mkdir -p /var/log/firewall")
+            setup.append("  cp $BACKUP/firewall/* /var/log/firewall")
+            setup.append("  chown root:wheel /var/log/firewall")
+            setup.append(  "chmod 750 /var/log/firewall")
+            setup.append("  chown -R root:root /var/log/firewall/*")
+            setup.append("  chmod 640 /var/log/firewall/*")
+            setup.append("fi")
 
 
 def _validate_vlan_pd_network(prefixlen: int, ipv6_pd_network: int):

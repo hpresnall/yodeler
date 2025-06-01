@@ -84,6 +84,14 @@ class VmHost(Role):
         self._cfg["before_chroot"].append(file.substitute("vmhost", "before_chroot.sh", self._cfg))
         self._cfg["after_chroot"].append(file.substitute("vmhost", "after_chroot.sh", self._cfg))
 
+        if self._cfg["backup"]:
+            self._cfg["backup_script"].comment("backup vm definitions")
+            self._cfg["backup_script"].comment("note these are not restored when recreating this host; they are for emergency usage")
+            self._cfg["backup_script"].append("for vm in $(virsh list --all --name); do")
+            self._cfg["backup_script"].append("  virsh dumpxml $vm > /backup/$vm.xml")
+            self._cfg["backup_script"].append("done")
+            self._cfg["backup_script"].blank()
+
     def validate(self):
         # ensure no reused PCI addresses, uplink interfaces, disk images or disk devices
         uplinks = set()

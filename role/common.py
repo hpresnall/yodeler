@@ -49,6 +49,11 @@ class Common(Role):
         return packages
 
     def additional_configuration(self):
+        if self._cfg["backup"]:
+            self._cfg["backup_script"].comment("backup auth logs")
+            self._cfg["backup_script"].append("cp /var/log/auth* /backup")
+            self._cfg["backup_script"].blank()
+
         # do not add any firewall rules for non infrastructure hosts
         if len(self._cfg["roles"]) == 1:  # i.e. only common role
             return
@@ -166,13 +171,11 @@ class Common(Role):
             # else dhcp4 and dhcp6 will provide all needed resolve.conf info
             dhcpcd.create_conf(self._cfg, output_dir)
             setup.service("dhcpcd", "boot")
-            setup.blank()
             sysctl.enable_temp_addresses(self._cfg, setup, output_dir)
         elif need_dhcp4:
             # no ipv6; dhcp4 will provide all needed resolve.conf info
             dhcpcd.create_conf(self._cfg, output_dir)
             setup.service("dhcpcd", "boot")
-            setup.blank()
         else:
             # static ipv4 and no ipv6 => static resolve.conf and no dhcpcd needed
             file.write("resolv.conf", resolv.create_conf(self._cfg), output_dir)
@@ -182,26 +185,22 @@ class Common(Role):
         disks.from_config(self._cfg, setup)
 
         if self._cfg["enable_watchdog"]:
+            setup.blank()
             setup.comment("enable the BusyBox watchdog service")
             setup.service("watchdog")
             setup.append(f"echo \"WATCHDOG_DEV={self._cfg['watchdog_dev']}\" >> /etc/conf.d/watchdog")
-            setup.blank()
 
         if self._cfg["is_vm"]:
             libvirt.write_vm_xml(self._cfg, output_dir)
 
-            if self._cfg["host_backup"]:
-                setup.comment("mount /backup at boot")
-                setup.append("echo -e \"backup\\t/backup\\tvirtiofs\\trw,relatime\\t0\\t0\" >> /etc/fstab")
-                setup.blank()
-
-            # backup dir already available in /tmp/backup via create_vm.sh's contributions to yodel.sh
-            setup.comment("backup was copied to /tmp via fs-skel-dir in yodel.sh")
-            setup.append("export BACKUP=/tmp/backup")
-        else:
-            # backup dir copied into host's site dir via create_physical.sh's contributions to yodel.sh
-            setup.substitute("physical", "setup_backup.sh", self._cfg)
-            setup.append("export BACKUP=/backup")
+        if self._cfg["backup"]:
+            setup.blank()
+            setup.comment("restore auth log backups")
+            setup.append("if [ -f $BACKUP/auth ]; then")
+            setup.append("  cp $BACKUP/auth* /var/log")
+            setup.append("  chown root:wheel /var/log/auth*")
+            setup.append("  chmod 640 /var/log/auth*")
+            setup.append("fi")
 
 
 def _setup_repos(cfg: dict, setup: shell.ShellScript):

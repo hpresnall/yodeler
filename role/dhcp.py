@@ -33,6 +33,12 @@ class Dhcp(Role):
                     f"DHCP for {hostname}; DHCP broadcast handled by dhcp option in interface config")
         fw.add_rule(self._cfg, [fw.location_all()], destinations, actions6, f"DHCP for {hostname}")
 
+        if self._cfg["backup"]:
+            self._cfg["backup_script"].comment("backup Kea leases & logs")
+            self._cfg["backup_script"].append("cd /var/lib/kea; tar cfz /backup/var_lib_kea.tar.gz *")
+            self._cfg["backup_script"].append("cd /var/log/kea; tar cfz /backup/var_log_kea.tar.gz *")
+            self._cfg["backup_script"].blank()
+
     def validate(self):
         for iface in self._cfg["interfaces"]:
             if (iface["type"] == "std") and (iface["ipv4_address"] == "dhcp"):
@@ -255,3 +261,22 @@ class Dhcp(Role):
             setup.service("kea-dhcp-ddns")
             setup.append("rootinstall $DIR/kea-dhcp-ddns.conf /etc/kea")
             setup.blank()
+
+        if self._cfg["backup"]:
+            setup.comment("restore Kea backups")
+            setup.append("if [ -f $BACKUP/var_lib_kea.tar.gz ]; then")
+            setup.append("  mkdir -p /var/lib/kea")
+            setup.append("  cd /var/lib/kea");
+            setup.append("  tar xfz /$BACKUP/var_lib_kea.tar.gz")
+            setup.append("  chown -R kea:kea /var/lib/kea")
+            setup.append("  chmod  750 /var/lib/kea")
+            setup.append("  chmod  644 /var/lib/kea/*")
+            setup.append("fi")
+            setup.append("if [ -f $BACKUP/var_log_kea.tar.gz ]; then")
+            setup.append("  mkdir -p /var/log/kea")
+            setup.append("  cd /var/log/kea")
+            setup.append("  tar xfz /$BACKUP/var_log_kea.tar.gz")
+            setup.append("  chown -R kea:kea /var/log/kea")
+            setup.append("  chmod  750 /var/log/kea")
+            setup.append("  chmod  644 /var/log/kea/*")
+            setup.append("fi")

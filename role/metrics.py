@@ -19,7 +19,7 @@ class Metrics(Role):
     """Role that adds Grafana and Prometheus based monitoring."""
 
     def additional_packages(self) -> set[str]:
-        return {"grafana", "prometheus"}
+        return {"grafana", "prometheus", "jq"}
 
     def additional_aliases(self) -> list[str]:
         return ["metrics", "prometheus", "grafana"]
@@ -52,6 +52,12 @@ class Metrics(Role):
         metric_intervals.setdefault("ipmi", 30)
 
         self._cfg["metric_intervals"] = metric_intervals
+
+        if self._cfg["backup"]:
+            self._cfg["backup_script"].comment("backup Prometheus DB")
+            self._cfg["backup_script"].append("snapshot=/var/lib/prometheus/data/snapshots/$(curl -s -XPOST http://localhost:9090/api/v1/admin/tsdb/snapshot | jq -r .data.name)")
+            self._cfg["backup_script"].append("tar cfz /backup/prometheus_backup.tar.gz $snapshot")
+            self._cfg["backup_script"].append("rm -rf $snapshot")
 
     def validate(self):
         if self._cfg["is_vm"] and (self._cfg["disk_size_mb"] < 1024):
@@ -109,8 +115,11 @@ class Metrics(Role):
         prometheus = {
             "global": {"scrape_interval": self._cfg["metric_intervals"]["default"]},
             "scrape_configs": [
-                # Prometheus itself
-                {"job_name": "prometheus", "static_configs": [{"targets": ["localhost:9090"]}]}
+                {
+                    "job_name": "prometheus",
+                    "comment": "prometheus itself",
+                    "static_configs": [{"targets": ["localhost:9090"]}]
+                }
             ]
         }
 
@@ -180,6 +189,14 @@ class Metrics(Role):
 
         setup.service("grafana")
         setup.service("prometheus")
+
+        if self._cfg["backup"]:
+            setup.blank()
+            setup.comment("restore Prometheus DB")
+            setup.append("if [ -f $BACKUP/prometheus_backup.tar.gz ]; then")
+            setup.append("  cd /var/lib/prometheus/data")
+            setup.append("  tar xvz $BACKUP/prometheus_backup.tar.gz")
+            setup.append("fi")
 
 # mkdir /var/log/grafana
 # chown grafana:grafana /var/log/grafana
