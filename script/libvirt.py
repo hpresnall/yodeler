@@ -105,6 +105,7 @@ def interface_from_config(hostname: str, iface: dict) -> xml.Element:
       <source network="<vswitch>" portgroup="<vlan>" />
       <target dev="<hostname>-<vlan>" />
       <model type="virtio" />
+      <driver name='vhost'/>
     </interface>
     """
     vlan_name = iface["vlan"]["name"]
@@ -113,6 +114,7 @@ def interface_from_config(hostname: str, iface: dict) -> xml.Element:
     xml.SubElement(interface, "source", {"network": iface["vswitch"]["name"], "portgroup": vlan_name})
     xml.SubElement(interface, "target", {"dev": device})
     xml.SubElement(interface, "model", {"type": "virtio"})
+    xml.SubElement(interface, "driver", {"name": "vhost"})
 
     if "mac_address" in iface:
         xml.SubElement(interface, "mac", {"address": iface["mac_address"]})
@@ -127,11 +129,13 @@ def macvtap_interface(iface: dict) -> xml.Element:
     <interface type="direct">
       <source dev="<host_iface>" mode="private" />
       <model type="virtio" />
+      <driver name='vhost'/>
     </interface>
     """
     interface = xml.Element("interface", {"type": "direct"})
     xml.SubElement(interface, "source", {"dev": iface["macvtap"], "mode": "private"})
     xml.SubElement(interface, "model", {"type": "virtio"})
+    xml.SubElement(interface, "driver", {"name": "vhost"})
 
     if "mac_address" in iface:
         xml.SubElement(interface, "mac", {"address": iface["mac_address"]})
@@ -150,7 +154,7 @@ def passthrough_interface(passthrough: dict, mac_address: str) -> xml.Element:
     </interface>
     """
     interface = xml.Element("interface", {"type": "hostdev", "managed": "yes"})
-    interface.insert(0, xml.Comment(f"PCI passthrough of {passthrough['name']}")) # type: ignore
+    interface.insert(0, xml.Comment(f"PCI passthrough of {passthrough['name']}"))  # type: ignore
     source = xml.SubElement(interface, "source")
     xml.SubElement(source, "address",
                    {"type": "pci",
@@ -173,12 +177,14 @@ def router_interface(hostname: str, vswitch: dict, mac_address: str) -> xml.Elem
       <source network="<vswitch>" portgroup="router" />
       <target dev="<hostname>-<vswitch>" />
       <model type="virtio" />
+      <driver name='vhost'/>
     </interface>
     """
     interface = xml.Element("interface", {"type": "network"})
     xml.SubElement(interface, "source",  {"network": vswitch["name"], "portgroup": "router"})
     xml.SubElement(interface, "target", {"dev": f"{hostname}-{vswitch['name']}"})
     xml.SubElement(interface, "model", {"type": "virtio"})
+    xml.SubElement(interface, "driver", {"name": "vhost"})
     xml.SubElement(interface, "mac", {"address": mac_address})
 
     return interface

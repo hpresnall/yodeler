@@ -64,6 +64,9 @@ virsh pool-start vmstorage
 # needed for pci passthrough
 echo vfio_iommu_type1 > /etc/modules-load.d/iommu.conf
 
+# used by virtio networking
+echo vhost_net > /etc/modules-load.d/vhost_net.conf
+
 log "Adding libvirt hook scripts"
 # add hook scripts for disabling ipv6 on vswitch and vm interfaces
 mkdir -p /etc/libvirt/hooks

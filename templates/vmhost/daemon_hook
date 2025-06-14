@@ -3,6 +3,11 @@
 # expecting command line args like '- start - start'
 
 if [ "$$2" = "start" ]; then
+  # ensure vhost-net is writable for virtio interfaces
+  if [ -e /dev/vhost-net ]; then
+    chown root:kvm /dev/vhost-net
+  fi
+
   # ensure vfio is writable for PCI passthrough
   if [ -e /dev/vfio/vfio ]; then
     chmod 666 /dev/vfio/vfio
