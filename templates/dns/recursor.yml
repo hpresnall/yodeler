@@ -1,0 +1,34 @@
+incoming:
+  listen: []
+  allow_from: []
+  port: 53
+  reuseport: true
+  tcp_fast_open: 16
+outgoing:
+  source_address:
+  - 0.0.0.0
+  - '::'
+  tcp_fast_open_connect: true
+logging:
+  loglevel: 4
+  quiet: true
+  statistics_interval: 3600
+dnssec:
+  validation: 'off'
+recordcache:
+  refresh_on_ttl_perc: 10
+recursor:
+  daemon: true
+  export_etc_hosts: true
+  export_etc_hosts_search_suffix: ''
+  forward_zones: []
+  forward_zones_recurse: []
+  lua_dns_script: /etc/pdns/blackhole.lua
+  security_poll_suffix: ''
+  setgid: recursor
+  setuid: recursor
+webservice:
+  address: 0.0.0.0
+  allow_from: []
+  port: 9102
+  webserver: true

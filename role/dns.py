@@ -90,7 +90,7 @@ class Dns(Role):
         setup.blank()
 
         setup.append(f"install -o pdns -g pdns -m 600 $DIR/pdns.conf /etc/pdns")
-        setup.append(f"install -o recursor -g recursor -m 600 $DIR/recursor.conf /etc/pdns")
+        setup.append(f"install -o recursor -g recursor -m 600 $DIR/recursor.yml /etc/pdns")
         setup.append(f"install -o recursor -g recursor -m 600 /tmp/blackhole.lua /etc/pdns")
         setup.blank()
 
@@ -103,7 +103,8 @@ class Dns(Role):
         setup.blank()
 
         if self._cfg["backup"]:
-            setup.comment("not restoring PDNS database from backups to avoid calculating config diffs or adding duplicate records")
+            setup.comment(
+                "not restoring PDNS database from backups to avoid calculating config diffs or adding duplicate records")
             setup.comment("let dynamic DNS re-add DHCP records as they are requested")
             setup.blank()
 
@@ -149,7 +150,7 @@ class Dns(Role):
 
         # forward to local dns on port 553
         # will add other vlan zones below
-        forward_zones = [self._cfg["dns_domain"] + "=127.0.0.1:553"]
+        forward_zones = [self._cfg["dns_domain"]]
 
         # specific addresses to bind to; add each interface
         listen_addresses = ["127.0.0.1", "::1"]
@@ -172,7 +173,7 @@ class Dns(Role):
                 if vlan["domain"]:
                     _add_zone(setup, vlan, dns_domain, dns_server)
 
-                    forward_zones.append(vlan["domain"] + "=127.0.0.1:553")
+                    forward_zones.append(vlan["domain"])
 
                     allow_subnets.append(str(vlan["ipv4_subnet"]))
 
@@ -200,16 +201,32 @@ class Dns(Role):
 
         pdns_conf = {
             "dns_server": dns_server,
-            "dns_domain": dns_domain,
-            "forward_zones": ", ".join(forward_zones),
-            "external_dns": ";".join(self._cfg["external_dns"]),  # note ; not comma and no spaces
             "listen_addresses": ", ".join(listen_addresses),
-            "allow_subnets": ", ".join(allow_subnets),
             "web_allow_from": ", ".join(web_allow_from)
         }
 
         file.substitute_and_write(self.name, "pdns.conf", pdns_conf, output_dir)
-        file.substitute_and_write(self.name, "recursor.conf", pdns_conf, output_dir)
+
+        recursor = file.load_yaml_string(file.read_template(self.name, "recursor.yml"))
+
+        recursor["incoming"]["listen"] = listen_addresses
+        recursor["incoming"]["allow_from"] = allow_subnets
+        recursor["recursor"]["export_etc_hosts_search_suffix"] = dns_domain
+        # do not forward known zones; query internal DNS
+        recursor["recursor"]["forward_zones"] = [{
+            "zone": zone,
+            "recurse": False,
+            "forwarders": ["127.0.0.1:553"]
+        } for zone in forward_zones]
+        # forward everything else to external DNS
+        recursor["recursor"]["forward_zones_recurse"] = [{
+            "zone": ".",
+            "recurse": True,
+            "forwarders": self._cfg["external_dns"]
+        }]
+        recursor["webservice"]["allow_from"] = web_allow_from
+
+        file.write("recursor.yml", file.output_yaml(recursor), output_dir)
 
         # directly add external hostnames to /etc/hosts; PDSN recursor will serve these
         if self._cfg["external_hosts"]:
