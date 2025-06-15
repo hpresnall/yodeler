@@ -188,7 +188,7 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
         setup.blank()
         setup.comment("run daily backups")
-        setup.append("rootinstall backup.sh /usr/local/bin")
+        setup.append("rootinstall $DIR/backup.sh /usr/local/bin")
         setup.append("chmod +x /usr/local/bin/backup.sh")
         setup.append("ln -s /usr/local/bin/backup.sh /etc/periodic/daily/backup")
         setup.blank()
@@ -553,7 +553,7 @@ DEFAULT_SITE_CONFIG = {
     "profile": {},
     "timezone": "UTC",
     "keymap": "us us",
-    "alpine_repositories": ["http://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
+    "alpine_repositories": ["https://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "https://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
     "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
     "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
     # top-level domain for the site; empty => no local DNS unless DNS server sets 'primary_domain'

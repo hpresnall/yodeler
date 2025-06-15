@@ -144,6 +144,7 @@ class FakeISP(Role):
         dhcp4_config["ddns-update-on-renew"] = False
         dhcp4_config["subnet4"] = [{
             "subnet": str(subnet),
+            "id": 1,
             "pools": [{"pool": str(subnet.network_address + vlan["dhcp_min_address_ipv4"])
                        + " - " + str(subnet.network_address + vlan["dhcp_max_address_ipv4"])}],
             "option-data": [{"name": "routers", "data": str(fakeisp["ipv4_address"])}]
@@ -168,6 +169,7 @@ class FakeISP(Role):
             dhcp6_config["ddns-update-on-renew"] = False
             dhcp6_config["subnet6"] = [{
                 "subnet": str(subnet),
+                "id": 1,
                 "pools": [{"pool": str(subnet.network_address + vlan["dhcp_min_address_ipv6"])
                            + " - " + str(subnet.network_address + vlan["dhcp_max_address_ipv6"])}],
                 "pd-pools": _create_pd_pools(vlan["ipv6_delegation_subnet"]),
@@ -205,7 +207,7 @@ class FakeISP(Role):
             radvd_template = radvd_template.format(fakeisp["name"], "on", "", "")  # AdvManagedFlag on => use DHCP6
             file.write("radvd.conf", radvd_template, output_dir)
 
-            setup.append("rootinstall radvd.conf /etc")
+            setup.append("rootinstall $DIR/radvd.conf /etc")
             setup.service("radvd", "boot")
             setup.blank()
 

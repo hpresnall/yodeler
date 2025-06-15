@@ -25,7 +25,8 @@ class NTP(Role):
         hostname = self._cfg["hostname"]
         destinations = fw.destinations_from_interfaces(self._cfg["interfaces"], hostname)
 
-        fw.add_rule(self._cfg, [fw.location_all()], destinations, [fw.allow_service("ntp")], f"NTP for {hostname}")
+        if destinations:
+            fw.add_rule(self._cfg, [fw.location_all()], destinations, [fw.allow_service("ntp")], f"NTP for {hostname}")
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

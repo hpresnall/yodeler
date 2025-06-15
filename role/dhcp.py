@@ -20,18 +20,19 @@ class Dhcp(Role):
     def additional_configuration(self):
         hostname = self._cfg["hostname"]
 
-        actions4 = [fw.allow_service("dhcp", ipv6=False)]
-        actions4[0]["comment"] = "allow direct DHCP renew requests"
-
-        actions6 = [fw.allow_proto_port({"proto": "udp", "port": "546:547"}, ipv4=False)]
-        actions6[0]["comment"] = "allow DHCP relay"
-
         # allow all routable vlans DHCP access to this host on all its interfaces
         destinations = fw.destinations_from_interfaces(self._cfg["interfaces"], hostname)
 
-        fw.add_rule(self._cfg, [fw.location_all()], destinations, actions4,
-                    f"DHCP for {hostname}; DHCP broadcast handled by dhcp option in interface config")
-        fw.add_rule(self._cfg, [fw.location_all()], destinations, actions6, f"DHCP for {hostname}")
+        if destinations:
+            actions4 = [fw.allow_service("dhcp", ipv6=False)]
+            actions4[0]["comment"] = "allow direct DHCP renew requests"
+
+            actions6 = [fw.allow_proto_port({"proto": "udp", "port": "546:547"}, ipv4=False)]
+            actions6[0]["comment"] = "allow DHCP relay"
+
+            fw.add_rule(self._cfg, [fw.location_all()], destinations, actions4,
+                        f"DHCP for {hostname}; DHCP broadcast handled by dhcp option in interface config")
+            fw.add_rule(self._cfg, [fw.location_all()], destinations, actions6, f"DHCP for {hostname}")
 
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup Kea leases & logs")
@@ -168,6 +169,7 @@ class Dhcp(Role):
                     ip4_subnet = vlan["ipv4_subnet"]
 
                     subnet4["subnet"] = str(ip4_subnet)
+                    subnet4["id"] = vlan["id"] if vlan["id"] else 0
                     subnet4["pools"] = [{"pool": str(ip4_subnet.network_address + vlan["dhcp_min_address_ipv4"]) +
                                         " - " + str(ip4_subnet.network_address + vlan["dhcp_max_address_ipv4"])}]
                     if vlan["domain"]:
@@ -194,6 +196,7 @@ class Dhcp(Role):
                     ip6_subnet = vlan["ipv6_subnet"]
 
                     subnet6["subnet"] = str(ip6_subnet)
+                    subnet6["id"] = vlan["id"] if vlan["id"] else 0
                     subnet6["rapid-commit"] = True
                     subnet6["pools"] = []
                     if vlan["dhcp6_managed"]:

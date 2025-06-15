@@ -29,7 +29,7 @@ if [ -f  $$DIR/rename-eth ]; then
 fi
 
 # install Alpine with answerfile
-log -e "\nInstalling Alpine for '$HOSTNAME' to $SYSTEM_DEV"
+log -e "\nInstalling Alpine on $SYSTEM_DEV for '$HOSTNAME'"
 setup-alpine -e -f $$DIR/answerfile > $$LOG 2>&1
 log -e "Alpine install complete; starting Yodeler configuration\n"
 
@@ -97,7 +97,7 @@ log -e "\nRunning setup for '$HOSTNAME' in chroot"
 chroot "$$INSTALLED" /bin/sh -c "cd /root/$SITE_NAME/$HOSTNAME; ./setup.sh"
 RESULT=$$?
 
-# restore original logging
+# restore original error handling
 trap error ERR
 set -o errexit
 
@@ -117,8 +117,8 @@ if [ -d "$$INSTALLED_SITE_DIR/logs" ]; then
   rsync -r "$$INSTALLED_SITE_DIR/logs" "$$SITE_DIR"
 fi
 
-if [ -d "$$INSTALLED_SITE_DIR/site_build" ]; then
-  rsync -r "$$INSTALLED_SITE_DIR/site_build" "$$SITE_DIR"
+if [ -d "$$INSTALLED_SITE_DIR/build" ]; then
+  rsync -r "$$INSTALLED_SITE_DIR/build" "$$SITE_DIR"
 fi
 
 # copy back final resolv.conf

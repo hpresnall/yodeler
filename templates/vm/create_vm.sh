@@ -33,7 +33,7 @@ $BEFORE_CHROOT
 # run commands due to library permission / loader issues
 umask 022
 
-# log failure and exit if alpine-make-vm-image fails
+# do not immediately fail if building the vm fails
 trap - ERR
 set +o errexit
 
@@ -53,7 +53,7 @@ $$SITE_BUILD_DIR/alpine-make-vm-image/alpine-make-vm-image \
 
 RESULT=$$?
 
-# restore original logging on error
+# restore error handling
 trap error ERR
 set -o errexit
 
@@ -83,7 +83,7 @@ fi
 
 # (auto)start the VM if configured
 if [ "$$AUTOSTART" = "True" ]; then
-  log "Setting autostart"
+  log "VM will automatically start on $$VMHOST boot"
   virsh autostart $HOSTNAME
 fi
 

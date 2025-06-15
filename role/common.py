@@ -67,8 +67,9 @@ class Common(Role):
         hostname = self._cfg["hostname"]
         destinations = fw.destinations_from_interfaces(self._cfg["interfaces"], hostname)
 
-        fw.add_rule(self._cfg, [fw.location_all()], destinations,
-                    [fw.allow_service("ping")], f"allow pings to {hostname}")
+        if destinations:
+            fw.add_rule(self._cfg, [fw.location_all()], destinations,
+                        [fw.allow_service("ping")], f"allow pings to {hostname}")
 
     def validate(self):
         # ensure each vlan is only used once
@@ -108,7 +109,7 @@ class Common(Role):
                 # insert to ensure before any other roles run builds, assume common runs first
                 # source so SITE_BUILD_MOUNT is exposed to the rest of setup
                 self._cfg["before_chroot"].insert(0, "# create & mount the site build image\n"
-                                                  "source $SITE_DIR/site_build/setup_site_build.sh\n")
+                                                  "source $SITE_DIR/build/setup_site_build.sh\n")
                 # setup_site_build.sh is on the _vmhost_; no need to install in the vm itself
         else:
             # for physical servers, add packages manually
@@ -125,12 +126,12 @@ class Common(Role):
 
             if self._cfg["needs_site_build"]:
                 setup.comment("ensure site build scripts are executable")
-                setup.append("chmod +x $SITE_DIR/site_build/setup_site_build.sh")
-                setup.append("chmod +x $SITE_DIR/site_build/unmount_site_build.sh")
+                setup.append("chmod +x $SITE_DIR/build/setup_site_build.sh")
+                setup.append("chmod +x $SITE_DIR/build/unmount_site_build.sh")
                 setup.blank()
                 setup.comment("create & mount the site build image")
                 # source so SITE_BUILD_MOUNT is exposed to the rest of setup
-                setup.append("source $SITE_DIR/site_build/setup_site_build.sh")
+                setup.append("source $SITE_DIR/build/setup_site_build.sh")
                 setup.blank()
 
         if (self._cfg["remove_packages"]):

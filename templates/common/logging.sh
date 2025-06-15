@@ -17,7 +17,7 @@ fi
 # fd 3 writes to logfile & console
 exec 3> >(tee -a $$LOG >&4)
 
-echo "Writing logs to $$LOG"
+echo -e "Writing logs to $$LOG\n"
 # stdout & stderr to log
 exec 1>> $$LOG
 exec 2>&1

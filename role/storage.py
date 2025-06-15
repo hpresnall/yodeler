@@ -202,7 +202,7 @@ class Storage(Role):
         self._cfg["unnested_after_chroot"].append("modprobe -r zfs")
         self._cfg["unnested_after_chroot"].append("apk -q del zfs losetup")
 
-        setup.append("rootinstall smb.conf /etc/samba")
+        setup.append("rootinstall $DIR/smb.conf /etc/samba")
         setup.blank()
 
         setup.service("zfs-import", "boot")

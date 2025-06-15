@@ -20,7 +20,7 @@ class Router(Role):
      vlans to the internet"""
 
     def additional_packages(self):
-        return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "dhcrelay", "ndisc6", "tcpdump", "ethtool"}
+        return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "ndisc6", "tcpdump", "ethtool"}
 
     def additional_aliases(self) -> list[str]:
         return ["gateway", "firewall"]
@@ -259,7 +259,7 @@ class Router(Role):
         if radvd_config:
             file.write("radvd.conf", "\n".join(radvd_config), output_dir)
 
-            setup.append("rootinstall radvd.conf /etc")
+            setup.append("rootinstall $DIR/radvd.conf /etc")
             setup.service("radvd", "boot")
 
         if dhrelay6_ifaces:  # at least one interface needs dhcp6
@@ -275,7 +275,7 @@ class Router(Role):
             setup.append("  mkdir -p /var/log/firewall")
             setup.append("  cp $BACKUP/firewall/* /var/log/firewall")
             setup.append("  chown root:wheel /var/log/firewall")
-            setup.append(  "chmod 750 /var/log/firewall")
+            setup.append("chmod 750 /var/log/firewall")
             setup.append("  chown -R root:root /var/log/firewall/*")
             setup.append("  chmod 640 /var/log/firewall/*")
             setup.append("fi")
@@ -308,12 +308,25 @@ def _write_dhcrelay_config(cfg: dict, setup: shell.ShellScript, dhrelay4_ifaces:
     if dhrelay4_ifaces or dhrelay6_ifaces:
         setup.blank()
         setup.comment("configure dhcp relay for routable vlans")
+        setup.comment("dhcp relay is no longer maintained and has been removed from Alpine")
+        setup.comment("download the last supported version manually")
+        setup.append("apk add wget")
+        setup.append("cd /etc/apk/cache")
+        setup.append("if [ ! -f dhcrelay-4.4.3_p1-r4.apk ]; then")
+        setup.append("  wget https://dl-cdn.alpinelinux.org/alpine/v3.20/main/x86_64/dhcrelay-4.4.3_p1-r4.apk")
+        setup.append("fi")
+        setup.append("  if [ ! -f dhcrelay-openrc-4.4.3_p1-r4.apk ]; then")
+        setup.append("  wget https://dl-cdn.alpinelinux.org/alpine/v3.20/main/x86_64/dhcrelay-openrc-4.4.3_p1-r4.apk")
+        setup.append("fi")
+        setup.append("apk add dhcrelay-4.4.3_p1-r4.apk dhcrelay-openrc-4.4.3_p1-r4.apk")
+        setup.append("cd -")
 
     if dhrelay6_ifaces:
         # create dhcrelay6 init.d first, then ipv4 conf, then ipv6 conf
         if not dhcp_addresses["ipv6_address"]:
             raise ValueError("router needs to relay DHCP but cannot find any reachable IPv6 addresses")
 
+        setup.blank()
         setup.append(file.read_template("router", "dhcrelay6.sh"))
 
     if dhrelay4_ifaces:
@@ -328,6 +341,7 @@ def _write_dhcrelay_config(cfg: dict, setup: shell.ShellScript, dhrelay4_ifaces:
         if upper_iface4 and upper_iface4 not in dhrelay4_ifaces:
             dhrelay4_ifaces.insert(0, upper_iface4)
 
+        setup.blank()
         setup.comment("setup dhcrelay.conf")
         setup.append("echo 'IFACE=\"" + " ".join(dhrelay4_ifaces) + "\"' >> /etc/conf.d/dhcrelay")
         setup.append("echo 'DHCRELAY_SERVERS=\"" +

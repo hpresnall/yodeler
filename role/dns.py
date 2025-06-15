@@ -23,13 +23,14 @@ class Dns(Role):
         hostname = self._cfg["hostname"]
         destinations = fw.destinations_from_interfaces(self._cfg["interfaces"], hostname)
 
-        actions = [
-            fw.allow_service("dns"),
-            fw.allow_proto_port({"proto": "tcp", "port": 553}),
-            fw.allow_proto_port({"proto": "udp", "port": 553})
-        ]
+        if destinations:
+            actions = [
+                fw.allow_service("dns"),
+                fw.allow_proto_port({"proto": "tcp", "port": 553}),
+                fw.allow_proto_port({"proto": "udp", "port": 553})
+            ]
 
-        fw.add_rule(self._cfg, [fw.location_all()], destinations, actions, f"DNS and nsupdate for {hostname}")
+            fw.add_rule(self._cfg, [fw.location_all()], destinations, actions, f"DNS and nsupdate for {hostname}")
 
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup PDNS database")
