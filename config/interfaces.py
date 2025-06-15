@@ -563,6 +563,7 @@ def validate_renaming(cfg: dict):
         renamings = cfg["rename_interfaces"]
     else:
         # optional
+        cfg["rename_interfaces"] = []
         return
 
     location = f"{cfg['hostname']}.rename_interfaces"

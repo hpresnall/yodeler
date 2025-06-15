@@ -86,7 +86,8 @@ class VmHost(Role):
 
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup vm definitions")
-            self._cfg["backup_script"].comment("note these are not restored when recreating this host; they are for emergency usage")
+            self._cfg["backup_script"].comment(
+                "note these are not restored when recreating this host; they are for emergency usage")
             self._cfg["backup_script"].append("for vm in $(virsh list --all --name); do")
             self._cfg["backup_script"].append("  virsh dumpxml $vm > /backup/$vm.xml")
             self._cfg["backup_script"].append("done")
@@ -355,14 +356,15 @@ def _setup_open_vswitch(cfg: dict, setup: shell.ShellScript):
 def _create_vswitch_uplink(vswitch: dict, setup: shell.ShellScript):
     # for each uplink, create a port on the vswitch
     uplinks = vswitch["uplinks"]
+    bond = vswitch.get("bond_uplinks", True)
 
     if not uplinks:
         return []
 
     vswitch_name = vswitch["name"]
 
-    if len(uplinks) > 1:
-        # multiple uplink interfaces; create a bond named 'uplink'
+    if bond and len(uplinks) > 1:
+        # create a bond named 'uplink' using all the interfaces
         bond_ifaces = " ".join(uplinks)
         bond_name = f"{vswitch_name}-uplink"
 
@@ -370,15 +372,25 @@ def _create_vswitch_uplink(vswitch: dict, setup: shell.ShellScript):
         setup.append(
             f"ovs-vsctl add-bond {vswitch_name} {bond_name} {bond_ifaces} lacp=active bond_mode=balance-slb other-config:lacp-fallback-ab=true")
 
-        uplink_name = bond_name  # use new uplink name for tagging, if needed
+        _tag_uplink(bond_name,  vswitch["vlans_by_id"].keys(), setup)
+        setup.blank()
     else:
-        uplink_name = uplinks[0]
+        vlans_by_id = vswitch["vlans_by_id"].keys()
+        uplink_count = len(uplinks)
 
-        setup.comment(f"uplink for vswitch '{vswitch_name}'")
-        setup.append(f"ovs-vsctl add-port {vswitch_name} {uplink_name}")
+        for i, uplink in enumerate(uplinks, start=1):
+            if uplink_count > 1:
+                setup.comment(f"uplink {i} of {uplink_count} for vswitch '{vswitch_name}'")
+            else:
+                setup.comment(f"uplink for vswitch '{vswitch_name}'")
 
-    # tag the uplink port
-    vlans_by_id = vswitch["vlans_by_id"].keys()
+            setup.append(f"ovs-vsctl add-port {vswitch_name} {uplink}")
+            _tag_uplink(uplink, vlans_by_id, setup)
+            setup.blank()
+
+
+def _tag_uplink(uplink_name: str, vlans_by_id: list, setup: shell.ShellScript):
+    # tag the uplink port based on the vlans
     if len(vlans_by_id) == 1:
         # single vlan with id => access port
         if None not in vlans_by_id:
@@ -393,8 +405,6 @@ def _create_vswitch_uplink(vswitch: dict, setup: shell.ShellScript):
         # see http://www.openvswitch.org/support/dist-docs/ovs-vswitchd.conf.db.5.txt
         vlan_mode = "native_untagged" if None in vlans_by_id else "trunk"
         setup.append(f"ovs-vsctl set port {uplink_name} trunks={trunks} vlan_mode={vlan_mode}")
-
-    # last output in setup; no need for setup.blank()
 
 
 def _setup_libvirt(cfg: dict, setup: shell.ShellScript, output_dir: str):

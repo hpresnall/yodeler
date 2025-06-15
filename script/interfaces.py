@@ -197,16 +197,17 @@ def _output_wifi(iface: dict, buffer: list[str]):
 def rename_interfaces(rename_rules: list[dict], script: shell.ShellScript, output_dir: str, hostname: str):
     # create init script & add it to boot
     rename_cmds = []
+
     for i, rule in enumerate(rename_rules, start=1):
         if "name" not in rule:
-            raise KeyError(f"no name for rename rule {i} for host '{hostname}'")
+            raise KeyError(f"no name for rename rule {i} in host '{hostname}'")
         if "mac_address" not in rule:
-            raise KeyError(f"no mac_address for rename rule {i} for host '{hostname}'")
+            raise KeyError(f"no mac_address for rename rule {i} in host '{hostname}'")
 
         name = rule["name"]
         mac = rule["mac_address"]
 
-        parse.validate_mac_address(mac, f"rename rule {i} for host '{hostname}'")
+        parse.validate_mac_address(mac, f"rename rule {i} in host '{hostname}'")
 
         rename_cmds.append(f"  rename_iface {mac} {name}")
 

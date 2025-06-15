@@ -84,7 +84,7 @@ class TestHost(base.TestCfgBase):
         # has all default packages
         packages = cfg["packages"]
         self.assertIsNotNone(packages, packages)
-        self.assertEqual(13, len(packages))
+        self.assertEqual(12, len(packages))
         # common packages + metrics enabled by default
         self.assertEqual(0, len({"e2fsprogs", "acpi", "doas", "openssh", "chrony",
                          "logrotate", "awall", "dhcpcd", "ifupdown-ng", "iproute2", "prometheus-node-exporter"} - packages))

@@ -23,7 +23,7 @@ class Common(Role):
     def additional_packages(self):
         # use dhcpcd for dhcp since it can also handle prefix delegation for routers
         # use better ifupdown-ng  and the Linux ip command, instead of Busybox's built-ins
-        packages = {"grub", "e2fsprogs", "acpi", "doas", "openssh", "chrony", "curl",
+        packages = {"e2fsprogs", "acpi", "doas", "openssh", "chrony", "curl",
                     "logrotate", "awall", "dhcpcd", "ifupdown-ng", "iproute2"}
 
         for iface in self._cfg["interfaces"]:
