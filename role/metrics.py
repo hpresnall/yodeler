@@ -113,11 +113,10 @@ class Metrics(Role):
 
         # base prometheus config; scrape configs will be added for each metric collector
         prometheus = {
-            "global": {"scrape_interval": self._cfg["metric_intervals"]["default"]},
+            "global": {"scrape_interval": str(self._cfg["metric_intervals"]["default"]) + "s"},
             "scrape_configs": [
                 {
                     "job_name": "prometheus",
-                    "comment": "prometheus itself",
                     "static_configs": [{"targets": ["localhost:9090"]}]
                 }
             ]
@@ -133,7 +132,7 @@ class Metrics(Role):
 
             interval = self._cfg["metric_intervals"].get(metric_type)
             if interval:
-                exporter["scrape_interval"] = interval
+                exporter["scrape_interval"] = str(interval) + "s"
 
             for hostname, ip in hosts_to_ips.items():
                 if not self._cfg["hosts"][hostname]["metrics"][metric_type]["enabled"]:
