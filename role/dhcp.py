@@ -36,8 +36,10 @@ class Dhcp(Role):
 
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup Kea leases & logs")
-            self._cfg["backup_script"].append("cd /var/lib/kea; tar cfz /backup/var_lib_kea.tar.gz *")
-            self._cfg["backup_script"].append("cd /var/log/kea; tar cfz /backup/var_log_kea.tar.gz *")
+            self._cfg["backup_script"].append(
+                f"cd /var/lib/kea; tar cfz {self._cfg['backup_dir']}/var_lib_kea.tar.gz *")
+            self._cfg["backup_script"].append(
+                f"cd /var/log/kea; tar cfz {self._cfg['backup_dir']}/var_log_kea.tar.gz *")
             self._cfg["backup_script"].blank()
 
     def validate(self):
@@ -266,19 +268,19 @@ class Dhcp(Role):
             setup.blank()
 
         if self._cfg["backup"]:
-            setup.append("if [ -f $BACKUP/var_lib_kea.tar.gz ]; then")
+            setup.append("if [ -f $RESTORE_DIR/var_lib_kea.tar.gz ]; then")
             setup.log("Restoring Kea state & logs", indent="  ")
             setup.append("  mkdir -p /var/lib/kea")
             setup.append("  cd /var/lib/kea")
-            setup.append("  tar xfz /$BACKUP/var_lib_kea.tar.gz")
+            setup.append("  tar xfz /$RESTORE_DIR/var_lib_kea.tar.gz")
             setup.append("  chown -R kea:kea /var/lib/kea")
             setup.append("  chmod  750 /var/lib/kea")
             setup.append("  chmod  644 /var/lib/kea/*")
             setup.append("fi")
-            setup.append("if [ -f $BACKUP/var_log_kea.tar.gz ]; then")
+            setup.append("if [ -f $RESTORE_DIR/var_log_kea.tar.gz ]; then")
             setup.append("  mkdir -p /var/log/kea")
             setup.append("  cd /var/log/kea")
-            setup.append("  tar xfz /$BACKUP/var_log_kea.tar.gz")
+            setup.append("  tar xfz /$RESTORE_DIR/var_log_kea.tar.gz")
             setup.append("  chown -R kea:kea /var/log/kea")
             setup.append("  chmod  750 /var/log/kea")
             setup.append("  chmod  644 /var/log/kea/*")

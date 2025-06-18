@@ -35,7 +35,7 @@ class Dns(Role):
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup PDNS database")
             self._cfg["backup_script"].append(
-                "sqlite3 -readonly /var/lib/pdns/pdns.sqlite3 \".backup /backup/pdns.bak\"")
+                f"sqlite3 -readonly /var/lib/pdns/pdns.sqlite3 \".backup {self._cfg['backup_dir']}/pdns.bak\"")
             self._cfg["backup_script"].blank()
 
     def validate(self):

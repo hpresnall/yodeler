@@ -51,7 +51,7 @@ class Common(Role):
     def additional_configuration(self):
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup auth logs")
-            self._cfg["backup_script"].append("cp /var/log/auth* /backup")
+            self._cfg["backup_script"].append(f"cp /var/log/auth* {self._cfg['backup_dir']}")
             self._cfg["backup_script"].blank()
 
         # do not add any firewall rules for non infrastructure hosts
@@ -186,22 +186,15 @@ class Common(Role):
         disks.from_config(self._cfg, setup)
 
         if self._cfg["enable_watchdog"]:
-            setup.blank()
             setup.comment("enable the BusyBox watchdog service")
             setup.service("watchdog")
             setup.append(f"echo \"WATCHDOG_DEV={self._cfg['watchdog_dev']}\" >> /etc/conf.d/watchdog")
+            setup.blank()
+
+        _configure_backups(self._cfg, setup)
 
         if self._cfg["is_vm"]:
             libvirt.write_vm_xml(self._cfg, output_dir)
-
-        if self._cfg["backup"]:
-            setup.blank()
-            setup.append("if [ -f $BACKUP/auth ]; then")
-            setup.log("Restoring auth log backups", indent="  ")
-            setup.append("  cp $BACKUP/auth* /var/log")
-            setup.append("  chown root:wheel /var/log/auth*")
-            setup.append("  chmod 640 /var/log/auth*")
-            setup.append("fi")
 
 
 def _setup_repos(cfg: dict, setup: shell.ShellScript):
@@ -217,3 +210,31 @@ def _setup_repos(cfg: dict, setup: shell.ShellScript):
         setup.append(f"echo {repo} >> /etc/apk/repositories")
 
     setup.blank()
+
+
+def _configure_backups(cfg: dict, setup: shell.ShellScript):
+    if not cfg["backup"]:
+        return
+
+    if cfg["is_vm"]:
+        setup.comment("mount backup virtiofs disk at boot")
+        setup.append("echo -e \"backup\\t$BACKUP_DIR\\tvirtiofs\\trw,relatime\\t0\\t0\" >> /etc/fstab")
+    else:
+        setup.comment("create a local backup directory")
+        setup.append("mkdir $BACKUP_DIR")
+        setup.append("chown root:root $BACKUP_DIR")
+        setup.append("chmod 750 $BACKUP_DIR")
+
+    setup.blank()
+    setup.comment("run daily backups")
+    setup.append("rootinstall $DIR/backup.sh /usr/local/bin")
+    setup.append("chmod +x /usr/local/bin/backup.sh")
+    setup.append("ln -s /usr/local/bin/backup.sh /etc/periodic/daily/backup")
+    setup.blank()
+
+    setup.append("if [ -f $RESTORE_DIR/auth ]; then")
+    setup.log("Restoring auth log backups", indent="  ")
+    setup.append("  cp $RESTORE_DIR/auth* /var/log")
+    setup.append("  chown root:wheel /var/log/auth*")
+    setup.append("  chmod 640 /var/log/auth*")
+    setup.append("fi")

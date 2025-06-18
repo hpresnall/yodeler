@@ -115,6 +115,11 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     # backup script all roles can contribute to
     if host_cfg["backup"]:
         host_cfg["backup_script"] = shell.ShellScript("backup.sh", errexit=False)
+        host_cfg["backup_dir"] = "/backup"
+
+        # vmhosts backup to the same directory that vms use for virtiofs backup disks
+        if not host_cfg["is_vm"] and hostname in host_cfg["roles_to_hostnames"]["vmhost"]:
+            host_cfg["backup_dir"] = f"{host_cfg['vm_images_path']}/backup/{hostname}"
     else:
         host_cfg["backup_script"] = None
 
@@ -171,26 +176,18 @@ def write_scripts(host_cfg: dict, output_dir: str):
     setup.append("source $SETUP_TMP/envvars")
     setup.blank()
 
-    # expose backups to roles; add backup script to cron
+    # expose backup and restore dirs to roles
     if host_cfg["backup"]:
         if host_cfg["is_vm"]:
-            setup.comment("mount /backup at boot")
-            setup.append("echo -e \"backup\\t/backup\\tvirtiofs\\trw,relatime\\t0\\t0\" >> /etc/fstab")
-            setup.blank()
-
-            # backup dir will be available in /tmp/backup via create_vm.sh's contributions to yodel.sh
+            # restore will be available in /tmp/backup via create_vm.sh's contributions to yodel.sh
             setup.comment("backup was copied to /tmp via fs-skel-dir in yodel.sh")
-            setup.append("BACKUP=/tmp/backup")
+            setup.append("RESTORE_DIR=/tmp/backup")
         else:
-            # backup dir will be copied into host's site dir via create_physical.sh's contributions to yodel.sh
-            setup.substitute("physical", "setup_backup.sh", host_cfg)
-            setup.append("BACKUP=/backup")
+            # restore will be copied into host's site dir via create_physical.sh's contributions to yodel.sh
+            setup.comment("backup was copied to host in yodel.sh as part of the site configuration")
+            setup.append(f"RESTORE_DIR=\"$SITE_DIR/backup/{host_cfg['hostname']}\"")
 
-        setup.blank()
-        setup.comment("run daily backups")
-        setup.append("rootinstall $DIR/backup.sh /usr/local/bin")
-        setup.append("chmod +x /usr/local/bin/backup.sh")
-        setup.append("ln -s /usr/local/bin/backup.sh /etc/periodic/daily/backup")
+        setup.append(f"BACKUP_DIR={host_cfg['backup_dir']}")
         setup.blank()
 
     # append setup for each role
@@ -285,6 +282,9 @@ def _set_defaults(cfg: dict):
         cfg["vmhost"] = vmhost
     else:
         cfg["vmhost"] = None
+
+        if " " in cfg["vm_images_path"]:
+            raise ValueError(f"'{cfg['vm_images_pat']}' vm_images_path value cannot contain spaces")
 
         # physical installs need an interface configured to download APKs and a disk to install the OS
         cfg.setdefault("install_interfaces", """auto lo

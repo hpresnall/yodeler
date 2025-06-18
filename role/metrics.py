@@ -55,8 +55,9 @@ class Metrics(Role):
 
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup Prometheus DB")
-            self._cfg["backup_script"].append("snapshot=/var/lib/prometheus/data/snapshots/$(curl -s -XPOST http://localhost:9090/api/v1/admin/tsdb/snapshot | jq -r .data.name)")
-            self._cfg["backup_script"].append("tar cfz /backup/prometheus_backup.tar.gz $snapshot")
+            self._cfg["backup_script"].append(
+                "snapshot=/var/lib/prometheus/data/snapshots/$(curl -s -XPOST http://localhost:9090/api/v1/admin/tsdb/snapshot | jq -r .data.name)")
+            self._cfg["backup_script"].append(f"tar cfz {self._cfg['backup_dir']}/prometheus_backup.tar.gz $snapshot")
             self._cfg["backup_script"].append("rm -rf $snapshot")
 
     def validate(self):
@@ -159,7 +160,7 @@ class Metrics(Role):
 
         file.write("prometheus.yml", file.output_yaml(prometheus), output_dir)
 
-        # order matters; properf configuration is needed to provision grafana and create /var/lib/grafana
+        # order matters; proper configuration is needed to provision grafana and create /var/lib/grafana
         setup.comment("add grafana and prometheus config")
         setup.append("rootinstall $DIR/grafana.ini /etc")
         setup.append("rootinstall $DIR/prometheus.yml /etc/prometheus")
@@ -178,7 +179,7 @@ class Metrics(Role):
             "install -o grafana -g grafana -m 600 $DIR/prometheus_datasrc /var/lib/grafana/provisioning/datasources")
         setup.append(
             "mv /var/lib/grafana/provisioning/datasources/prometheus_datasrc /var/lib/grafana/provisioning/datasources/prometheus.yaml")
-        setup.append("chown -R grafana:grafana /var/lib/grafana")
+        setup.append("chown -R grafana:grafana /var/lib/grafana /var/log/grafana")
         setup.blank()
 
         setup.comment("provision grafana")
@@ -191,11 +192,8 @@ class Metrics(Role):
 
         if self._cfg["backup"]:
             setup.blank()
-            setup.append("if [ -f $BACKUP/prometheus_backup.tar.gz ]; then")
+            setup.append("if [ -f $RESTORE_DIR/prometheus_backup.tar.gz ]; then")
             setup.log("Restoring Prometheus TSDB", indent="  ")
             setup.append("  cd /var/lib/prometheus/data")
-            setup.append("  tar xvz $BACKUP/prometheus_backup.tar.gz")
+            setup.append("  tar xvz $RESTORE_DIR/prometheus_backup.tar.gz")
             setup.append("fi")
-
-# mkdir /var/log/grafana
-# chown grafana:grafana /var/log/grafana

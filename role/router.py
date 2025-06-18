@@ -132,7 +132,8 @@ class Router(Role):
 
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup firewall logs")
-            self._cfg["backup_script"].append("mkdir -p /backup/firewall; cp /var/log/firewall/* /backup/firewall")
+            self._cfg["backup_script"].append(f"mkdir -p {self._cfg['backup_dir']}/firewall")
+            self._cfg["backup_script"].append(f"cp /var/log/firewall/* {self._cfg['backup_dir']}/firewall")
             self._cfg["backup_script"].blank()
 
     @staticmethod
@@ -270,10 +271,10 @@ class Router(Role):
 
         if self._cfg["backup"]:
             setup.blank()
-            setup.append("if [ -f $BACKUP/firewall ]; then")
+            setup.append("if [ -f $RESTORE_DIR/firewall ]; then")
             setup.log("Restoring firewall log backups", indent="  ")
             setup.append("  mkdir -p /var/log/firewall")
-            setup.append("  cp $BACKUP/firewall/* /var/log/firewall")
+            setup.append("  cp $RESTORE_DIR/firewall/* /var/log/firewall")
             setup.append("  chown root:wheel /var/log/firewall")
             setup.append("chmod 750 /var/log/firewall")
             setup.append("  chown -R root:root /var/log/firewall/*")

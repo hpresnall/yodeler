@@ -17,7 +17,7 @@ rm -f $$SETUP_TMP/envvars
 echo "export START_TIME=$$START_TIME" > $$SETUP_TMP/envvars
 
 # expose any backups to the VM
-if [ -d $$SITE_DIR/backup/$HOSTNAME ]; then
+if [ "$$BACKUP" = "True" -a -d "$$SITE_DIR/backup/$HOSTNAME" ]; then
   log "Supplying backups to the VM"
   mkdir -p $$SETUP_TMP/backup
   cp -r $$SITE_DIR/backup/$HOSTNAME/* $$SETUP_TMP/backup || : # allow empty
