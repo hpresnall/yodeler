@@ -1,6 +1,6 @@
 #!/bin/sh
 # adds a CDROM iso file to a vm and configures it to boot
-# the vm should be stopped
+# the vm should be stopped before running this script
 set -o errexit
 
 vm=$1

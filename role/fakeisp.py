@@ -91,7 +91,7 @@ class FakeISP(Role):
 
         # create the parent interface for tagged vlans
         # vmhost will configure the vswitches to vlan tag, so parents are not necessary
-        if ("vmhost") in self._cfg["roles_to_hostnames"] and (self._cfg["hostname"] not in self._cfg["roles_to_hostnames"]["vmhost"]):
+        if "vmhost" in self._cfg["roles_to_hostnames"] and (self._cfg["hostname"] not in self._cfg["roles_to_hostnames"]["vmhost"]):
             if (fisp_vlan["id"] is not None):
                 parent = fakeisp.get("name", "eth1")
                 # insert before fakeisp
@@ -211,7 +211,10 @@ class FakeISP(Role):
             setup.service("radvd", "boot")
             setup.blank()
 
+        sysctl.enable_ipv6_forwarding(setup, output_dir)
+
         # fakeisp runs before vmhost, create the directory here; let vmhost role chmod & chown
+        setup.comment("add helper scripts for Yodeling with nested VMs")
         setup.append("mkdir -p " + self._cfg["vm_images_path"])
 
         for script in ["add_boot_iso.sh", "rm_boot_iso.sh"]:
@@ -220,9 +223,6 @@ class FakeISP(Role):
         for script in ["add_boot_iso.py", "rm_boot_iso.py"]:
             file.copy_template(self.name, script, output_dir)
             setup.append(f"install -o nobody -g libvirt -m 640 $DIR/{script} {self._cfg['vm_images_path']}")
-        setup.blank()
-
-        sysctl.enable_ipv6_forwarding(setup, output_dir)
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:

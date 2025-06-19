@@ -1,6 +1,6 @@
 #!/bin/sh
 # removes CDROM iso file from a vm
-# the vm should be stopped
+# the vm should be stopped before running this script
 set -o errexit
 
 vm=$1

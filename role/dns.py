@@ -235,10 +235,11 @@ class Dns(Role):
 
             for external in self._cfg["external_hosts"]:
                 output = True
-                hosts.append(str(external["ipv4_address"]) + " " + " ".join(external["hostnames"]))
+                hostnames = " ".join(external["hostnames"])
+                hosts.append(str(external["ipv4_address"]) + " " + hostnames)
 
-                if "ipv6_address" in external:
-                    hosts.append(str(external["ipv6_address"]) + " " + " ".join(external["hostnames"]))
+                if external["ipv6_address"]:
+                    hosts.append(str(external["ipv6_address"]) + " " + hostnames)
 
             if output:
                 hosts.append("")

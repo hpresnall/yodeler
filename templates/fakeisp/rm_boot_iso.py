@@ -3,7 +3,6 @@
 Requires <path_to_xml> as a command line argument.
 """
 import xml.etree.ElementTree as xml
-import os.path
 import sys
 
 if len(sys.argv) == 1:
@@ -13,7 +12,7 @@ if len(sys.argv) == 1:
 domain_xml = sys.argv[1]
 domain = xml.parse(domain_xml).getroot()
 
-# remove boot element from top-level os
+# remove bootmenu and force boot from disk to top-level os
 os = domain.find("os")
 if os is not None:
     boot = os.find("boot")
@@ -48,6 +47,7 @@ for i, disk in enumerate(disks, start=1):
 
     if dev == "hdc":
         devices.remove(disk)
+        break
 
 xml.indent(domain, space="  ")
 xml.dump(domain)

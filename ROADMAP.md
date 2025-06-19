@@ -50,7 +50,7 @@
 - [x] Configure Grafana
 - [ ] Create / generate dashboards for all servers in a site
 - [x] Add libvirt metrics for vmhosts
-- [ ] Add nvme metrics for SSDs
+- [ ] Add SMART metrics for SATA & NVME disks
 - [x] Add IPMI metrics for physical servers
 - [ ] Add OneWire support for sensor metrics
 - [ ] Add SNMP support for network metrics
@@ -61,7 +61,8 @@
 - [x] Configure ZFS
 - [x] Support for image, device and PCI passthrough disks on VMs
 - [x] Add backup and / or shared mount support for durable VM configuration data
-- [ ] Add backup scripts for each server role & configure nightly backups
+- [x] Add backup scripts for each server role & configure nightly backups
+- [] Add backup script on vmhosts that create differential backups for each VM
 
 ## Build Server
 - [x] Configure basic build tools
