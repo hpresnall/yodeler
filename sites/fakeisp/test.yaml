@@ -11,3 +11,7 @@ interfaces:
     # meant for testing to confirm the fakeisp server is working correctly
     ipv6_ask_for_prefix: true 
     vswitch: fakeisp
+  # optional 2nd interface if needed for the "physical" VM host when running a nested Yodeler setup
+  # this address will not be used in the final, nested Yodeler config
+  # - ipv4_address: 192.168.253.2
+  #   vswitch: secondary

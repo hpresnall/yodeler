@@ -27,7 +27,7 @@ class Dhcp(Role):
             actions4 = [fw.allow_service("dhcp", ipv6=False)]
             actions4[0]["comment"] = "allow direct DHCP renew requests"
 
-            actions6 = [fw.allow_proto_port({"proto": "udp", "port": "546:547"}, ipv4=False)]
+            actions6 = [fw.allow_proto_port("546:547", proto="udp", ipv4=False)]
             actions6[0]["comment"] = "allow DHCP relay"
 
             fw.add_rule(self._cfg, [fw.location_all()], destinations, actions4,

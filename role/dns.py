@@ -26,8 +26,8 @@ class Dns(Role):
         if destinations:
             actions = [
                 fw.allow_service("dns"),
-                fw.allow_proto_port({"proto": "tcp", "port": 553}),
-                fw.allow_proto_port({"proto": "udp", "port": 553})
+                fw.allow_proto_port(553),
+                fw.allow_proto_port(553, proto="udp")
             ]
 
             fw.add_rule(self._cfg, [fw.location_all()], destinations, actions, f"DNS and nsupdate for {hostname}")
@@ -250,9 +250,11 @@ class Dns(Role):
 
 
 def _add_zone(setup: shell.ShellScript, vlan: dict, dns_domain: str, dns_server: str):
+    top_level = False
+
     if vlan["name"] == "top-level":
         setup.comment("creating zone for top-level domain")
-        vlan["name"] = "dns"
+        top_level = True
     else:
         setup.comment(f"create zone for '{vlan['name']}' vlan")
 
@@ -264,7 +266,7 @@ def _add_zone(setup: shell.ShellScript, vlan: dict, dns_domain: str, dns_server:
     setup.append(f"pdnsutil create-zone {vlan['domain']} {dns_server}")
     setup.append(f"pdnsutil secure-zone {vlan['domain']}")
 
-    if vlan["name"] == "dns":
+    if top_level:
         # no reverse zones; only allow updates to the top-level domain from localhost, the default
         setup.blank()
         return
@@ -384,7 +386,7 @@ def _create_host_entries(setup: shell.ShellScript, cfg: dict, dns_domain: str):
             if vlan["domain"] == cfg["domain"]:
                 continue
 
-            # CNAMES for each alias
+            # add CNAMES for each alias
             for alias in host_cfg["aliases"]:
                 if (alias == "dns") and (vlan["domain"] == dns_domain):
                     # 'dns' entry already covered by glue record
@@ -422,5 +424,6 @@ def _create_static_host_entries(setup: shell.ShellScript, cfg: dict):
                     _add_cname(setup, alias, host)
                     output |= True
 
+                # blank after each host
                 if output:
                     setup.blank()

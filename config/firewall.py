@@ -458,6 +458,8 @@ def _validate_host_vlan(cfg: dict, hostname: str, vlan: dict, loc_name: str, loc
 
 # functions to build rules; for use in role.additional_configuration()
 def add_rule(cfg: dict, sources: list[dict], destinations: list[dict], actions: list[dict], comment: str = ""):
+    if not cfg:
+        raise ValueError("cfg cannot be empty")
     if not sources:
         raise ValueError("sources cannot be empty")
     if not destinations:
@@ -549,8 +551,8 @@ def action_service(action: str, service: str, location: str = "", ipv4: bool = T
     }
 
 
-def allow_proto_port(proto_port: dict, location="", ipv4: bool = True,  ipv6: bool = True) -> dict:
-    return action_proto_port("allow", proto_port, location, ipv4, ipv6)
+def allow_proto_port(port: int|str|list, proto: str="tcp", location:str="", ipv4: bool = True,  ipv6: bool = True) -> dict:
+    return action_proto_port("allow", {"proto": proto, "port": port}, location, ipv4, ipv6)
 
 
 def action_proto_port(action: str, proto_port: dict, location="", ipv4: bool = True,  ipv6: bool = True) -> dict:

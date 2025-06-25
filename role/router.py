@@ -592,11 +592,12 @@ def _create_shorewall_rule(rule: dict, rule_idx: int, shorewall: dict):
                     protocol = action["protocol"]
                     n = len(action["ports"])
 
-                    # add comment at the end of the line if there is only one line of output
+                    # add comment before rules if there is only one line of output
+                    # otherwise, add at the end of the first (only) line 
                     if n > 1 and action["comment"]:
                         if ipv4:
                             actions4.append("# " + action["comment"])
-                        if ipv4:
+                        if ipv6:
                             actions6.append("# " + action["comment"])
 
                     for i, port in enumerate(action["ports"]):

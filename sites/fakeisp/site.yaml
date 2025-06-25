@@ -48,3 +48,12 @@ vswitches:
         # with a /56, 15 /60 delegations will be created, each with 16 subnets (vlans)
         ipv6_subnet: fdff:dead:beef::/48
         dhcp6_managed: true # DHCP6 will run on this network
+  # optional fake vswitch so that VMs running a test Yodeler site can have a second interface on the "physical" VM host
+  # - name: secondary
+  #   vlans:
+  #     - name: vm2nd
+  #       routable: false
+  #       # dummy subnet that will not be used in the final, nested Yodeler config
+  #       ipv4_subnet: 192.168.253.0/24
+  #       dhcp4_enabled: false
+  #       # uplink should probably not be specified as this could subvert nested Yodler subnets
