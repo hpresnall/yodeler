@@ -452,7 +452,7 @@ def _bootstrap_physical(cfg: dict, output_dir: str):
 
     # create Alpine setup answerfile
     # use external DNS for initial Alpine setup
-    cfg["external_dns_str"] = " ".join(cfg["external_dns"])
+    cfg["external_dns_str"] = " ".join([str(ip) for ip in cfg["external_dns"]])
 
     file.substitute_and_write("physical", "answerfile", cfg, output_dir)
 

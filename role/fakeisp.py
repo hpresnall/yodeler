@@ -132,10 +132,8 @@ class FakeISP(Role):
         setup.service("ip6tables", "boot")
         setup.blank()
 
-        external_dns = [ipaddress.ip_address(ip) for ip in self._cfg["external_dns"]]
-
         subnet = vlan["ipv4_subnet"]
-        dns = [str(ip) for ip in external_dns if ip.version == 4]
+        dns = [str(ip) for ip in self._cfg["external_dns"] if ip.version == 4]
 
         dhcp4_json = file.load_json("templates/kea/kea-dhcp4.conf")
         dhcp4_config = dhcp4_json["Dhcp4"]
@@ -160,7 +158,7 @@ class FakeISP(Role):
         subnet = vlan["ipv6_subnet"]
 
         if subnet:
-            dns = [str(ip) for ip in external_dns if ip.version == 6]
+            dns = [str(ip) for ip in self._cfg["external_dns"] if ip.version == 6]
 
             dhcp6_json = file.load_json("templates/kea/kea-dhcp6.conf")
             dhcp6_config = dhcp6_json["Dhcp6"]

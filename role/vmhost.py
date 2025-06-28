@@ -238,7 +238,7 @@ sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /etc/default/grub
         for _, vm in self._cfg["hosts"].items():
             hostname = vm["hostname"]
 
-            if not vm["is_vm"] or hostname == self._cfg["hostname"]:
+            if not vm["is_vm"] or (hostname == self._cfg["hostname"]):
                 continue
 
             if vm["vmhost"] != self._cfg["hostname"]:
@@ -363,7 +363,7 @@ def _create_vswitch_uplink(vswitch: dict, setup: shell.ShellScript):
     vswitch_name = vswitch["name"]
     vlans_by_id = vswitch["vlans_by_id"].keys()
 
-    if vswitch.get("bond_uplinks", True) and len(uplinks) > 1:
+    if vswitch.get("bond_uplinks", True) and (len(uplinks) > 1):
         # create a bond named 'uplink' using all the uplink interfaces
         # assumes switch is configured for LACP
         bond_ifaces = " ".join(uplinks)

@@ -83,16 +83,17 @@ def validate(site_yaml: dict | str | None) -> dict:
     host.validate_overridable_site_defaults(site_cfg)
 
     # validate values that hosts cannot override
-    for key in ("alpine_repositories", "external_ntp", "external_dns"):
+    for key in ("alpine_repositories", "external_ntp", "external_dns", "external_ntp"):
         site_cfg[key] = parse.read_string_list(key, site_cfg, f"site '{site_cfg['site_name']}'")
+
+    external_dns_ips = []
 
     for dns in site_cfg["external_dns"]:
         try:
-            ipaddress.ip_address(dns)
+            external_dns_ips.append(ipaddress.ip_address(dns))
         except ValueError as ve:
             raise KeyError(f"invalid 'external_dns' IP address {dns}") from ve
-
-    site_cfg["external_ntp"] = parse.read_string_list("external_ntp", site_cfg, f"site '{site_cfg['site_name']}'")
+    site_cfg["external_dns"] = external_dns_ips
 
     # order matters here; vswitch / vlans first since the firewall config needs that information
     vswitch.validate(site_cfg)
@@ -297,22 +298,33 @@ def _validate_external_hosts(cfg: dict):
 
         for hostname in entry["hostnames"]:
             if dns.invalid_hostname(hostname):
-                ValueError(f"invalid hostname {hostname} for {location}[{i}]")
+                raise ValueError(f"invalid hostname '{hostname}' for {location}[{i}]")
 
         if "ipv4_address" not in entry:
             raise KeyError(f"{location}[{i}] must specify an ipv4_address")
         try:
-            entry["ipv4_address"] = ipaddress.ip_address(entry["ipv4_address"])
+            entry["ipv4_address"] = ipaddress.IPv4Address(entry["ipv4_address"])
         except ValueError as ve:
             raise ValueError(f"invalid ipv4_address for {location}[{i}]") from ve
 
         if "ipv6_address" in entry:
             try:
-                entry["ipv6_address"] = ipaddress.ip_address(entry["ipv6_address"])
+                entry["ipv6_address"] = ipaddress.IPv6Address(entry["ipv6_address"])
             except ValueError as ve:
                 raise ValueError(f"invalid ipv6_address for {location}[{i}]") from ve
         else:
             entry["ipv6_address"] = None
+
+        for vswitch in cfg["vswitches"].values():
+            for vlan in vswitch["vlans"]:
+                if entry["ipv4_address"] in vlan["ipv4_subnet"]:
+                    raise ValueError(
+                        f"{location}[{i}] ipv4 address {entry['ipv4_address']} should be in 'static_hosts' for vlan '{vlan['name']}'")
+
+                if entry["ipv6_address"] and vlan["ipv6_subnet"]:
+                    if entry["ipv6_address"] in vlan["ipv6_subnet"]:
+                        raise ValueError(
+                            f"{location}[{i}] ipv6 address {entry['ipv6_address']} should be in 'static_hosts' for vlan '{vlan['name']}'")
 
 
 def _setup_site_build_scripts(cfg: dict, build_dir: str):

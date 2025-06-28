@@ -220,6 +220,8 @@ def _validate_ipaddress(ip_version: str, vlan: dict, cfg: dict, location: str, r
         address = ipaddress.ip_address(cfg[key])
     except ValueError as ve:
         raise ValueError(f"{location} invalid {key}") from ve
+    if address.version != int(ip_version[-1:]):
+        raise ValueError(f"{location} invalid {ip_version} address '{cfg[key]}'")
 
     if (ip_version == "ipv6") and (vlan["ipv6_subnet"] is None):
         _logger.warning("%s ipv6_address %s will be ignored in vlan with no ipv6_subnet defined", location, address)

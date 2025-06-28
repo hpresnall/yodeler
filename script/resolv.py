@@ -10,7 +10,7 @@ def create_conf(cfg: dict) -> str:
 
     for iface in cfg["interfaces"]:
         # possibly search vlan domains
-        if iface["type"] in {"std", "vlan"} and iface["vlan"]["domain"]:
+        if (iface["type"] in {"std", "vlan"}) and iface["vlan"]["domain"]:
             search_domains.append(iface["vlan"]["domain"])
 
     buffer = []
@@ -20,7 +20,7 @@ def create_conf(cfg: dict) -> str:
         buffer.append(f"domain {cfg['primary_domain']}")
 
     dns_addresses = []
-    if "dns" in cfg["roles_to_hostnames"] and cfg["roles_to_hostnames"]["dns"]:
+    if ("dns" in cfg["roles_to_hostnames"]) and cfg["roles_to_hostnames"]["dns"]:
         for hostname in cfg["roles_to_hostnames"]["dns"]:
             dns_server = cfg["hosts"][hostname]
             dns_addresses.extend(interfaces.find_ips_to_interfaces(cfg, dns_server["interfaces"]))
@@ -33,13 +33,13 @@ def create_conf(cfg: dict) -> str:
         if search_domains:
             buffer.append("search {}".format(" ".join(search_domains)))
 
-        nameservers = [str(match["ipv4_address"]) for match in dns_addresses if match["ipv4_address"]]
-        nameservers.extend([str(match["ipv6_address"]) for match in dns_addresses if match["ipv6_address"]])
+        nameservers = [match["ipv4_address"] for match in dns_addresses if match["ipv4_address"]]
+        nameservers.extend([match["ipv6_address"] for match in dns_addresses if match["ipv6_address"]])
     else:
         nameservers = cfg["external_dns"]
 
     for server in nameservers:
-        buffer.append("nameserver " + server)
+        buffer.append("nameserver " + str(server))
     buffer.append("")
 
     return "\n".join(buffer)

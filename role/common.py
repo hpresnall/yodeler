@@ -92,7 +92,7 @@ class Common(Role):
 
             if vlan["routable"] and (vswitch_name in vswitches_used):
                 raise ValueError(
-                    f"host '{self._cfg['hostname']} defines interfaces on multiple routable vlans for switch '{vswitch_name}'")
+                    f"host '{self._cfg['hostname']}' defines interfaces on multiple routable vlans for switch '{vswitch_name}'")
 
             vswitches_used.add(vswitch_name)
 

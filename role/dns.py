@@ -197,7 +197,7 @@ class Dns(Role):
             for hostname in self._cfg["roles_to_hostnames"]["metrics"]:
                 host_cfg = self._cfg["hosts"][hostname]
 
-                for match in interfaces.find_ips_to_interfaces(host_cfg, self._cfg["interfaces"], first_match_only=False):
+                for match in interfaces.find_ips_to_interfaces(self._cfg, host_cfg["interfaces"], first_match_only=False):
                     if match["ipv4_address"]:
                         web_allow_from.append(str(match["ipv4_address"]))
                     if match["ipv6_address"]:
@@ -224,7 +224,7 @@ class Dns(Role):
         # forward everything else to external DNS
         recursor["recursor"]["forward_zones_recurse"] = [{
             "zone": ".",
-            "forwarders": self._cfg["external_dns"]
+            "forwarders": [str(ip) for ip in self._cfg["external_dns"]]
         }]
         recursor["webservice"]["allow_from"] = web_allow_from
 

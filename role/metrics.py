@@ -109,7 +109,7 @@ class Metrics(Role):
             elif other:
                 hosts_to_ips[host_cfg["hostname"]] = other
             else:
-                _logger.warning(f"no matching ip address found to '{host_cfg['hostname']}';"
+                _logger.warning(f"no matching ipv4 address found for access to '{host_cfg['hostname']}';"
                                 " no metrics will be collected")
 
         # base prometheus config; scrape configs will be added for each metric collector

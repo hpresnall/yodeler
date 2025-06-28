@@ -224,11 +224,9 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
 
             if "ipv4_address" in loc:
                 try:
-                    address = ipaddress.ip_address(loc["ipv4_address"])
+                    address = ipaddress.IPv4Address(loc["ipv4_address"])
                 except ValueError as ve:
                     raise ValueError(f"{loc_name} invalid ipv4 address '{loc['ipv4_address']}'") from ve
-                if not isinstance(address, ipaddress.IPv4Address):
-                    raise ValueError(f"{loc_name} invalid ipv4 address '{loc['ipv4_address']}'")
 
                 # address must be in the vlan or not in any vlans
                 if vlan == "internet":
@@ -245,11 +243,9 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
 
             if "ipv6_address" in loc:
                 try:
-                    address = ipaddress.ip_address(loc["ipv6_address"])
+                    address = ipaddress.IPv6Address(loc["ipv6_address"])
                 except ValueError as ve:
                     raise ValueError(f"{loc_name} invalid ipv6 address '{loc['ipv6_address']}'") from ve
-                if not isinstance(address, ipaddress.IPv6Address):
-                    raise ValueError(f"{loc_name} invalid ipv6 address '{loc['ipv6_address']}'")
 
                 # address must be in the vlan or not in any vlans
                 if vlan == "internet":
@@ -357,7 +353,7 @@ def _validate_location_hostname(cfg: dict, rule: dict, idx: int, src_or_dest: st
             continue
         # else not an alias, check external_hosts
 
-        # hostnames in the internet vlan have already been against external_hosts
+        # hostnames in the internet vlan have already been checked against external_hosts
         # but recheck here for incorrect use of external_hosts in other vlans
         # also disable ipv6 here for consistency with other host types
         for ext in cfg["external_hosts"]:

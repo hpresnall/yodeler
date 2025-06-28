@@ -1,5 +1,5 @@
 #!/bin/sh
-# this should be run when chrooted in the shared build image
+# this should be run when chrooted into the shared build image
 set -o errexit
 
 apk -q --no-progress add git

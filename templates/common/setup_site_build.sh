@@ -1,6 +1,6 @@
 #!/bin/sh
 # create log function if running outside of Yodeler
-type log >/dev/null
+type log > /dev/null
 
 if [ "$$?" != "0" ]; then
   log () {

@@ -32,8 +32,9 @@ def configure(cfg: dict, setup: shell.ShellScript, output_dir: str):
     for role in cfg["roles"]:
         _load_templates(services, "templates/" + role.name + "/awall")
 
-    custom_services = {'service': services.pop('custom', {})}
+    custom_services = {"service": services.pop("custom", {})}
 
+    # note no attempt to limit access to just the metrics server
     for metric_type, metric in cfg["metrics"].items():
         if metric["enabled"]:
             _add_service_for_metric(metric_type, services, custom_services)
@@ -111,7 +112,7 @@ def _load_templates(services: dict, template_dir: str):
 
         if path == "custom-services.json":
             # consolidate custom service definitions into a single entry
-            if "service" in service and service["service"]:
+            if ("service" in service) and service["service"]:
                 for name, definition in service["service"].items():
                     services["custom"][name] = definition
             else:
