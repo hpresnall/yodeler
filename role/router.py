@@ -10,6 +10,7 @@ import util.parse as parse
 import script.libvirt as libvirt
 import script.shell as shell
 import script.sysctl as sysctl
+import script.metrics as metrics
 
 import config.interfaces as interfaces
 import config.firewall as fw
@@ -236,6 +237,30 @@ class Router(Role):
                         self._cfg['hostname'], vswitch, vswitch["router_iface"]["mac_address"]))
         # for each vswitch
 
+        # now that all hosts are known, add firewall rules so the metrics server can access this host
+        # special handling needed for the router since it does not use awall
+        for hostname in self._cfg["roles_to_hostnames"]["metrics"]:
+            host_cfg = self._cfg["hosts"][hostname]
+            metrics_hostname = host_cfg["hostname"]
+
+            sources = []
+            actions = []
+
+            for iface in host_cfg["interfaces"]:
+                if (iface["type"] in {"std", "vlan"}) and iface["vlan"]["routable"]:
+                    source_added = False
+                    for metric_type, metric in self._cfg["metrics"].items():
+                        if metric["enabled"]:
+                            actions.append(fw.allow_proto_port(metrics.get_ports(metric_type), comment=metric_type))
+                            if not source_added:
+                                # metrics config currently only uses ipv4
+                                sources.append(fw.location(iface["vlan"], hostname=metrics_hostname, ipv6=False))
+                                source_added = True
+
+            if sources:
+                fw.add_rule(self._cfg, sources, [fw.location_firewall()], actions,
+                            f"metrics server ({metrics_hostname}) can access firewall's metrics")
+
         _add_shorewall_host_params(self._cfg, shorewall)
 
         for idx, rule in enumerate(self._cfg["firewall"]["rules"], start=1):
@@ -339,7 +364,7 @@ def _write_dhcrelay_config(cfg: dict, setup: shell.ShellScript, dhrelay4_ifaces:
 
         # dhrelay requires listening on the interface that is on the dhcp server's vlan
         # make sure it is setup, even if that vlan does not have dhcp enabled
-        if upper_iface4 and upper_iface4 not in dhrelay4_ifaces:
+        if upper_iface4 and (upper_iface4 not in dhrelay4_ifaces):
             dhrelay4_ifaces.insert(0, upper_iface4)
 
         setup.blank()
@@ -593,8 +618,8 @@ def _create_shorewall_rule(rule: dict, rule_idx: int, shorewall: dict):
                     n = len(action["ports"])
 
                     # add comment before rules if there is only one line of output
-                    # otherwise, add at the end of the first (only) line 
-                    if n > 1 and action["comment"]:
+                    # otherwise, add at the end of the first (only) line
+                    if (n > 1) and action["comment"]:
                         if ipv4:
                             actions4.append("# " + action["comment"])
                         if ipv6:

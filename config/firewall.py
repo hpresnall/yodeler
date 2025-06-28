@@ -276,7 +276,7 @@ def _parse_action(action_type: str, actions: str | dict | list, location: str) -
     if isinstance(actions, str):
         return [action_service(action_type, actions, base)]
     elif isinstance(actions, dict):
-        return [action_proto_port(action_type, actions, base)]
+        return [_action_proto_port(action_type, actions, base)]
     # else assume list
 
     actions = parse.non_empty_list(location, actions)
@@ -288,7 +288,7 @@ def _parse_action(action_type: str, actions: str | dict | list, location: str) -
         if isinstance(action, str):
             parsed_actions.append(action_service(action_type, action, location))
         elif isinstance(action, dict):
-            parsed_actions.append(action_proto_port(action_type, action, location))
+            parsed_actions.append(_action_proto_port(action_type, action, location))
         else:
             raise ValueError(
                 f"{location} must be a string or dict, not {type(action)}")
@@ -551,11 +551,11 @@ def action_service(action: str, service: str, location: str = "", ipv4: bool = T
     }
 
 
-def allow_proto_port(port: int|str|list, proto: str="tcp", location:str="", ipv4: bool = True,  ipv6: bool = True) -> dict:
-    return action_proto_port("allow", {"proto": proto, "port": port}, location, ipv4, ipv6)
+def allow_proto_port(port: int|str|list, proto: str="tcp", location:str="", comment:str="", ipv4: bool = True,  ipv6: bool = True) -> dict:
+    return _action_proto_port("allow", {"proto": proto, "port": port, "comment": comment}, location, ipv4, ipv6)
 
 
-def action_proto_port(action: str, proto_port: dict, location="", ipv4: bool = True,  ipv6: bool = True) -> dict:
+def _action_proto_port(action: str, proto_port: dict, location="", ipv4: bool = True,  ipv6: bool = True) -> dict:
     # action is a dict of protocol & ports
     # port(s) can be an int or a range separated by - or :
     if not location:
