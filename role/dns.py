@@ -170,15 +170,19 @@ class Dns(Role):
 
             for vlan in top_level_iface["vswitch"]["vlans"]:
                 # no domain => no dns
-                if vlan["domain"]:
-                    _add_zone(setup, vlan, dns_domain, dns_server)
+                if not vlan["domain"]:
+                    continue
 
-                    forward_zones.append(vlan["domain"])
+                _add_zone(setup, vlan, dns_domain, dns_server)
 
-                    allow_subnets.append(str(vlan["ipv4_subnet"]))
+                forward_zones.append(vlan["domain"])
+                forward_zones.append(address.rptr_ipv4(vlan["ipv4_subnet"]))
 
-                    if vlan["ipv6_subnet"]:
-                        allow_subnets.append(str(vlan["ipv6_subnet"]))
+                allow_subnets.append(str(vlan["ipv4_subnet"]))
+
+                if vlan["ipv6_subnet"]:
+                    forward_zones.append(address.rptr_ipv6(vlan["ipv6_subnet"]))
+                    allow_subnets.append(str(vlan["ipv6_subnet"]))
 
         _create_host_entries(setup, self._cfg, dns_domain)
         # no entries needed for DHCP reservations; DDNS will dynamically add the host when it requests an address
@@ -215,13 +219,11 @@ class Dns(Role):
         # do not forward known zones; query internal DNS
         recursor["recursor"]["forward_zones"] = [{
             "zone": zone,
-            "recurse": False,
             "forwarders": ["127.0.0.1:553"]
         } for zone in forward_zones]
         # forward everything else to external DNS
         recursor["recursor"]["forward_zones_recurse"] = [{
             "zone": ".",
-            "recurse": True,
             "forwarders": self._cfg["external_dns"]
         }]
         recursor["webservice"]["allow_from"] = web_allow_from
@@ -275,14 +277,14 @@ def _add_zone(setup: shell.ShellScript, vlan: dict, dns_domain: str, dns_server:
 
     # reverse zones
     if vlan["ipv4_subnet"]:
-        domain = str(address.rptr_ipv4(vlan["ipv4_subnet"]))
+        domain = address.rptr_ipv4(vlan["ipv4_subnet"])
         setup.append(f"pdnsutil create-zone {domain} {dns_server}")
         setup.append(f"pdnsutil secure-zone {domain}")
 
         subnets.append(str(vlan["ipv4_subnet"]))
 
     if vlan["ipv6_subnet"]:
-        domain = str(address.rptr_ipv6(vlan["ipv6_subnet"]))
+        domain = address.rptr_ipv6(vlan["ipv6_subnet"])
         setup.append(f"pdnsutil create-zone {domain} {dns_server}")
         setup.append(f"pdnsutil secure-zone {domain}")
 
