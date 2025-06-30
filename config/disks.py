@@ -61,9 +61,9 @@ def validate(cfg: dict):
             # require path to image file on vmhost; optional size
             # system disk image is just named with the hostname
             postfix = "" if name == "system" else "_" + name
-            path = disk.setdefault("path", f"{cfg['vm_images_path']}/{cfg['hostname']}{postfix}.img")
+            path = parse.set_default_string("path", disk, f"{cfg['vm_images_path']}/{cfg['hostname']}{postfix}.img")
 
-            int(disk.setdefault("size_mb", 1024))
+            parse.set_default_int("size_mb", disk, 1024)
 
             disk["partition"] = ""
             parse.set_default_string("fs_type", disk, "ext4")
@@ -75,7 +75,7 @@ def validate(cfg: dict):
             if not path.startswith("/dev/"):
                 raise ValueError(f"{location}.path '{path}' does not start with /dev/")
 
-            disk["partition"] = str(disk.setdefault("partition", ""))
+            disk["partition"] = parse.set_default_string("partition", disk, "")
             parse.set_default_string("fs_type", disk, "ext4")
             disk["format"] = bool(disk.get("format", True))
         elif "passthrough" == type:

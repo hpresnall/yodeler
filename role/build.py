@@ -15,7 +15,9 @@ class Build(Role):
         packages = {"build-base", "automake", "autoconf", "make", "pkgconf", "git", "gcc", "python3", "py3-pip", "perl"}
 
         if self._cfg.setdefault("java", False):
-            packages.add("openjdk19-jdk")
+            packages.add("openjdk24-jdk")
+        if self._cfg.setdefault("java21", False):
+            packages.add("openjdk21-jdk")
         if self._cfg.setdefault("java17", False):
             packages.add("openjdk17-jdk")
         if self._cfg.setdefault("java11", False):

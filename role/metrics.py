@@ -9,6 +9,7 @@ import config.interfaces as interfaces
 import config.vlan as vlan
 
 import util.file as file
+import util.parse as parse
 
 import script.metrics as metrics
 
@@ -42,14 +43,14 @@ class Metrics(Role):
         if not self._cfg["metrics"]:
             raise ValueError("metrics server must have metrics enabled")
 
-        self._cfg.setdefault("grafana_password", "m3trics!")
+        parse.set_default_string("grafana_password", self._cfg, "m3trics!")
 
         # slower default times in seconds for scraping some metric types
         metric_intervals = self._cfg.get("metric_intervals", {})
-        metric_intervals.setdefault("default", 15)
-        metric_intervals.setdefault("nvme", 60)
-        metric_intervals.setdefault("onewire", 60)
-        metric_intervals.setdefault("ipmi", 30)
+        parse.set_default_int("default", metric_intervals, 15)
+        parse.set_default_int("nvme", metric_intervals,60)
+        parse.set_default_int("onewire", metric_intervals,60)
+        parse.set_default_int("ipmi", metric_intervals,30)
 
         self._cfg["metric_intervals"] = metric_intervals
 

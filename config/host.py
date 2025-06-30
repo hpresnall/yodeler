@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import sys
+import ipaddress
 
 import role.roles as roles
 
@@ -287,7 +288,7 @@ def _set_defaults(cfg: dict):
             raise ValueError(f"'{cfg['vm_images_pat']}' vm_images_path value cannot contain spaces")
 
         # physical installs need an interface configured to download APKs and a disk to install the OS
-        cfg.setdefault("install_interfaces", """auto lo
+        parse.set_default_string("install_interfaces", cfg, """auto lo
 iface lo inet loopback
 auto eth0
 iface eth0 inet dhcp""")
@@ -555,7 +556,7 @@ DEFAULT_SITE_CONFIG = {
     "keymap": "us us",
     "alpine_repositories": ["https://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "https://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
     "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
-    "external_dns": ["8.8.8.8", "9.9.9.9", "1.1.1.1"],
+    "external_dns": [ipaddress.ip_address("8.8.8.8"), ipaddress.ip_address("9.9.9.9"), ipaddress.ip_address("1.1.1.1")],
     # top-level domain for the site; empty => no local DNS unless DNS server sets 'primary_domain'
     "domain": "",
     # if not specified, no SSH access will be possible!

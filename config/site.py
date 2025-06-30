@@ -83,7 +83,7 @@ def validate(site_yaml: dict | str | None) -> dict:
     host.validate_overridable_site_defaults(site_cfg)
 
     # validate values that hosts cannot override
-    for key in ("alpine_repositories", "external_ntp", "external_dns", "external_ntp"):
+    for key in ("alpine_repositories", "external_ntp", "external_ntp"):
         site_cfg[key] = parse.read_string_list(key, site_cfg, f"site '{site_cfg['site_name']}'")
 
     external_dns_ips = []

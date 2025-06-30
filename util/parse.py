@@ -53,6 +53,14 @@ def non_empty_string(key: str, cfg: None | dict, dict_name: str) -> str:
 
 
 def set_default_string(key: str, cfg: dict, default: str) -> str:
+    return cast(str, _set_default(key, cfg, default, str))
+
+
+def set_default_int(key: str, cfg: dict, default: int) -> int:
+    return cast(int, _set_default(key, cfg, default, int))
+
+
+def _set_default(key: str, cfg: dict, default: object, kind: type) -> object:
     if not key:
         raise ValueError("key cannot be empty")
     if cfg is None:
@@ -64,7 +72,7 @@ def set_default_string(key: str, cfg: dict, default: str) -> str:
 
     if not value:
         value = default
-    elif not isinstance(value, str):
+    if not isinstance(value, kind):
         raise ValueError(f"{key} must be a string")
 
     cfg[key] = value
