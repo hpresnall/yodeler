@@ -46,7 +46,8 @@ class NTP(Role):
                                                       self._cfg["vswitches"].values())
 
         if missing_vlans:
-            _logger.warning("vlans '%s' cannot access time from NTP host '%s'", missing_vlans, self._cfg["hostname"])
+            raise ValueError(
+                f"host '{self._cfg['hostname']}' does not have access to vlans {missing_vlans} to provide DNS")
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         # chrony.create_conf() will be called by common

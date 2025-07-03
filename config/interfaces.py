@@ -326,9 +326,15 @@ def check_accessiblity(to_check: list[dict], vswitches: list[dict], ignore_vlan:
     Optionally accepts an additional check function that can remove a vlan from consideration. This function will be
     passed a single vlan. If the vlan should be removed, even if it is not accessible by the given interfaces, the
     function should return 'True'."""
-    # find all the vlans this host can access
     accessible_vlans = set()
 
+    # find all vlans
+    for vswitch in vswitches:
+        for vlan in vswitch["vlans"]:
+            if not ignore_vlan(vlan):
+                accessible_vlans.add(vlan["name"])
+
+    # look for missing vlans
     for iface in to_check:
         if iface["type"] not in {"std", "vlan"}:
             continue
@@ -336,15 +342,9 @@ def check_accessiblity(to_check: list[dict], vswitches: list[dict], ignore_vlan:
         if iface["vlan"]["routable"]:
             for vlan in iface["vswitch"]["vlans"]:
                 if vlan["routable"]:  # router will make all routable vlans accessible
-                    accessible_vlans.add(vlan["name"])
+                    accessible_vlans.remove(vlan["name"])
         else:  # non-routable vlans must have an interface on the vlan
-            accessible_vlans.add(iface["vlan"]["name"])
-
-    # look for missing vlans
-    for vswitch in vswitches:
-        for vlan in vswitch["vlans"]:
-            if (vlan["name"] in accessible_vlans) or ignore_vlan(vlan):
-                accessible_vlans.remove(vlan["name"])
+            accessible_vlans.remove(iface["vlan"]["name"])
 
     return accessible_vlans
 

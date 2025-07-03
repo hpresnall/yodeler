@@ -212,7 +212,9 @@ def _validate_full_site(site_cfg: dict):
         if role_name == "common":
             continue
 
-        hostnames = site_cfg["roles_to_hostnames"][role_name] if role_name in site_cfg["roles_to_hostnames"] else []
+        hostnames = []
+        if role_name in site_cfg["roles_to_hostnames"]:
+            hostnames = site_cfg["roles_to_hostnames"][role_name]
         count = len(hostnames)
 
         clazz = roles.class_for_name(role_name)
@@ -228,6 +230,7 @@ def _validate_full_site(site_cfg: dict):
 
     # hostname uniqueness already determined as hosts were loaded but _not_ against all aliases; see host.validate()
     aliases = set()
+    vmhosts = site_cfg["roles_to_hostnames"]["vmhost"]
 
     for host_cfg in site_cfg["hosts"].values():
         hostname = host_cfg["hostname"]
@@ -253,7 +256,6 @@ def _validate_full_site(site_cfg: dict):
 
         # and validate the VM host
         if host_cfg["is_vm"]:
-            vmhosts = site_cfg["roles_to_hostnames"]["vmhost"]
             to_match = host_cfg["vmhost"]
 
             if not to_match:

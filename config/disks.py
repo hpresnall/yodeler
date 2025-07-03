@@ -75,7 +75,7 @@ def validate(cfg: dict):
             if not path.startswith("/dev/"):
                 raise ValueError(f"{location}.path '{path}' does not start with /dev/")
 
-            disk["partition"] = parse.set_default_string("partition", disk, "")
+            disk["partition"] = str(disk.setdefault("partition", ""))
             parse.set_default_string("fs_type", disk, "ext4")
             disk["format"] = bool(disk.get("format", True))
         elif "passthrough" == type:

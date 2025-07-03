@@ -20,7 +20,8 @@ def create_conf(cfg: dict) -> str:
         buffer.append(f"domain {cfg['primary_domain']}")
 
     dns_addresses = []
-    if ("dns" in cfg["roles_to_hostnames"]) and cfg["roles_to_hostnames"]["dns"]:
+
+    if "dns" in cfg["roles_to_hostnames"]:
         for hostname in cfg["roles_to_hostnames"]["dns"]:
             dns_server = cfg["hosts"][hostname]
             dns_addresses.extend(interfaces.find_ips_to_interfaces(cfg, dns_server["interfaces"]))

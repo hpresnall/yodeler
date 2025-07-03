@@ -55,11 +55,12 @@ class Dns(Role):
                 raise KeyError(
                     f"host '{self._cfg['hostname']}' cannot configure a DNS server with a DHCP address on interface '{iface['name']}'")
 
-        accessible_vlans = interfaces.check_accessiblity(self._cfg["interfaces"],
-                                                         self._cfg["vswitches"].values())
+        missing_vlans = interfaces.check_accessiblity(self._cfg["interfaces"],
+                                                      self._cfg["vswitches"].values())
 
-        if accessible_vlans:
-            raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {accessible_vlans}")
+        if missing_vlans:
+            raise ValueError(
+                f"host '{self._cfg['hostname']}' does not have access to vlans {missing_vlans} to provide DNS")
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -193,7 +194,8 @@ class Dns(Role):
         web_allow_from = ["127.0.0.1", "::1"]
 
         # allow the metrics server to contact PDNS's webserver for metrics
-        if self._cfg["metrics"] and self._cfg["metrics"]["pdns"]["enabled"]:
+        if ("metrics" in self._cfg["roles_to_hostnames"]) \
+                and ("pdns" in self._cfg["metrics"]) and self._cfg["metrics"]["pdns"]["enabled"]:
             for hostname in self._cfg["roles_to_hostnames"]["metrics"]:
                 host_cfg = self._cfg["hosts"][hostname]
 

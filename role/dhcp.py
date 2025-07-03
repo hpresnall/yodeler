@@ -48,12 +48,13 @@ class Dhcp(Role):
                 raise KeyError(
                     f"host '{self._cfg['hostname']}' cannot configure a DHCP server with a DHCP address on interface '{iface['name']}'")
 
-        accessible_vlans = interfaces.check_accessiblity(self._cfg["interfaces"],
-                                                         self._cfg["vswitches"].values(),
-                                                         lambda vlan: not vlan["dhcp4_enabled"] and not vlan["ipv6_subnet"])
+        missing_vlans = interfaces.check_accessiblity(self._cfg["interfaces"],
+                                                      self._cfg["vswitches"].values(),
+                                                      lambda vlan: not vlan["dhcp4_enabled"] and not vlan["ipv6_subnet"])
 
-        if accessible_vlans:
-            raise ValueError(f"host '{self._cfg['hostname']}' does not have access to vlans {accessible_vlans}")
+        if missing_vlans:
+            raise ValueError(
+                f"host '{self._cfg['hostname']}' does not have access to vlans {missing_vlans} to provide DHCP")
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -141,7 +142,7 @@ class Dhcp(Role):
         # for each vlan, create a subnet configuration entry for DHCP4 & 6, along with DDNS forward and reverse zones
         for vswitch in self._cfg["vswitches"].values():
             for vlan in vswitch["vlans"]:
-                # dns server addresses for this vlan
+                # dns server addresses for this vlan; should not be empty since accessiblity was checked in validate()
                 dns_addresses = interfaces.find_ips_from_vlan(vswitch, vlan, dns_server_interfaces)
                 dns4 = [str(match["ipv4_address"]) for match in dns_addresses if match["ipv4_address"]]
                 dns6 = [str(match["ipv6_address"]) for match in dns_addresses if match["ipv6_address"]]
