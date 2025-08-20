@@ -207,10 +207,6 @@ def write_scripts(host_cfg: dict, output_dir: str):
 
         setup.blank()
 
-    setup.comment("ensure any additions to Grub are applied")
-    setup.append("update-grub")
-    setup.blank()
-
     setup.comment("not removing host's /tmp, just its contents")
     setup.append("rm -rf $SETUP_TMP/*")
     setup.blank()
@@ -267,6 +263,10 @@ def _set_defaults(cfg: dict):
     parse.configure_defaults(cfg["hostname"], DEFAULT_CONFIG, _DEFAULT_CONFIG_TYPES, cfg)
 
     cfg["awall_disable"] = parse.read_string_list("awall_disable", cfg, f"'{cfg['hostname']}'")
+
+    cfg["kernel_params"] = parse.read_string_list_plurals(
+        {"kernel_param", "kernel_params"}, cfg, f"'{cfg['hostname']}'")
+    cfg.pop("kernel_param", None)
 
     # remove from script output if not needed
     if not cfg["install_private_ssh_key"]:
@@ -607,6 +607,11 @@ DEFAULT_CONFIG = {
     "unnested_before_chroot": [],
     "unnested_after_chroot": [],
     "rename_interfaces": [],
+    # Linux kernel command line parameters; allow singular and plural
+    "kernel_param": "",
+    "kernel_params": [],
+    # script to calculate parameters
+    "setup_kernel_params": [],
     "enable_metrics": True  # allow metrics for this host?; separate from the metrics _role_ which is for collection
 }
 
@@ -631,5 +636,8 @@ _DEFAULT_CONFIG_TYPES = {
     "unnested_before_chroot": list,
     "unnested_after_chroot": list,
     "rename_interfaces": list,
+    "kernel_param": str,
+    "kernel_params": list,
+    "setup_kernel_params": list,
     "enable_metrics": bool
 }

@@ -49,7 +49,7 @@ while [ "$$?" -ne 0 ]; do
 done
 
 log "Configuring libvirt storage"
-mkdir -p $VM_IMAGES_PATH/backup
+mkdir -p $VM_IMAGES_PATH/backup # for vm backups even if the vm host has not enabled backups
 mkdir -p $VM_IMAGES_PATH/shared
 chown -R nobody:libvirt $VM_IMAGES_PATH
 chmod 755 -R $VM_IMAGES_PATH

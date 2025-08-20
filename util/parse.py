@@ -41,7 +41,7 @@ def non_empty_string(key: str, cfg: None | dict, dict_name: str) -> str:
         raise ValueError("dict_name cannot be empty")
 
     if key not in cfg:
-        raise KeyError(f"{key} not in {dict_name}")
+        raise KeyError(f"'{key}' not in {dict_name}")
 
     value = cfg[key]
     if not isinstance(value, str):
@@ -106,7 +106,7 @@ def _read_list_plurals(keys: set[str], cfg: None | dict, value_name: str, value_
 
     for key in keys:
         if not key:
-            raise ValueError(f"{value_name}.{key} cannot be empty")
+            raise ValueError(f"{value_name} cannot have an empty key in {keys}")
 
         if key not in cfg:
             continue
@@ -155,7 +155,7 @@ def configure_defaults(config_name: str, default_config: dict, default_types: di
 
     for key in default_config:
         if key not in default_types:
-            raise KeyError(f"{key} in {config_name} does not define a type")
+            raise KeyError(f"'{key}' in {config_name} does not define a type")
 
         use_default = False
 

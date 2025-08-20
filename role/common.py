@@ -39,12 +39,16 @@ class Common(Role):
         # remove iptables if there is no local firewall
         if not self._cfg["local_firewall"]:
             self._cfg["remove_packages"].add("iptables")
-            self._cfg["packages"].discard("awall")
+            packages.discard("awall")
 
         # add utilities for physical servers
         if not self._cfg["is_vm"]:
             packages.update(["util-linux", "pciutils", "dmidecode", "cpufrequtils", "nvme-cli", "smartmontools",
                              "lm-sensors", "ethtool"])
+
+        # need update-grub if there are addtional kernel command line parameters
+        if self._cfg["kernel_params"]:
+            packages.add("grub")
 
         return packages
 
@@ -58,7 +62,7 @@ class Common(Role):
         if len(self._cfg["roles"]) == 1:  # i.e. only common role
             return
 
-        # different rules for the router / firewall
+        # different firewall rules for the router / firewall
         for role in self._cfg["roles"]:
             if role.name == "router":
                 return
@@ -193,6 +197,18 @@ class Common(Role):
 
         _configure_backups(self._cfg, setup)
 
+        if self._cfg["kernel_params"]:
+            if self._cfg["setup_kernel_params"]:
+                for setup_param in self._cfg["setup_kernel_params"]:
+                    setup.append(setup_param)
+                setup.blank()
+
+            params = " ".join(self._cfg["kernel_params"])
+
+            setup.comment("update kernel command line parameters")
+            setup.append(f"sed -i -e \"s/quiet/{params} quiet/g\" /etc/default/grub")
+            setup.append("update-grub")
+
         if self._cfg["is_vm"]:
             libvirt.write_vm_xml(self._cfg, output_dir)
 
@@ -221,7 +237,7 @@ def _configure_backups(cfg: dict, setup: shell.ShellScript):
         setup.append("echo -e \"backup\\t$BACKUP_DIR\\tvirtiofs\\trw,relatime\\t0\\t0\" >> /etc/fstab")
     else:
         setup.comment("create a local backup directory")
-        setup.append("mkdir $BACKUP_DIR")
+        setup.append("mkdir -p $BACKUP_DIR")
         setup.append("chown root:root $BACKUP_DIR")
         setup.append("chmod 750 $BACKUP_DIR")
 
@@ -238,3 +254,4 @@ def _configure_backups(cfg: dict, setup: shell.ShellScript):
     setup.append("  chown root:wheel /var/log/auth*")
     setup.append("  chmod 640 /var/log/auth*")
     setup.append("fi")
+    setup.blank()

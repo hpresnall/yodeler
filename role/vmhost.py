@@ -93,6 +93,17 @@ class VmHost(Role):
             self._cfg["backup_script"].append("done")
             self._cfg["backup_script"].blank()
 
+        # kernel parameters for PCI passthrough
+        self._cfg["setup_kernel_params"].extend([
+            "# enable VT-d / IOMMU depending on CPU vendor",
+            "if $(grep vendor_id /proc/cpuinfo | head -n 1 | grep AMD > /dev/null); then",
+            "  iommu=\"amd_iommu=pgtbl_v1\"",
+            "else",
+            "  iommu=\"intel_iommu=on\"",
+            "fi"])
+
+        self._cfg["kernel_params"].extend(["${iommu}", "iommu=pt"])
+
     def validate(self):
         # ensure no reused PCI addresses, uplink interfaces, disk images or disk devices
         uplinks = set()
@@ -183,16 +194,6 @@ class VmHost(Role):
             setup.service("local")
             setup.append("install -o root -g root -m 750 $DIR/ipv6.start /etc/local.d")
             setup.blank()
-
-        if not self._cfg["is_vm"]:
-            setup.append("""# enable VT-d / IOMMU
-if $(grep vendor_id /proc/cpuinfo | head -n 1 | grep AMD > /dev/null); then
-  iommu="amd_iommu=pgtbl_v1"
-else
-  iommu="intel_iommu=on"
-fi
-sed -i -e \"s/quiet/${iommu} iommu=pt quiet/g\" /etc/default/grub
-""")
 
         # libvirt hook scripts for networks (i.e. vswitches) and vms
         file.copy_template(self.name, "network_hook", output_dir)
