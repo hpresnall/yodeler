@@ -1,5 +1,4 @@
-# setup additional ip6tables rules
-# rules to block incoming already set up in yodel.sh
+# setup basic ip6tables rules without awall
 # iptables save will be called on shutdown
 
 # ensure default policy

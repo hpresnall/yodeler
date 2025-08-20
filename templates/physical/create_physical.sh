@@ -6,7 +6,7 @@ mkdir -p $$SITE_DIR/apk_cache
 ln -s $$(realpath $$SITE_DIR/apk_cache) /etc/apk/cache
 
 # alpine install will setup the network
-# block all incoming traffic until awall is configured
+# block all incoming traffic during the install
 # install rsync too for later use; avoid issues with moving world file later
 log "Blocking incoming network traffic"
 apk -q add iptables ip6tables rsync
