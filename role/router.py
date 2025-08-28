@@ -591,12 +591,15 @@ def _create_shorewall_rule(rule: dict, rule_idx: int, shorewall: dict):
                 ipv4 = source["ipv4"] and destination["ipv4"] and action["ipv4"]
                 ipv6 = source["ipv6"] and destination["ipv6"] and action["ipv6"]
 
-                if action["type"] == "allow-all":
-                    # append rule directly to policy file, commenting only once
+                if action["type"] == "drop-all":
+                    actions4.append("DROP:NFLOG(4)" + '\t' + s4 + '\t' + d4)
+                    actions6.append("DROP:NFLOG(6)" + '\t' + s6 + '\t' + d6)
+                elif action["type"] == "allow-all":
+                    # append rule directly to policy file, preventing default DROP rule from being reached
                     # policy for ipv6 is copied; avoid duplicate output
                     if allow_all_comment and rule["comment"]:
                         shorewall["policy"].append("# " + rule["comment"])
-                        allow_all_comment = False
+                        allow_all_comment = False  # comment once
                     shorewall["policy"].append(s + '\t' + d + '\t' + a + '\n')
                 elif action["type"] == "named":
                     if action["protocol"] in _allowed_macros:
@@ -681,6 +684,7 @@ def _write_shorewall_config(cfg: dict, shorewall: dict, setup: shell.ShellScript
         file.write("mangle", dns, shorewall4)
         file.write("mangle", dns + dhcrelay6, shorewall6)
 
+    # final, default rules for security
     template = """# drop everything coming in from the internet
 inet\tall\tDROP\tNFLOG({0})
 

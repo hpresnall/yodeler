@@ -21,7 +21,7 @@ _logger = logging.getLogger(__name__)
 
 class FakeISP(Role):
     def additional_packages(self) -> set[str]:
-        return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-admin", "kea-ctrl-agent", "kea-hook-run-script", "iptables", "ip6tables", "radvd", "python3"}
+        return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-admin", "kea-ctrl-agent", "kea-hook-run-script", "iptables", "ip6tables", "radvd", "python3", "qemu-system-i386"}
 
     def configure_interfaces(self):
         # ensure required vswitches and vlans exist

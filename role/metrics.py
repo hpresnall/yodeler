@@ -48,9 +48,9 @@ class Metrics(Role):
         # slower default times in seconds for scraping some metric types
         metric_intervals = self._cfg.get("metric_intervals", {})
         parse.set_default_int("default", metric_intervals, 15)
-        parse.set_default_int("nvme", metric_intervals,60)
-        parse.set_default_int("onewire", metric_intervals,60)
-        parse.set_default_int("ipmi", metric_intervals,30)
+        parse.set_default_int("nvme", metric_intervals, 60)
+        parse.set_default_int("onewire", metric_intervals, 60)
+        parse.set_default_int("ipmi", metric_intervals, 30)
 
         self._cfg["metric_intervals"] = metric_intervals
 

@@ -92,12 +92,14 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     # since site_cfg is shared with all host's config, all hosts can find other hosts
     site_cfg["hosts"][hostname] = host_cfg
 
-    _set_defaults(host_cfg)
-
+    # order matters from here
+    # roles determine if host is a vmhost => is_vm = False
     _load_roles(host_cfg)
 
-    # order matters here
-    # add all interfaces then validate the configuration
+    # then, set default config values, which differ for vms
+    _set_defaults(host_cfg)
+
+    # next, add all interfaces before validating the configuration
     for role in host_cfg["roles"]:
         role.configure_interfaces()
 
@@ -332,6 +334,11 @@ def _load_roles(cfg: dict):
     if "vmhost" in role_names:
         ordered_roles.append("vmhost")
         role_names.discard("vmhost")
+
+        # vmhost is always configured like a physical server
+        # nested VMs require a second Yodel from within an already running VM
+        # set here before any validation is run
+        cfg["is_vm"] = False
 
     ordered_roles.extend(role_names)
 
@@ -581,6 +588,7 @@ _DEFAULT_SITE_CONFIG_TYPES = {
 # accessible for testing
 DEFAULT_CONFIG = {
     "is_vm": True,
+    "vm_use_efi": False,
     "autostart": True,
     "host_share": True,
     "backup": True,
@@ -608,7 +616,6 @@ DEFAULT_CONFIG = {
     "unnested_after_chroot": [],
     "rename_interfaces": [],
     # Linux kernel command line parameters; allow singular and plural
-    "kernel_param": "",
     "kernel_params": [],
     # script to calculate parameters
     "setup_kernel_params": [],
@@ -617,8 +624,9 @@ DEFAULT_CONFIG = {
 
 _DEFAULT_CONFIG_TYPES = {
     "is_vm": bool,
+    "vm_use_efi": bool,
     "autostart": bool,
-    "host_share": bool,  # on VMs, exposed shared drive from KVM host?
+    "host_share": bool,  # on VMs, expose shared drive from KVM host? Drive will be shared by _all_ VMs on the host.
     "backup": bool,
     "vcpus": int,
     "memory_mb": int,
@@ -636,7 +644,6 @@ _DEFAULT_CONFIG_TYPES = {
     "unnested_before_chroot": list,
     "unnested_after_chroot": list,
     "rename_interfaces": list,
-    "kernel_param": str,
     "kernel_params": list,
     "setup_kernel_params": list,
     "enable_metrics": bool

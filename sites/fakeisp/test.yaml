@@ -3,6 +3,7 @@ vcpus: 4
 memory_mb: 4096
 disk_size_mb: 16384
 motd: "Yodeler test VM"
+vm_use_efi: True # boot with EFI for a nested VM install
 interfaces:
     # request both DHCP for ipv4 and ipv6
   - ipv4_address: dhcp

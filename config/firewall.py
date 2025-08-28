@@ -104,7 +104,9 @@ def _parse_rules(cfg: dict, firewall: dict) -> list[dict]:
 
         actions = []
 
-        if ("allow-all" in rule) and rule["allow-all"]:  # allow-all: true supercedes other rules
+        if ("drop-all" in rule) and rule["drop-all"]:  # drop-all: true supercedes other rules
+            actions.append({"action": "drop-all", "type": "drop-all", "ipv4": True, "ipv6": True})
+        elif ("allow-all" in rule) and rule["allow-all"]:  # allow-all: true supercedes other rules except drop
             actions.append({"action": "allow-all", "type": "allow-all", "ipv4": True, "ipv6": True})
         elif "allow" in rule:
             actions.extend(_parse_action("allow", rule.get("allow"), location))
@@ -547,7 +549,7 @@ def action_service(action: str, service: str, location: str = "", ipv4: bool = T
     }
 
 
-def allow_proto_port(port: int|str|list, proto: str="tcp", location:str="", comment:str="", ipv4: bool = True,  ipv6: bool = True) -> dict:
+def allow_proto_port(port: int | str | list, proto: str = "tcp", location: str = "", comment: str = "", ipv4: bool = True, ipv6: bool = True) -> dict:
     return _action_proto_port("allow", {"proto": proto, "port": port, "comment": comment}, location, ipv4, ipv6)
 
 

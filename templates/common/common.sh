@@ -106,6 +106,6 @@ sed -i -e "s/provide net/# provide net/g" -e "s/before dns/before networking dns
 sed -i -e "s#/sbin/dhcpcd \$$optargs#/sbin/dhcpcd -q -n \$$optargs#g" /usr/libexec/ifupdown-ng/dhcp
 
 # reduce crond logging level so info messages are not printed to syslog on every execution
-echo "CRON_OPTS=\"$$CRON_OPTS -l 6\"" >> /etc/conf.d/crond
+echo "CRON_OPTS=\"\$$CRON_OPTS -l 6\"" >> /etc/conf.d/crond
 # disable execution every 15 minutes
 sed -i "s:\*/15:#\*/15:g" /etc/crontabs/root

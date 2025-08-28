@@ -7,7 +7,7 @@ rc-update add ovs-vswitchd boot
 echo tun >> /etc/modules
 
 # disable logging to console and syslog; use a log file instead
-echo "OPTIONS=\"$$OPTIONS --verbose=console:warn --verbose=syslog:warn --log-file=/var/log/openvswitch\"" >> /etc/conf.d/ovs-vswitchd 
+echo "OPTIONS=\"\$$OPTIONS --verbose=console:warn --verbose=syslog:warn --log-file=/var/log/openvswitch\"" >> /etc/conf.d/ovs-vswitchd 
 
 # run now
 # ovs-modules starts openvswitch kernel module; this was loaded loaded before running this script in chroot

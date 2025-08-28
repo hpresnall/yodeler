@@ -321,12 +321,12 @@ def _validate_external_hosts(cfg: dict):
             for vlan in vswitch["vlans"]:
                 if entry["ipv4_address"] in vlan["ipv4_subnet"]:
                     raise ValueError(
-                        f"{location}[{i}] ipv4 address {entry['ipv4_address']} should be in 'static_hosts' for vlan '{vlan['name']}'")
+                        f"{location}[{i}] ipv4 address {entry['ipv4_address']} should be in 'static_hosts' for vlan '{vlan['name']}', not 'external_hosts'")
 
                 if entry["ipv6_address"] and vlan["ipv6_subnet"]:
                     if entry["ipv6_address"] in vlan["ipv6_subnet"]:
                         raise ValueError(
-                            f"{location}[{i}] ipv6 address {entry['ipv6_address']} should be in 'static_hosts' for vlan '{vlan['name']}'")
+                            f"{location}[{i}] ipv6 address {entry['ipv6_address']} should be in 'static_hosts' for vlan '{vlan['name']}', not 'external_hosts'")
 
 
 def _setup_site_build_scripts(cfg: dict, build_dir: str):

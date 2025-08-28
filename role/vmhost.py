@@ -77,9 +77,6 @@ class VmHost(Role):
         return True
 
     def additional_configuration(self):
-        # do not support nested vms
-        self._cfg["is_vm"] = False
-
         # additional physical server config to load libvirt kernel modules
         self._cfg["before_chroot"].append(file.substitute("vmhost", "before_chroot.sh", self._cfg))
         self._cfg["after_chroot"].append(file.substitute("vmhost", "after_chroot.sh", self._cfg))

@@ -15,16 +15,18 @@ def from_config(cfg: dict, setup: shell.ShellScript):
             # for host passthrough, let other roles format the disk and set the mountpoint, if needed
             continue
 
+        hostname = cfg["hostname"]
+
         if cfg["is_vm"]:
             # for vms, setup the disk before chroot
             if disk["type"] == "img":
                 # create the image in the outermost script
                 # other config will need to move the image to correct location _inside_ the VM host
                 # split for better formatting in output
-                cfg["unnested_before_chroot"].extend(_create_image(disk).split("\n"))
+                cfg["unnested_before_chroot"].extend(_create_image(hostname, disk).split("\n"))
             elif disk["type"] == "device":
                 # note formatting with the host's disk path; it will be a different dev (e.g. vda) in a running vm
-                cfg["before_chroot"].append(format(disk, "host_path"))
+                cfg["before_chroot"].append(format(hostname, disk, "host_path"))
 
             cfg["before_chroot"].append(_add_uuid_to_envvars(disk))
         else:
@@ -32,15 +34,15 @@ def from_config(cfg: dict, setup: shell.ShellScript):
             if disk["type"] == "img":
                 # TODO config.disks does not actually allow this
                 # would need to set the 'loop' option in create_fstab_entry()
-                setup.append(_create_image(disk))
+                setup.append(_create_image(hostname, disk))
             elif disk["type"] == "device":
-                setup.append(format(disk, "path"))
+                setup.append(format(hostname, disk, "path"))
 
             setup.append(_set_uuid_to_local_var(disk))
             setup.blank()
 
 
-def _create_image(disk: dict) -> str:
+def _create_image(hostname: str, disk: dict) -> str:
     """Output the commands to create and format a disk image."""
     path = disk["host_path"]
     dir = os.path.dirname(path)
@@ -48,20 +50,20 @@ def _create_image(disk: dict) -> str:
 
     # assume VM and UUID is written to $SETUP_TMP/envvars
     return f"""if [ ! -f "{path}" ]; then
-  log "Creating & formatting '{disk['name']}' disk image"
+  log "Creating & formatting '{disk['name']}' disk image for '{hostname}'"
   mkdir -p {dir}
   truncate -s {disk['size_mb']}M {path}
   sync{format}
 else
-  log "Reusing existing '{disk['name']}' disk image"
+  log "Reusing existing '{disk['name']}' disk image for '{hostname}'"
 fi
 """
 
 
-def format(disk: dict, path_key: str) -> str:
+def format(hostname: str, disk: dict, path_key: str) -> str:
     path = disk[path_key]
     # for loop checks partitions if disk path is a full disk
-    return f"""# only format the '{disk['name']}' disk if there are no existing, formatted partitions
+    return f"""# only format the '{disk['name']}' disk if there are no existing, formatted partitions on '{hostname}'
 has_fs=false
 for fs in $(lsblk -ln -o FSTYPE {path}); do
   if [ -n $fs ]; then
@@ -70,10 +72,10 @@ for fs in $(lsblk -ln -o FSTYPE {path}); do
   fi
 done
 if [ "$has_fs" == "false" ]; then
-  log "Formatting {path} as {disk['fs_type']} for '{disk['name']}'"
+  log "Formatting {path} as {disk['fs_type']} for '{disk['name']}' on '{hostname}'"
   mkfs.{disk['fs_type']} {path}
 else
-  log "Not reformatting {path} for '{disk['name']}'"
+  log "Not reformatting {path} for '{disk['name']}' on '{hostname}'"
 fi
 """
 

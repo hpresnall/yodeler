@@ -12,6 +12,14 @@ def write_vm_xml(cfg: dict, output_dir: str) -> None:
     _find_and_set_text(domain, "memory", str(cfg["memory_mb"]))
     _find_and_set_text(domain, "vcpu", str(cfg["vcpus"]))
 
+    if cfg["vm_use_efi"]:
+        vm_os = domain.find("os")
+        if vm_os is None:
+            raise AttributeError("<os> not defined in 'templates/vm/vm.xml'")
+        vm_os.set("firmware", "efi")
+
+        xml.SubElement(vm_os, "loader", {"secure": "no"})
+
     devices = domain.find("devices")
 
     # assume no disks in the template; this if statement fixes typing errors
@@ -63,10 +71,10 @@ def _disk_img(img_path: str, virtual_dev: str) -> xml.Element:
 def _disk_device(host_dev: str, virtual_dev: str) -> xml.Element:
     """Create a <disk> XML element for the given host path in /dev.
 
-    <disk type='block' device='disk'>
-      <driver name='qemu' type='raw'/>
-      <source dev='{host_dev}'/>
-      <target dev='{virtual_dev}' bus='virtio'/>
+    <disk type="block" device="disk">
+      <driver name="qemu" type="raw" />
+      <source dev="{host_dev}" />
+      <target dev="{virtual_dev}" bus="virtio" />
     </disk>
     """
     disk = xml.Element("disk", {"type": "block", "device": "disk"})
@@ -78,10 +86,11 @@ def _disk_device(host_dev: str, virtual_dev: str) -> xml.Element:
 
 
 def _disk_passthrough(disk_cfg: dict) -> xml.Element:
-    """Create a <disk> XML element for the given host path in /dev.
-    <hostdev mode='subsystem' type='pci' managed='yes'>
+    """Create a PCI passthrough <disk> XML element for the given host PCI address.
+
+    <hostdev mode="subsystem" type="pci" managed="yes">
       <source>
-        <address domain='0x0000' bus='0x00' slot='0x00' function='0x0'/>
+        <address domain="0x0000" bus="0x00" slot="0x00" function="0x0"/>
       </source>
     </hostdev>
     """
@@ -99,13 +108,13 @@ def _disk_passthrough(disk_cfg: dict) -> xml.Element:
 
 
 def interface_from_config(hostname: str, iface: dict) -> xml.Element:
-    """Create an <interface> XML element for the given iface configuration.
+    """Create an <interface> XML element for the given interface configuration.
 
     <interface type="network">
       <source network="<vswitch>" portgroup="<vlan>" />
       <target dev="<hostname>-<vlan>" />
       <model type="virtio" />
-      <driver name='vhost'/>
+      <driver name="vhost" />
     </interface>
     """
     vlan_name = iface["vlan"]["name"]
@@ -124,15 +133,16 @@ def interface_from_config(hostname: str, iface: dict) -> xml.Element:
 
 def macvtap_interface(iface: dict) -> xml.Element:
     """Create an <interface> XML element that uses macvtap to connect the host's iface to the VM.
-    The given iface_name is the name of the interface _on the host_.
+    The given interface's macvtap setting is the interface _on the host_, not the vm.
 
-    <interface type="direct">
+    <interface type="direct" trustGuestRxFilters="yes">
       <source dev="<host_iface>" mode="private" />
       <model type="virtio" />
-      <driver name='vhost'/>
+      <driver name="vhost" />
     </interface>
     """
-    interface = xml.Element("interface", {"type": "direct"})
+    # trustGuestRxFilters ensures that IPv6 neighbor solicitation for the router itself is passed through macvtap
+    interface = xml.Element("interface", {"type": "direct", "trustGuestRxFilters": "yes"})
     xml.SubElement(interface, "source", {"dev": iface["macvtap"], "mode": "private"})
     xml.SubElement(interface, "model", {"type": "virtio"})
     xml.SubElement(interface, "driver", {"name": "vhost"})
@@ -143,13 +153,13 @@ def macvtap_interface(iface: dict) -> xml.Element:
     return interface
 
 
-def passthrough_interface(passthrough: dict, mac_address: str) -> xml.Element:
+def passthrough_interface(passthrough: dict, mac_address: str | None) -> xml.Element:
     """Create an <interface> XML element that uses PCI passthrough to connect the host's iface to the VM.
     The given iface_name is the name of the interface _on the host_.
 
-    <interface type="hostdev" managed="yes">               
-      <source>                                                                   
-        <address type='pci' domain='0x0000' bus='0x01' slot='0x06' function='0x0'/>
+    <interface type="hostdev" managed="yes">
+      <source>
+        <address type="pci" domain="0x0000" bus="0x00" slot="0x00" function="0x0" />
       </source>
     </interface>
     """
@@ -177,7 +187,8 @@ def router_interface(hostname: str, vswitch: dict, mac_address: str) -> xml.Elem
       <source network="<vswitch>" portgroup="router" />
       <target dev="<hostname>-<vswitch>" />
       <model type="virtio" />
-      <driver name='vhost'/>
+      <driver name="vhost"/>
+      <mac address="<mac_address>" />
     </interface>
     """
     interface = xml.Element("interface", {"type": "network"})
@@ -269,11 +280,11 @@ def create_network(vswitch: dict, output_dir: str) -> None:
 def _create_host_share(vmhost_path: str, share_name: str) -> xml.Element:
     """Create an <filesystem> XML element for a directory shared with the KVM host.
 
-    <filesystem type='mount' accessmode='passthrough'>                           
-      <driver type='virtiofs'/>                         
+    <filesystem type="mount" accessmode="passthrough">
+      <driver type="virtiofs" />
       <binary path="/usr/lib/qemu/virtiofsd"/>
-      <source dir='<path>'/>                  
-      <target dir='<name>'/>                                                  
+      <source dir="<path>" />
+      <target dir="<share_name>" />
     </filesystem>
     """
     filesystem = xml.Element("filesystem", {"type": "mount", "accessmode": "passthrough"})

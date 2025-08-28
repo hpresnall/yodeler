@@ -129,7 +129,7 @@ def validate(cfg: dict):
         # make it the first disk
         disks.insert(0, disk)
 
-    # now that disk ordering is set, set the vm device as the path
+    # now that disk ordering is establised, set the vm device as the path
     if cfg["is_vm"]:
         for i, disk in enumerate(disks):
             disk["host_path"] = disk["path"]

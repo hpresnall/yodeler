@@ -1,5 +1,4 @@
 hostname: vmhost
-is_vm: False
 motd: vmhost
 interfaces:
   - ipv4_address: 192.168.1.2
@@ -9,3 +8,8 @@ interfaces:
     ipv6_address:
     vswitch: private
 roles: [vmhost, xwindows]
+install_interfaces: |
+  auto lo
+  iface lo inet loopback
+  auto eth0
+  iface eth0 inet dhcp

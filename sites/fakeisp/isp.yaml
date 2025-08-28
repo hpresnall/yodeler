@@ -1,4 +1,3 @@
-is_vm: false
 motd: "Alpine physical fake ISP for testing nested Yodeler installs"
 roles: [vmhost, fakeisp]
 # /etc/network/interfaces used during initial Alpine Linux install
