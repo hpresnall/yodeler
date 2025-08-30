@@ -20,7 +20,6 @@ def validate(cfg: dict):
 
     names = set()
     paths = set()
-    # TODO check paths across all vmhosts
 
     system_disk = None
     system_disk_idx = -1
@@ -40,7 +39,7 @@ def validate(cfg: dict):
         names.add(name)
 
         # root disk for the OS
-        if "system" == name:
+        if name == "system":
             system_disk = disk
             system_disk_idx = i - 1
 
@@ -52,7 +51,7 @@ def validate(cfg: dict):
         # default to img for vms and device for physical
         type = parse.set_default_string("type", disk, "img" if cfg["is_vm"] else "device")
 
-        if "img" == type:
+        if type == "img":
             if not cfg["is_vm"]:
                 # possible, but no use case now
                 # would require creating the image and then loop mounting it, probably outside of /etc/fstab
@@ -68,7 +67,7 @@ def validate(cfg: dict):
             disk["partition"] = ""
             parse.set_default_string("fs_type", disk, "ext4")
             disk["format"] = bool(disk.get("format", True))
-        elif "device" == type:
+        elif type == "device":
             # require /dev/ path; optional partition
             path = parse.non_empty_string("path", disk, location)
 
@@ -78,7 +77,7 @@ def validate(cfg: dict):
             disk["partition"] = str(disk.setdefault("partition", ""))
             parse.set_default_string("fs_type", disk, "ext4")
             disk["format"] = bool(disk.get("format", True))
-        elif "passthrough" == type:
+        elif type == "passthrough":
             if not cfg["is_vm"]:
                 # possible, but no use case now
                 # would require associating pci addresses / ids to /dev/disk path

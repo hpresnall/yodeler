@@ -70,6 +70,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     host_yaml["hostname"] = hostname
 
     # silently ignore attempts to overwrite site config
+    host_yaml.pop("site_name", None)
     host_yaml.pop("vswitches", None)
     host_yaml.pop("firewall", None)
     host_yaml.pop("domain", None)
@@ -92,11 +93,11 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     # since site_cfg is shared with all host's config, all hosts can find other hosts
     site_cfg["hosts"][hostname] = host_cfg
 
-    # order matters from here
-    # roles determine if host is a vmhost => is_vm = False
+    # order matters here
+    # default values may change by role, so load roles first
     _load_roles(host_cfg)
 
-    # then, set default config values, which differ for vms
+    # then, set default config values
     _set_defaults(host_cfg)
 
     # next, add all interfaces before validating the configuration
@@ -107,41 +108,24 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
             # uniquify all role names and role aliases
             aliases.make_unique(host_cfg, role)
 
+    # validate the rest of the config
     interfaces.validate(host_cfg)
-
-    # validate other configs
     interfaces.validate_renaming(host_cfg)
     disks.validate(host_cfg)
     metrics.validate(host_cfg)
     aliases.validate(host_cfg)
 
-    # backup script all roles can contribute to
-    if host_cfg["backup"]:
-        host_cfg["backup_script"] = shell.ShellScript("backup.sh", errexit=False)
-        host_cfg["backup_dir"] = "/backup"
-
-        # vmhosts backup to the same directory that vms use for virtiofs backup disks
-        if not host_cfg["is_vm"] and hostname in host_cfg["roles_to_hostnames"]["vmhost"]:
-            host_cfg["backup_dir"] = f"{host_cfg['vm_images_path']}/backup/{hostname}"
-    else:
-        host_cfg["backup_script"] = None
-
-    needs_site_build = False
-
-    # all other config is valid, now add additional config and packages
+    # all other config is valid, now add additional config
     for role in host_cfg["roles"]:
-        needs_site_build |= role.needs_build_image()
-
-        # add any additional configuration
         role.additional_configuration()
 
-    host_cfg["needs_site_build"] = needs_site_build
-
-    # run after addtional configuration to allow role.additional_packages() to use interfaces, aliases, etc
+    # run after additional configuration to allow role.additional_packages() to use interfaces, aliases, etc
     _configure_packages(site_cfg, host_yaml, host_cfg)
 
     # note role.validate() is called _after_ all hosts are loaded in site.py
     # see _validate_full_site()
+
+    del host_cfg["profile"]
 
     return host_cfg
 
@@ -243,36 +227,63 @@ def validate_overridable_site_defaults(cfg: dict):
 
 
 def _set_defaults(cfg: dict):
-    for i, key in enumerate(_REQUIRED_PROPERTIES):
-        # overlay the profile values into the site config, if any
+    # overlay the profile values into the host config, if any
+    required_values = {}
+
+    for key in _REQUIRED_PROPERTIES.keys():
+        # overlay the profile values into the host config, if any
         if key in cfg["profile"]:
             cfg[key] = cfg["profile"][key]
 
         if key not in cfg:
             raise KeyError(f"{key} not defined in '{cfg['hostname']}'")
 
-        value = cfg[key]
-        kind = _REQUIRED_PROPERTIES_TYPES[i]
+        required_values[key] = cfg[key]
 
-        if not isinstance(value, kind):
-            raise KeyError(f"{key} value '{value}' in '{cfg['hostname']}' is {type(value)} not {kind}")
-
-    # overlay the profile values into the host config, if any
     for key in DEFAULT_CONFIG.keys():
         if key in cfg["profile"]:
             cfg[key] = cfg["profile"][key]
 
-    parse.configure_defaults(cfg["hostname"], DEFAULT_CONFIG, _DEFAULT_CONFIG_TYPES, cfg)
+    # also called in site.py; this call ensures overridden values from the host are also valid
+    validate_overridable_site_defaults(cfg)
 
+    # validate required properties and types
+    parse.configure_defaults(cfg["hostname"], DEFAULT_CONFIG, _DEFAULT_CONFIG_TYPES, cfg)
+    parse.configure_defaults(cfg["hostname"], required_values, _REQUIRED_PROPERTIES, cfg)
+
+    # confirm lists contain only strings
     cfg["awall_disable"] = parse.read_string_list("awall_disable", cfg, f"'{cfg['hostname']}'")
 
     cfg["kernel_params"] = parse.read_string_list_plurals(
         {"kernel_param", "kernel_params"}, cfg, f"'{cfg['hostname']}'")
     cfg.pop("kernel_param", None)
 
+    needs_site_build = False
+
+    for role in cfg["roles"]:
+        needs_site_build |= role.needs_build_image()
+
+        if role.name == "vmhost":
+            # vmhost is always configured like a physical server
+            # nested VMs require a second Yodel from within an already running VM
+            cfg["is_vm"] = False
+
+    cfg["needs_site_build"] = needs_site_build
+
     # remove from script output if not needed
     if not cfg["install_private_ssh_key"]:
         cfg["private_ssh_key"] = ""
+
+    # backup script all roles can contribute to
+    if cfg["backup"]:
+        cfg["backup_script"] = shell.ShellScript("backup.sh", errexit=False)
+        cfg["backup_dir"] = "/backup"
+
+        # vmhosts backup to the same directory that vms use for virtiofs backup disks
+        if not cfg["is_vm"] and cfg["hostname"] in cfg["roles_to_hostnames"]["vmhost"]:
+            cfg["backup_dir"] = f"{cfg['vm_images_path']}/backup/{cfg['hostname']}"
+    else:
+        cfg["backup_script"] = None
 
     if cfg["is_vm"]:
         vmhost = cfg.get("vmhost")
@@ -299,12 +310,6 @@ iface eth0 inet dhcp""")
             cfg["install_interfaces"] = cfg["profile"]["install_interfaces"]
 
         parse.non_empty_string("install_interfaces", cfg, cfg["hostname"])
-
-    if "rename_interfaces" in cfg["profile"]:
-        cfg["rename_interfaces"] = cfg["profile"]["rename_interfaces"]
-
-    # also called in site.py; this call ensures overridden values from the host are also valid
-    validate_overridable_site_defaults(cfg)
 
     aliases.configure(cfg)
 
@@ -334,11 +339,6 @@ def _load_roles(cfg: dict):
     if "vmhost" in role_names:
         ordered_roles.append("vmhost")
         role_names.discard("vmhost")
-
-        # vmhost is always configured like a physical server
-        # nested VMs require a second Yodel from within an already running VM
-        # set here before any validation is run
-        cfg["is_vm"] = False
 
     ordered_roles.extend(role_names)
 
@@ -552,13 +552,11 @@ def _preview_dir(output_dir: str, line_count: int = sys.maxsize):
 
 # properties that are unique and cannot be set as defaults
 # usually set by the site and copied to the host
-_REQUIRED_PROPERTIES = ["site_name", "public_ssh_key"]
-_REQUIRED_PROPERTIES_TYPES = [str, str]
+_REQUIRED_PROPERTIES = {"site_name": str, "public_ssh_key": str}
 
 # site-level properties defined here since they should be checked when loading the site YAML _and_ for each host YAML
 # accessible for testing
 DEFAULT_SITE_CONFIG = {
-    "profile": {},
     "timezone": "UTC",
     "keymap": "us us",
     "alpine_repositories": ["https://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "https://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
@@ -573,7 +571,6 @@ DEFAULT_SITE_CONFIG = {
 }
 
 _DEFAULT_SITE_CONFIG_TYPES = {
-    "profile": dict,
     "timezone": str,
     "keymap": str,
     "alpine_repositories": list,

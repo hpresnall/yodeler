@@ -150,14 +150,14 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
 
         vlan_obj = None
 
-        if "all" == vlan:
+        if vlan == "all":
             # no need for further processing
             return [_all]
-        elif "internet" == vlan:
+        elif vlan == "internet":
             # not a valid vlan with a hostname, but continue processing for ipsets which can be external
             vlan_obj = _internet["vlan"]
             vlan = vlan_obj["name"]
-        elif "firewall" == vlan:
+        elif vlan == "firewall":
             # not a valid vlan with a hostname, but continue processing other locations
             vlan_obj = _fw["vlan"]
             vlan = vlan_obj["name"]
@@ -191,7 +191,7 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
 
             hostname = parse.non_empty_string("hostname", loc, loc_name).lower()
 
-            if (vlan == "internet"):
+            if vlan == "internet":
                 found = False
                 for ext in cfg["external_hosts"]:
                     if hostname in ext["hostnames"]:

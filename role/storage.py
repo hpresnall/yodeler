@@ -69,7 +69,7 @@ class Storage(Role):
                     # mount / unmount image disks
                     # use loop mount rather than the raw disk image; set envvar on mount, use that for unmount
                     # zfs treats images differently and importing them into the vm does not work
-                    before_chroot.append(f"STORAGE{image_disks_count}=$(losetup  --find --show {path})")
+                    before_chroot.append(f"STORAGE{image_disks_count}=$(losetup --find --show {path})")
                     self._cfg["unnested_after_chroot"].append(f"losetup --detach $STORAGE{image_disks_count}")
                     zpool += "$STORAGE" + str(image_disks_count) + " "
                     image_disks_count += 1

@@ -83,8 +83,7 @@ def validate(site_yaml: dict | str | None) -> dict:
     host.validate_overridable_site_defaults(site_cfg)
 
     # validate values that hosts cannot override
-    for key in ("alpine_repositories", "external_ntp", "external_ntp"):
-        site_cfg[key] = parse.read_string_list(key, site_cfg, f"site '{site_cfg['site_name']}'")
+    site_cfg["external_ntp"] = parse.read_string_list("external_ntp", site_cfg, f"site '{site_cfg['site_name']}'")
 
     external_dns_ips = []
 
@@ -95,10 +94,10 @@ def validate(site_yaml: dict | str | None) -> dict:
             raise KeyError(f"invalid 'external_dns' IP address {dns}") from ve
     site_cfg["external_dns"] = external_dns_ips
 
-    # order matters here; vswitch / vlans first since the firewall config needs that information
+    # order matters here; external hosts checks against vlan hosts, firewall needs external hosts
     vswitch.validate(site_cfg)
-    firewall.validate(site_cfg)
     _validate_external_hosts(site_cfg)
+    firewall.validate(site_cfg)
 
     # map hostname to host config
     site_cfg["hosts"] = {}
