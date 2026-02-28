@@ -50,13 +50,23 @@ class Common(Role):
         if self._cfg["kernel_params"]:
             packages.add("grub")
 
+        # use smartd to monitor physical disks
+        for disk in self._cfg["disks"]:
+            if disk["type"] != "img": # device or passthrough
+                packages.add("smartmontools")
+                break
+
         return packages
 
     def additional_configuration(self):
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup auth logs")
             self._cfg["backup_script"].append(f"cp /var/log/auth* {self._cfg['backup_dir']}")
-            self._cfg["backup_script"].blank()
+            self._cfg["backup_script"].blank()  
+
+        if self._cfg["is_vm"] and self._cfg["vm_use_efi"]:
+            # use serial console to display uEFI boot output
+            self._cfg["kernel_params"].append("console=ttyS0")
 
         # do not add any firewall rules for non infrastructure hosts
         if len(self._cfg["roles"]) == 1:  # i.e. only common role
@@ -254,4 +264,4 @@ def _configure_backups(cfg: dict, setup: shell.ShellScript):
     setup.append("  chown root:wheel /var/log/auth*")
     setup.append("  chmod 640 /var/log/auth*")
     setup.append("fi")
-    setup.blank()
+

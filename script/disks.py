@@ -7,13 +7,20 @@ import script.shell as shell
 def from_config(cfg: dict, setup: shell.ShellScript):
     # create disks, format them and add fstab entries, as needed
     # defer to other roles if mounting is needed during setup
-    for disk in cfg["disks"]:
-        if disk["name"] == "system":
-            continue  # base host setup will handle formatting the OS disk
 
+    # configure smartd to explicitly monitor the list of disks
+    monitored_disks = []
+
+    for disk in cfg["disks"]:
         if (disk["type"] == "passthrough"):
+            monitored_disks.append(disk["path"])
             # for host passthrough, let other roles format the disk and set the mountpoint, if needed
             continue
+        elif disk["type"] == "device":
+            monitored_disks.append(disk["path"])
+
+        if disk["name"] == "system":
+            continue  # base host setup will handle formatting the OS disk
 
         hostname = cfg["hostname"]
 
@@ -40,6 +47,16 @@ def from_config(cfg: dict, setup: shell.ShellScript):
 
             setup.append(_set_uuid_to_local_var(disk))
             setup.blank()
+
+    if monitored_disks:
+        setup.comment("disable default smartd device scanning and monitor specific disks instead")
+        setup.service("smartd")
+        setup.append("sed -i -e \"s/^DEVICESCAN$/#DEVICESCAN/g\" /etc/smartd.conf")
+
+        for disk in monitored_disks:
+            setup.append(f"echo \"{disk} -a\" >> /etc/smartd.conf")
+
+        setup.blank()
 
 
 def _create_image(hostname: str, disk: dict) -> str:

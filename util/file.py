@@ -12,7 +12,7 @@ except ImportError:
     loader, dumper = yaml.Loader, yaml.Dumper
 
 
-def read_template(role_name: str, template: str):
+def read_template(role_name: str, template: str) -> str:
     """Read the entire file into a string."""
     path = os.path.join("templates", role_name, template)
 
@@ -29,7 +29,7 @@ def write(path: str, data_str: str, base_dir: str | None = None):
         return file.write(data_str)
 
 
-def substitute(role_name: str, file_name: str, cfg: dict):
+def substitute(role_name: str, file_name: str, cfg: dict) -> str:
     """Read the given file and do $variable substitution from the given config. Return the content as a string."""
     # use $UPPERCASE in scripts
     upper_cfg = {k.upper(): v for (k, v) in cfg.items()}

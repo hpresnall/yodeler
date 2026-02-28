@@ -15,6 +15,7 @@
     <access mode='shared'/>
   </memoryBacking>
   <devices>
+    <!-- ttyS0-->
     <console type="pty">
       <target type="serial" port="0" />
     </console>

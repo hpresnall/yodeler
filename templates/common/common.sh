@@ -51,7 +51,7 @@ else
   # enable services on physical systems
   rc-update add cpufrequtils
   rc-update add cgroups sysinit
-  rc-update add smartd default
+
   # acpid should only be run at boot runlevel
   rc-update del acpid default
 
