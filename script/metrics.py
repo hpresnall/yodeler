@@ -37,8 +37,11 @@ def configure(cfg: dict, setup: shell.ShellScript, output_dir: str):
     setup.blank()
 
     _configure_libvirt(cfg, setup)
-    _configure_ipmi(cfg, setup, output_dir)
-
+    _configure_ipmi(cfg, setup)
+    _configure_smartmon(cfg, setup)
+    # TODO configure NVME from https://github.com/fritchie/nvme_exporter
+    # TODO configure onewire from https://github.com/cliviu74/onewire-prom-exporter
+    # PDNS configured by the DNS role
 
 def _configure_libvirt(cfg: dict, setup: shell.ShellScript):
     if cfg["metrics"]["libvirt"]["enabled"]:
@@ -48,18 +51,17 @@ def _configure_libvirt(cfg: dict, setup: shell.ShellScript):
         setup.blank()
 
 
-def _configure_ipmi(cfg: dict, setup: shell.ShellScript, output_dir: str):
+def _configure_ipmi(cfg: dict, setup: shell.ShellScript):
     if cfg["metrics"]["ipmi"]["enabled"]:
-        if cfg["is_vm"]:
-            raise ValueError(f"{cfg['hostname']}: cannot enable IPMI metrics on VMs")
-
-        file.copy_template("metrics/ipmi", "ipmi-exporter_initd", output_dir)
-
-        build = file.read_template("metrics/ipmi", "build.sh")
-        setup.append(build)
-        setup.append("install -o root -g root -m 755 $DIR/ipmi-exporter_initd /etc/init.d/ipmi-exporter")
-        setup.append("install -o root -g root -m 755 $SETUP_TMP/ipmi-exporter /usr/bin")
+        setup.comment("collect IPMI metrics")
         setup.service("ipmi-exporter")
+        setup.blank()
+
+
+def _configure_smartmon(cfg: dict, setup: shell.ShellScript):
+    if cfg["metrics"]["smartmon"]["enabled"]:
+        setup.comment("collect SMART disk metrics")
+        setup.service("smartctl-exporter")
         setup.blank()
 
 
@@ -68,18 +70,14 @@ _exporter_ports = {
     "pdns": [9101, 9102],
     "libvirt": 9177,
     "ipmi": 9290,
-    "nvme": 9105,  # TODO update to actual value
-    "onewire": 8105
+    "nvme": 9998,
+    "onewire": 8105,
+    "smartmon": 9633
 }
 
 
 def get_ports(metric_type: str) -> list[int] | int:
     return _exporter_ports[metric_type]
-
-
-def get_types_and_ports() -> dict:
-    return dict(_exporter_ports)
-
 
 # ignore all ram, loop, floppy disks and all _partitions_
 # ignore all non-file systems

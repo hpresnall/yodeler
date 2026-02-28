@@ -20,7 +20,7 @@ import config.firewall as fw
 class Common(Role):
     """Common setup required for all systems. This role _must_ be run before any other setup."""
 
-    def additional_packages(self):
+    def additional_packages(self) -> set[str]:
         # use dhcpcd for dhcp since it can also handle prefix delegation for routers
         # use better ifupdown-ng  and the Linux ip command, instead of Busybox's built-ins
         packages = {"e2fsprogs", "acpi", "doas", "openssh", "chrony", "curl",

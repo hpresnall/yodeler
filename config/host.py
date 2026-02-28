@@ -389,7 +389,7 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
         if host_cfg["remove_packages"]:
             _logger.debug("removing packages %s", host_cfg["remove_packages"])
 
-    if host_cfg["enable_testing"]:
+    if host_cfg["enable_testing_repository"]:
         host_cfg["alpine_repositories"].append(host_cfg["alpine_testing_repository"])
 
 def _configure_before_and_after_chroot(cfg: dict):
@@ -563,7 +563,7 @@ DEFAULT_SITE_CONFIG = {
     "keymap": "us us",
     "alpine_repositories": ["https://dl-cdn.alpinelinux.org/alpine/latest-stable/main", "https://dl-cdn.alpinelinux.org/alpine/latest-stable/community"],
     "alpine_testing_repository": "https://dl-cdn.alpinelinux.org/alpine/edge/testing",
-    "enable_testing": False,
+    "enable_testing_repository": False,
     "external_ntp": ["0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org"],
     "external_dns": [ipaddress.ip_address("8.8.8.8"), ipaddress.ip_address("9.9.9.9"), ipaddress.ip_address("1.1.1.1")],
     # top-level domain for the site; empty => no local DNS unless DNS server sets 'primary_domain'
@@ -579,7 +579,7 @@ _DEFAULT_SITE_CONFIG_TYPES = {
     "keymap": str,
     "alpine_repositories": list,
     "alpine_testing_repository": str,
-    "enable_testing": bool,
+    "enable_testing_repository": bool,
     "external_ntp": list,
     "external_dns": list,
     "domain": str,

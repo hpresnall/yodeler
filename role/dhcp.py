@@ -14,7 +14,7 @@ import config.firewall as fw
 class Dhcp(Role):
     """Dhcp defines the configuration needed to setup Kea DHCP."""
 
-    def additional_packages(self):
+    def additional_packages(self) -> set[str]:
         return {"kea", "kea-dhcp4", "kea-dhcp6", "kea-dhcp-ddns", "kea-admin", "kea-ctrl-agent"}
 
     def additional_configuration(self):

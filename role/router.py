@@ -20,7 +20,7 @@ class Router(Role):
     """Router defines the configuration needed to setup a system that can route from the configured
      vlans to the internet"""
 
-    def additional_packages(self):
+    def additional_packages(self) -> set[str]:
         return {"shorewall", "shorewall6", "ipset", "radvd", "ulogd", "ulogd-json", "ndisc6", "tcpdump", "ethtool"}
 
     def additional_aliases(self) -> list[str]:

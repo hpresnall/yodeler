@@ -45,15 +45,6 @@ class Metrics(Role):
 
         parse.set_default_string("grafana_password", self._cfg, "m3trics!")
 
-        # slower default times in seconds for scraping some metric types
-        metric_intervals = self._cfg.get("metric_intervals", {})
-        parse.set_default_int("default", metric_intervals, 15)
-        parse.set_default_int("nvme", metric_intervals, 60)
-        parse.set_default_int("onewire", metric_intervals, 60)
-        parse.set_default_int("ipmi", metric_intervals, 30)
-
-        self._cfg["metric_intervals"] = metric_intervals
-
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup Prometheus DB")
             self._cfg["backup_script"].append(
@@ -64,10 +55,6 @@ class Metrics(Role):
     def validate(self):
         if self._cfg["is_vm"] and (self._cfg["disk_size_mb"] < 1024):
             raise ValueError("metrics server must set 'disk_size_mb' to at least 1,024")
-
-        for metric, interval in self._cfg["metric_intervals"].items():
-            if not isinstance(interval, int):
-                raise ValueError(f"{self._cfg['hostname']}.metric_intervals['{metric}']={interval} must be an integer")
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         file.copy_template(self.name, "grafana.ini", output_dir)
@@ -93,10 +80,14 @@ class Metrics(Role):
         # determine which ip address prometheus should use to connect to each host for metrics
         # prefer ipv4 addresses on the same vlan
         hosts_to_ips = {}
+        # also track scrape intervals for each type since they can be different for each host
+        type_interval_hosts = {} # type -> dict of interval -> list of hostnames
+
         for host_cfg in self._cfg["hosts"].values():
             if not host_cfg["metrics"]:
                 continue
 
+            hostname = host_cfg["hostname"]
             preferred = other = None
 
             for match in interfaces.find_ips_to_interfaces(self._cfg, host_cfg["interfaces"], first_match_only=False):
@@ -106,16 +97,21 @@ class Metrics(Role):
                     other = str(match["ipv4_address"])
 
             if preferred:
-                hosts_to_ips[host_cfg["hostname"]] = preferred
+                hosts_to_ips[hostname] = preferred
             elif other:
-                hosts_to_ips[host_cfg["hostname"]] = other
+                hosts_to_ips[hostname] = other
             else:
-                _logger.warning(f"no matching ipv4 address found for access to '{host_cfg['hostname']}';"
+                _logger.warning(f"no matching ipv4 address found for access to '{hostname}';"
                                 " no metrics will be collected")
+
+            for type, metric_cfg in host_cfg["metrics"].items():
+                if metric_cfg["enabled"]:
+                    hosts_by_intervals = type_interval_hosts.setdefault(type, {})
+                    hosts_by_intervals.setdefault(metric_cfg["interval"], []).append(hostname)
 
         # base prometheus config; scrape configs will be added for each metric collector
         prometheus = {
-            "global": {"scrape_interval": str(self._cfg["metric_intervals"]["default"]) + "s"},
+            "global": {"scrape_interval": "15s"},
             "scrape_configs": [
                 {
                     "job_name": "prometheus",
@@ -125,39 +121,44 @@ class Metrics(Role):
         }
 
         # for each metric type, add a scrape_config with all the hosts that have that exporter enabled
-        for metric_type, ports in metrics.get_types_and_ports().items():
-            targets = []
-            relabel_configs = []
-            exporter = {"job_name": metric_type,
-                        "static_configs": [{"targets": targets}],
-                        "relabel_configs": relabel_configs}
+        for metric_type, hosts_by_intervals in type_interval_hosts.items():
+            include_interval = len(hosts_by_intervals) > 1
+            ports = metrics.get_ports(metric_type)
 
-            interval = self._cfg["metric_intervals"].get(metric_type)
-            if interval:
-                exporter["scrape_interval"] = str(interval) + "s"
+            # separate job for each type + interval combo
+            for interval, hostnames in hosts_by_intervals.items():
+                targets = []
+                relabel_configs = []
+                exporter = {"job_name": (metric_type + "_" + str(interval)) if include_interval else metric_type,
+                            "static_configs": [{"targets": targets}],
+                            "relabel_configs": relabel_configs}
 
-            for hostname, ip in hosts_to_ips.items():
-                if not self._cfg["hosts"][hostname]["metrics"][metric_type]["enabled"]:
-                    continue
+                if interval != 15:  # default interval set above
+                    exporter["scrape_interval"] = str(interval) + "s"
 
-                # multiple ports => target each
-                if isinstance(ports, int):
-                    targets.append(f"{ip}:{ports}")
-                elif isinstance(ports, list):
-                    for port in ports:
-                        targets.append(f"{ip}:{port}")
-                else:
-                    raise ValueError(f"ports for {metric_type} was {type(ports)} not int or list")
+                for hostname in hostnames:
+                    ip = hosts_to_ips[hostname]
 
-                # always relabel with the hostname
-                relabel_configs.append({
-                    "source_labels": ["__address__"],
-                    "regex": ip + ":.*",
-                    "target_label": "instance",
-                    "replacement": hostname
-                })
+                    # multiple ports => target each
+                    if isinstance(ports, int):
+                        regex = f"{ip}:{ports}"
+                        targets.append(regex)
+                    elif isinstance(ports, list):
+                        regex = f"{ip}:*"
+                        for port in ports:
+                            targets.append(f"{ip}:{port}")
+                    else:
+                        raise ValueError(f"ports for {metric_type} was {type(ports)} not int or list")
 
-            prometheus["scrape_configs"].append(exporter)
+                    # always relabel with the hostname
+                    relabel_configs.append({
+                        "source_labels": ["__address__"],
+                        "regex": regex,
+                        "target_label": "instance",
+                        "replacement": hostname
+                    })
+
+                prometheus["scrape_configs"].append(exporter)
 
         file.write("prometheus.yml", file.output_yaml(prometheus), output_dir)
 

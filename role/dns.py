@@ -15,7 +15,7 @@ class Dns(Role):
     """DNS defines the configuration needed to setup PowerDNS. Configures both the DNS server and a recursor to
     handle internal and external DNS."""
 
-    def additional_packages(self):
+    def additional_packages(self) -> set[str]:
         return {"pdns", "pdns-recursor", "pdns-backend-sqlite3", "pdns-doc", "pdns-openrc", "bind-tools"}
 
     def additional_configuration(self):
@@ -194,8 +194,7 @@ class Dns(Role):
         web_allow_from = ["127.0.0.1", "::1"]
 
         # allow the metrics server to contact PDNS's webserver for metrics
-        if ("metrics" in self._cfg["roles_to_hostnames"]) \
-                and ("pdns" in self._cfg["metrics"]) and self._cfg["metrics"]["pdns"]["enabled"]:
+        if ("metrics" in self._cfg["roles_to_hostnames"]) and self._cfg["metrics"]["pdns"]["enabled"]:
             for hostname in self._cfg["roles_to_hostnames"]["metrics"]:
                 host_cfg = self._cfg["hosts"][hostname]
 

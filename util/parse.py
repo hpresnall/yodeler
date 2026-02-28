@@ -60,12 +60,16 @@ def set_default_int(key: str, cfg: dict, default: int) -> int:
     return cast(int, _set_default(key, cfg, default, int))
 
 
+def set_default_bool(key: str, cfg: dict, default: bool) -> bool:
+    return cast(bool, _set_default(key, cfg, default, bool))
+
+
 def _set_default(key: str, cfg: dict, default: object, kind: type) -> object:
     if not key:
         raise ValueError("key cannot be empty")
     if cfg is None:
         raise ValueError("cfg cannot be None")
-    if not default:
+    if (kind != bool) and not default:
         raise ValueError("default cannot be empty")
 
     value = cfg.get(key)
@@ -73,9 +77,10 @@ def _set_default(key: str, cfg: dict, default: object, kind: type) -> object:
     if not value:
         value = default
     if not isinstance(value, kind):
-        raise ValueError(f"{key} must be a string")
+        raise ValueError(f"{key} must be a {kind}, not a {type(value)}")
 
     cfg[key] = value
+
     return value
 
 

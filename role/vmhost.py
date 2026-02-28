@@ -17,7 +17,7 @@ import script.sysctl as sysctl
 class VmHost(Role):
     """VmHost defines the configuration needed to setup a KVM host using OpenVswitch."""
 
-    def additional_packages(self):
+    def additional_packages(self) -> set[str]:
         # packages for openvswitch, qemu, libvirt and alpine-make-vm-image
         packages = {"python3", "openvswitch", "qemu-system-x86_64", "qemu-img",
                     "libvirt", "libvirt-daemon", "libvirt-qemu", "virtiofsd",

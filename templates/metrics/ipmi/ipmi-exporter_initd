@@ -1,8 +1,0 @@
-#!/sbin/openrc-run
-name="prometheus-ipmi-exporter"
-supervisor=supervise-daemon
-command="/usr/bin/ipmi-exporter"
-command_args="$ARGS"
-command_background="yes"
-command_user="root:root"
-pidfile="/run/${RC_SVCNAME}.pid"
