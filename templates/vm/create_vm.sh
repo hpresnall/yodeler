@@ -44,7 +44,7 @@ $$SITE_BUILD_DIR/alpine-make-vm-image/alpine-make-vm-image \
   --image-format raw \
   --serial-console \
   --image-size ${DISK_SIZE_MB}M \
-  --repositories-file /etc/apk/repositories \
+  --repositories-file ${REPOSITORIES_FILE} \
   --packages "$$(cat $$DIR/packages)" \
   --fs-skel-dir "$$SETUP_TMP/.." \
   --script-chroot \

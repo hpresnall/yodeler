@@ -274,7 +274,7 @@ def _validate_full_site(site_cfg: dict):
 
     _logger.debug("all_aliases=%s", aliases)
 
-    # finally, confirm & clean up and add base firewall rules now that all hosts are known
+    # finally, confirm, clean up and add base firewall rules now that all hosts are known
     firewall.validate_full_site(site_cfg)
 
 

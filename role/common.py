@@ -114,6 +114,9 @@ class Common(Role):
         # write all packages to a file; usage depends on vm or physical server
         file.write("packages", " ".join(self._cfg["packages"]), output_dir)
 
+        # configure Alpine repositories config, if needed
+        _setup_repos(self._cfg, setup) 
+
         if self._cfg["is_vm"]:
             # VMs will use host's configured repositories & APK cache
             # packages will be installed as part of image creation
@@ -127,7 +130,6 @@ class Common(Role):
                 # setup_site_build.sh is on the _vmhost_; no need to install in the vm itself
         else:
             # for physical servers, add packages manually
-            _setup_repos(self._cfg, setup)
             setup.append("apk -q update")
             setup.append("apk -q cache sync")
             setup.blank()
@@ -224,18 +226,33 @@ class Common(Role):
 
 
 def _setup_repos(cfg: dict, setup: shell.ShellScript):
-    setup.log("Setting up APK repositories")
-    setup.blank()
+    if cfg["is_vm"]:
+        # set repo file substitution variable handled by create_vm.sh
+        if set(cfg["hosts"][cfg["vmhost"]]["alpine_repositories"]) == set(cfg["alpine_repositories"]):
+            # repo config is the same, use vm host's
+            cfg["repositories_file"] = "/etc/apk/repositories"
+            return # no setup needed
+        else:
+            # create file for this vm before chroot
+            repo_file = cfg["repositories_file"] = "$SETUP_TMP/repositories"
+            repo_writer = lambda r: cfg["before_chroot"].append(r)
+    else:
+        # create during setup
+        repo_file = "/etc/apk/repositories"
+        repo_writer = lambda r: setup.append(r)
 
-    repos = list(cfg["alpine_repositories"])
+    repo_writer("log \"Setting up APK repositories\"")
+    repo_writer("")
+
+    repos = cfg["alpine_repositories"]
 
     # overwrite on first, append on subsequent
-    setup.append(f"echo {repos[0]} > /etc/apk/repositories")
+    repo_writer(f"echo {repos[0]} > {repo_file}")
 
     for repo in repos[1:]:
-        setup.append(f"echo {repo} >> /etc/apk/repositories")
+        repo_writer(f"echo {repo} >> {repo_file}")
 
-    setup.blank()
+    repo_writer("")
 
 
 def _configure_backups(cfg: dict, setup: shell.ShellScript):
