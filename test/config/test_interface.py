@@ -172,8 +172,8 @@ class TestInterface(base.TestCfgBase):
 
         matching = copy.deepcopy(cfg["interfaces"])
 
-        self._host_yaml["interfaces"][0]["ipv4_address"] = "dhcp"
-        del self._host_yaml["interfaces"][0]["ipv6_address"]
+        self._host_cfg["interfaces"][0]["ipv4_address"] = "dhcp"
+        del self._host_cfg["interfaces"][0]["ipv6_address"]
 
         matches = interfaces.find_ips_to_interfaces(cfg, matching)
 

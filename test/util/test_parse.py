@@ -138,6 +138,10 @@ class TestParse(unittest.TestCase):
         self.assertEqual("default", value)
         self.assertEqual("default", cfg["test"])
 
+    def test_set_string_default_int_value(self):
+        with self.assertRaises(ValueError):
+            value = parse.set_string_default("test", "test", {"test": 1}, "default")
+
     def test_list_none_location(self):
         with self.assertRaises(ValueError):
             parse.get_string_list_plurals(None, {"key"}, {"key": ["test1, test2"]})  # type: ignore

@@ -13,3 +13,9 @@ install_interfaces: |
   iface lo inet loopback
   auto eth0
   iface eth0 inet dhcp
+metrics:
+  ipmi: false
+  node: 10
+  smartmon: {
+    interval: 120
+  }

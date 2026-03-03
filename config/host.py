@@ -1,6 +1,7 @@
 """Handles parsing and validating host configuration from YAML files."""
 import logging
 import os
+import copy
 import shutil
 import sys
 import ipaddress
@@ -70,26 +71,28 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
         raise ValueError(f"invalid hostname '{hostname}'")
     host_yaml["hostname"] = hostname
 
+    host_cfg = copy.deepcopy(host_yaml)
+
     # silently ignore attempts to overwrite site config
-    host_yaml.pop("site_name", None)
-    host_yaml.pop("vswitches", None)
-    host_yaml.pop("firewall", None)
-    host_yaml.pop("domain", None)
-    host_yaml.pop("external_ntp", None)
-    host_yaml.pop("external_dns", None)
-    host_yaml.pop("external_hosts", None)
-    host_yaml.pop("site_enable_metrics", None)
-    host_yaml.pop("profile", None)
+    host_cfg.pop("site_name", None)
+    host_cfg.pop("vswitches", None)
+    host_cfg.pop("firewall", None)
+    host_cfg.pop("domain", None)
+    host_cfg.pop("external_ntp", None)
+    host_cfg.pop("external_dns", None)
+    host_cfg.pop("external_hosts", None)
+    host_cfg.pop("site_enable_metrics", None)
+    host_cfg.pop("profile", None)
 
     # profile is dict of hostname -> overrides
     if site_cfg["profile"] and (hostname in site_cfg["profile"]):
-        host_yaml["profile"] = site_cfg["profile"][hostname]
-        host_yaml["profile"]["name"] = site_cfg["profile"]["name"]
+        host_cfg["profile"] = site_cfg["profile"][hostname]
+        host_cfg["profile"]["name"] = site_cfg["profile"]["name"]
     else:
-        host_yaml["profile"] = {}
+        host_cfg["profile"] = {}
 
     # shallow copy site config; host values overwrite site values
-    host_cfg = {**site_cfg, **host_yaml}
+    host_cfg = {**site_cfg, **host_cfg}
 
     # since site_cfg is shared with all host's config, all hosts can find other hosts
     site_cfg["hosts"][hostname] = host_cfg
@@ -121,7 +124,7 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
         role.additional_configuration()
 
     # run after additional configuration to allow role.additional_packages() to use interfaces, aliases, etc
-    _configure_packages(site_cfg, host_yaml, host_cfg)
+    _configure_packages(site_cfg, host_cfg)
 
     # note role.validate() is called _after_ all hosts are loaded in site.py
     # see _validate_full_site()
@@ -356,12 +359,12 @@ def _load_roles(cfg: dict):
         cfg["roles_to_hostnames"][role_name].append(cfg['hostname'])
 
 
-def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
+def _configure_packages(site_cfg: dict, host_cfg: dict):
     # manually merge packages
     # use set for uniqueness and union/intersection operations
     for key in ["packages", "remove_packages"]:
         site = site_cfg.get(key)
-        host = host_yaml.get(key)
+        host = host_cfg.get(key)
 
         if site is None:
             site = set()

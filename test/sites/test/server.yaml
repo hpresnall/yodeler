@@ -24,8 +24,13 @@ disks:
   - name: storage1
     type: img
   - name: build
-    type: img
+    type: device
     mountpoint: /tmp
+    path: /dev/sdb
+  - name: storage2
+    type: passthrough
+    pci_address: "1234:56.7"
+    path: /dev/disk/by-id/nvme-Fake-Disk
 java: true
 go: true
 build_dir: builder

@@ -16,6 +16,10 @@ def non_empty_list(location: str, value: None | list) -> list:
     return cast(list, _non_empty(location, value, list))
 
 
+def non_empty_string(location: str, value: None | str) -> str:
+    return cast(str, _non_empty(location, value, str))
+
+
 def get_dict(location: str, key: str, cfg: None | dict) -> dict:
     return cast(dict, _non_empty_from_key(location, key, cfg, dict))
 
@@ -26,6 +30,10 @@ def get_list(location: str, key: str, cfg: None | dict) -> list:
 
 def get_string(location: str, key: str, cfg: None | dict) -> str:
     return cast(str, _non_empty_from_key(location, key, cfg, str))
+
+
+def get_int(location: str, key: str, cfg: None | dict) -> int:
+    return cast(int, _non_empty_from_key(location, key, cfg, int))
 
 
 def _non_empty_from_key(location: str, key: str, cfg: None | dict, kind: type) -> object:
@@ -49,7 +57,7 @@ def _non_empty(location: str, value, kind: type) -> object:
 
     if not isinstance(value, kind):
         raise ValueError(f"{location} must be a {kind}, not a {type(value)}")
-    if len(value) == 0:
+    if not isinstance(value, int) and len(value) == 0:
         raise ValueError(f"{location} cannot be empty")
 
     return value
