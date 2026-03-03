@@ -8,110 +8,122 @@ from typing import cast
 from typing import Hashable
 
 
-def non_empty_dict(name: str, value: object) -> dict:
-    return cast(dict, _non_empty(name, value, dict))
+def non_empty_dict(location: str, value: None | dict) -> dict:
+    return cast(dict, _non_empty(location, value, dict))
 
 
-def non_empty_list(name: str, value: object) -> list:
-    return cast(list, _non_empty(name, value, list))
+def non_empty_list(location: str, value: None | list) -> list:
+    return cast(list, _non_empty(location, value, list))
 
 
-def _non_empty(name: str, value, kind: type) -> object:
-    if not name:
-        raise ValueError(f"name cannot be empty for value {value}")
+def get_dict(location: str, key: str, cfg: None | dict) -> dict:
+    return cast(dict, _non_empty_from_key(location, key, cfg, dict))
+
+
+def get_list(location: str, key: str, cfg: None | dict) -> list:
+    return cast(list, _non_empty_from_key(location, key, cfg, list))
+
+
+def get_string(location: str, key: str, cfg: None | dict) -> str:
+    return cast(str, _non_empty_from_key(location, key, cfg, str))
+
+
+def _non_empty_from_key(location: str, key: str, cfg: None | dict, kind: type) -> object:
+    if not key:
+        raise KeyError(f"key cannot be empty for {location}")
+    if not cfg:
+        raise ValueError(f"cfg must be defined for {location}")
+    if not key in cfg:
+        raise KeyError(f"'{key}' not in {location}")
+
+    return _non_empty("" if not location else f"{location}['{key}']", cfg[key], kind)
+
+
+def _non_empty(location: str, value, kind: type) -> object:
+    if not location:
+        raise ValueError(f"location cannot be empty")
     if value is None:
-        raise ValueError(f"value cannot be None for name {name}")
+        raise ValueError(f"value must be defined for {location}")
     if not kind:
-        raise ValueError(f"kind cannot be empty for name {name}, value {value}")
+        raise ValueError(f"kind cannot be empty for {location}={value}")
 
     if not isinstance(value, kind):
-        raise ValueError(f"{name} must be a {kind}, not a {type(value)}")
+        raise ValueError(f"{location} must be a {kind}, not a {type(value)}")
     if len(value) == 0:
-        raise ValueError(f"{name} cannot be empty")
+        raise ValueError(f"{location} cannot be empty")
 
     return value
 
 
-def non_empty_string(key: str, cfg: None | dict, dict_name: str) -> str:
+def set_string_default(location: str, key: str, cfg: None | dict, default: str) -> str:
+    return cast(str, _set_default(location, key, cfg, default, str))
+
+
+def set_int_default(location: str, key: str, cfg: None | dict, default: int) -> int:
+    return cast(int, _set_default(location, key, cfg, default, int))
+
+
+def set_bool_default(location: str, key: str, cfg: dict | None, default: bool) -> bool:
+    return cast(bool, _set_default(location, key, cfg, default, bool))
+
+
+def _set_default(location: str, key: str, cfg: dict | None, default: object, kind: type) -> object:
+    if not location:
+        raise ValueError(f"location cannot be empty")
     if not key:
-        raise ValueError("key cannot be empty")
+        raise KeyError(f"key cannot be empty for {location}")
+
+    location = f"{location}['{key}']"
     if cfg is None:
-        raise ValueError("cfg cannot be None")
-    if not dict_name:
-        raise ValueError("dict_name cannot be empty")
+        raise ValueError(f"cfg must be defined for {location}")
 
-    if key not in cfg:
-        raise KeyError(f"'{key}' not in {dict_name}")
+    if cfg:
+        value = cfg.get(key)
 
-    value = cfg[key]
-    if not isinstance(value, str):
-        raise KeyError(f"{dict_name}['{key}'] must be a string, not a {type(value)}")
-    if not value:
-        raise KeyError(f"{dict_name}['{key}'] cannot be an empty string")
-
-    return value
-
-
-def set_default_string(key: str, cfg: dict, default: str) -> str:
-    return cast(str, _set_default(key, cfg, default, str))
-
-
-def set_default_int(key: str, cfg: dict, default: int) -> int:
-    return cast(int, _set_default(key, cfg, default, int))
-
-
-def set_default_bool(key: str, cfg: dict, default: bool) -> bool:
-    return cast(bool, _set_default(key, cfg, default, bool))
-
-
-def _set_default(key: str, cfg: dict, default: object, kind: type) -> object:
-    if not key:
-        raise ValueError("key cannot be empty")
-    if cfg is None:
-        raise ValueError("cfg cannot be None")
-    if (kind != bool) and not default:
-        raise ValueError("default cannot be empty")
-
-    value = cfg.get(key)
-
-    if not value:
+        if not value:
+            value = default
+    else:
         value = default
+
+    if (kind != bool) and not default:
+        raise ValueError(f"{location} default cannot be empty")
     if not isinstance(value, kind):
-        raise ValueError(f"{key} must be a {kind}, not a {type(value)}")
+        raise ValueError(f"{location} must be a {kind}, not a {type(value)}")
 
     cfg[key] = value
 
     return value
 
 
-def read_string_list(key: str, cfg: dict, value_name: str) -> list[str]:
-    return read_string_list_plurals({key}, cfg, value_name)
+def get_string_list(location: str, key: str, cfg: None | dict) -> list[str]:
+    return get_string_list_plurals(location, {key}, cfg)
 
 
-def read_string_list_plurals(keys: set[str], cfg: None | dict, value_name: str) -> list[str]:
-    return _read_list_plurals(keys, cfg, value_name, str)
+def get_string_list_plurals(location: str, keys: set[str], cfg: None | dict) -> list[str]:
+    return _get_list_plurals(location, keys, cfg, str)
 
 
-def read_dict_list_plurals(keys: set[str], cfg: None | dict, value_name: str) -> list[dict]:
-    return _read_list_plurals(keys, cfg, value_name, dict)
+def get_dict_list_plurals(location: str, keys: set[str], cfg: None | dict) -> list[dict]:
+    return _get_list_plurals(location, keys, cfg, dict)
 
 
-def _read_list_plurals(keys: set[str], cfg: None | dict, value_name: str, value_type: type) -> list:
+def _get_list_plurals(location: str, keys: set[str], cfg: None | dict, value_type: type) -> list:
     # combine all all the values from all the keys into a single set
     # this allows something like foo: bar or foos: [ bar, baz ]
+    # silently ignores empty strings
+    if not location:
+        raise ValueError("location cannot be empty")
     if not keys:
-        raise KeyError("keys cannot be empty")
+        raise KeyError(f"keys cannot be empty for {location}")
     if cfg is None:
-        raise ValueError("cfg cannot be None")
-    if not value_name:
-        raise ValueError("value_name cannot be empty")
+        raise ValueError(f"cfg must be defined for {location}")
 
     unique_values = set()
     values = []
 
     for key in keys:
         if not key:
-            raise ValueError(f"{value_name} cannot have an empty key in {keys}")
+            raise ValueError(f"{location} cannot have an empty key in {keys}")
 
         if key not in cfg:
             continue
@@ -132,7 +144,7 @@ def _read_list_plurals(keys: set[str], cfg: None | dict, value_name: str, value_
             # for lists, check each value
             for value in cfg[key]:
                 if not isinstance(value, value_type):
-                    raise ValueError(f"invalid {value_name} value '{value}'; it must be a {value_type}")
+                    raise ValueError(f"invalid {location}['{key}'] value '{value}'; it must be a {value_type}")
                 if value:
                     # only add hashable values once
                     if isinstance(value, Hashable):
@@ -142,25 +154,30 @@ def _read_list_plurals(keys: set[str], cfg: None | dict, value_name: str, value_
                     else:
                         values.append(value)
         else:
-            raise KeyError(
-                f"{key} for {value_name} must be a {value_type} or list of {value_type}, not {type(cfg[key])}")
+            raise ValueError(
+                f"{location}['{key}'] must be a {value_type} or list of {value_type}, not {type(cfg[key])}")
+
+    # note not checking if values is empty
+    # all calls to these functions are currently for optional config params
 
     return values
 
 
-def configure_defaults(config_name: str, default_config: dict, default_types: dict, cfg: dict):
-    if not config_name:
-        raise ValueError("config_name cannot be empty")
-    if default_config is None:
-        raise ValueError("default_config cannot be None")
-    if default_types is None:
-        raise ValueError("default_types cannot be None")
+def configure_defaults(location: str, default_config: dict, default_types: dict, cfg: dict):
+    if not location:
+        raise ValueError(f"location cannot be empty")
+    if not default_config:
+        raise ValueError("default_config must be defined for {location}")
+    if not default_types:
+        raise ValueError("default_types must be defined for {location}")
     if cfg is None:
-        raise ValueError("cfg cannot be None")
+        raise ValueError(f"cfg must be defined for {location}")
+    if len(default_config) != len(default_types):
+        raise ValueError(f"default_config and default_types must be the same size for {location}")
 
     for key in default_config:
         if key not in default_types:
-            raise KeyError(f"'{key}' in {config_name} does not define a type")
+            raise KeyError(f"{location}['{key}'] does not define a type")
 
         use_default = False
 
@@ -173,7 +190,7 @@ def configure_defaults(config_name: str, default_config: dict, default_types: di
         kind = default_types[key]
 
         if not isinstance(value, kind):
-            raise KeyError(f"{key} value '{value}' in {config_name} is {type(value)} not {kind}")
+            raise KeyError(f"{location}['{key}'] value '{value}' is {type(value)} not {kind}")
         # some default values can be empty; so do not check here
 
         if use_default:

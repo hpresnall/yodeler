@@ -15,7 +15,8 @@ _logger = logging.getLogger(__name__)
 
 def validate(cfg: dict):
     """Validate all the interfaces defined in the host."""
-    ifaces = parse.non_empty_list("interfaces", cfg.get("interfaces"))
+    cfg_loc = f"{cfg['hostname']}"
+    ifaces = parse.get_list(cfg_loc, "interfaces", cfg)
 
     vswitches = cfg["vswitches"]
 
@@ -26,12 +27,12 @@ def validate(cfg: dict):
     names = set()
 
     for i, iface in enumerate(ifaces, start=1):
-        location = f"cfg[{cfg['hostname']}].iface[{i}]"
+        location = f"{cfg_loc}.iface[{i}]"
 
         parse.non_empty_dict(location, iface)
 
         if "name" in iface:
-            iface["name"] = parse.non_empty_string("name", iface, location)
+            iface["name"] = parse.get_string(location, "name", iface)
         else:
             iface["name"] = f"eth{iface_counter}"
             iface_counter += 1
@@ -41,7 +42,7 @@ def validate(cfg: dict):
         names.add(iface["name"])
 
         try:
-            parse.set_default_string("type", iface, "std")
+            parse.set_string_default(location, "type", iface, "std")
             _validate_network(iface, vswitches)
             _validate_iface(iface, location)
         except KeyError as err:
@@ -157,8 +158,8 @@ def _validate_iface(iface: dict, location: str):
     else:
         iface["ipv6_address"] = None
 
-    additional = parse.read_string_list_plurals(
-        {"additional_ipv6_address", "additional_ipv6_address"}, iface, f"{location}.additional_ipv6_addresses")
+    additional = parse.get_string_list_plurals(f"{location}.additional_ipv6_addresses",
+        {"additional_ipv6_address", "additional_ipv6_address"}, iface)
     iface.pop("additional_ipv6_address", None)
     iface["additional_ipv6_addresses"] = []
 
@@ -423,14 +424,13 @@ def configure_uplink(cfg: dict):
     Allows partial configuration of IP addresses, including DHCP.
     For VMs, requires either a 'macvtap' interface, a 'passthrough' interface + PCI address
     or a 'vswitch' + 'vlan' to use for connectivity."""
-    location = cfg["hostname"]
-    uplink = parse.non_empty_dict(location, cfg.get("uplink"))
+    location = f"{cfg['hostname']}.uplink"
 
-    if uplink is None:
-        raise KeyError(f"{location} must define an uplink")
+    uplink = parse.get_dict(location, "uplink",cfg)
 
     if "uplink" in cfg["profile"]:
-        o_loc = f"profile['{cfg['profile_name']}']['{location}'].uplink"
+        o_loc = f"profile['{cfg['profile']['name']}']['{cfg['hostname']}'].uplink"
+
         new_uplink = parse.non_empty_dict(o_loc, cfg["profile"]["uplink"])
         old_uplink = dict(uplink)
 
@@ -445,8 +445,6 @@ def configure_uplink(cfg: dict):
         cfg["uplink"] = uplink
 
         _logger.debug(f"{o_loc} overriding base config: {old_uplink} -> {uplink}")
-
-    location += ".uplink"
 
     # allow some end user configuration of the uplink interface YAML
     # but it will always use forwarding
@@ -464,7 +462,7 @@ def configure_uplink(cfg: dict):
     if cfg["is_vm"]:
         # create a random mac address and use that for renaming
         uplink["mac_address"] = random_mac_address()
-        parse.set_default_string("name", uplink, "wan")
+        parse.set_string_default(location, "name", uplink, "wan")
 
         # uplink can be an existing vswitch or a physical iface either on the host via macvtap or PCI passthrough
         if "macvtap" in uplink:
@@ -503,20 +501,20 @@ def configure_uplink(cfg: dict):
             uplink["vlan"] = _uplink_vlan
         elif ("vswitch" in uplink) and ("vlan" in uplink):
             if ("macvtap" in uplink) or ("passthrough" in uplink):
-                raise ValueError(f"{location} can only set one of 'macvtap', 'passwthrough' or 'vswitch'+'vlan'")
+                raise ValueError(f"{location} can only set one of 'macvtap', 'passthrough' or 'vswitch'+'vlan'")
             # vswitch & vlan will be validated when validate() is called
         else:
-            raise ValueError(f"{location} must define one of 'macvtap', 'passwthrough' or 'vswitch'+'vlan'")
+            raise ValueError(f"{location} must define one of 'macvtap', 'passthrough' or 'vswitch'+'vlan'")
     else:  # physical server
         uplink["mac_address"] = uplink.get("mac_address", None)
 
         if uplink["mac_address"]:
             parse.validate_mac_address(uplink["mac_address"], location)
             # mac address is set; renaming will use the name
-            parse.set_default_string("name", uplink, "wan")
+            parse.set_string_default(location, "name", uplink, "wan")
         else:
             # cannot rename without mac address; use existing name
-            parse.non_empty_string("name", uplink, location)
+            parse.get_string(location, "name", uplink)
 
         # physical host uplinks are treated like normal ifaces, but without a vswitch+vlan
         uplink["vswitch"] = "__unknown__"
@@ -578,7 +576,7 @@ def validate_renaming(cfg: dict):
             raise ValueError(f"{r_loc} must be a dict, not a {type(rename)}")
 
         # must include name and valid MAC address
-        parse.non_empty_string("name", rename, r_loc)
+        parse.get_string(r_loc, "name", rename)
 
         mac_address = rename.get("mac_address")
         parse.validate_mac_address(mac_address, r_loc)

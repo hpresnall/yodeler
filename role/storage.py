@@ -17,9 +17,11 @@ class Storage(Role):
         return ["storage", "nas", "samba", "smb"]
 
     def additional_configuration(self):
-        parse.set_default_string("storage_dir", self._cfg, "/storage")
-        parse.set_default_string("storage_user", self._cfg, "storage")
-        parse.set_default_string("storage_group", self._cfg, "storage")
+        hostname = self._cfg["hostname"]
+
+        parse.set_string_default(hostname, "storage_dir", self._cfg, "/storage")
+        parse.set_string_default(hostname, "storage_user", self._cfg, "storage")
+        parse.set_string_default(hostname, "storage_group", self._cfg, "storage")
 
     @staticmethod
     def minimum_instances(site_cfg: dict) -> int:
@@ -233,53 +235,52 @@ def _validate_storage(cfg: dict):
     storage_loc = cfg["hostname"] + ".storage"
     storage = parse.non_empty_dict(storage_loc, cfg.get("storage"))
 
-    base_dir = parse.set_default_string("base_dir", storage, "/storage")
+    base_dir = parse.set_string_default(storage_loc, "base_dir", storage, "/storage")
     if not base_dir.startswith("/"):
         base_dir = "/" + base_dir
 
     invalid_names = {"root", "samba", "smb", "nobody", "wheel", "nfs"}
 
-    group = parse.set_default_string("group", storage, "storage")
+    group = parse.set_string_default(storage_loc, "group", storage, "storage")
     if group in invalid_names:
         raise ValueError(f"{storage_loc} illegal group name '{group}'")
 
-    location = storage_loc + ".users"
     invalid_names.add(group)  # cannot add group name as a user
     user_names = set()
 
-    users = parse.non_empty_list(location, storage.get("users"))
+    users = parse.get_list(storage_loc, "users", storage)
+
     for i, user in enumerate(users, start=1):
-        parse.non_empty_dict(location, user)
+        u_loc = f"{storage_loc}.users[{i}]"
 
-        u_loc = location + f"[{i}]"
-        name = parse.non_empty_string("name", user, u_loc)
+        parse.non_empty_dict(u_loc, user)
 
+        name = parse.get_string(u_loc, "name", user)
         if name in invalid_names:
             raise ValueError(f"{u_loc} duplicate or illegal username '{name}'")
         # ensure no duplicate names; track user names for use in shares
         invalid_names.add(name)
         user_names.add(name)
 
-        parse.non_empty_string("password", user, u_loc)
+        parse.get_string(u_loc, "password", user)
 
-    location = storage_loc + ".shares"
-    shares = parse.non_empty_list(location, storage.get("shares"))
+    shares = parse.get_list(storage_loc, "shares", storage)
     share_names = set()
     share_paths = set()
 
     for i, share in enumerate(shares, start=1):
-        parse.non_empty_dict(location, share)
+        s_loc = f"{storage_loc}.shares[{i}]"
 
-        s_loc = location + f"[{i}]"
+        parse.non_empty_dict(s_loc, share)
 
-        name = parse.non_empty_string("name", share, s_loc)
+        name = parse.get_string(s_loc, "name", share)
         if name in share_names:
             raise ValueError(f"{s_loc} duplicate share name '{name}'")
         share_names.add(name)
 
         # optional path; defaults to lowercase share name with substitutions
         # will be relative to base_dir
-        path = parse.set_default_string("path", share, name.lower().replace(" ", "_"))
+        path = parse.set_string_default(s_loc, "path", share, name.lower().replace(" ", "_"))
         if "/" in path:
             raise ValueError(f"{s_loc} share path '{path}' cannot contain '/'")
         if path in share_paths:
@@ -304,7 +305,7 @@ def _validate_storage(cfg: dict):
             share["readers"] = list(readers - writers)
         share["writers"] = list(writers)
 
-        parse.set_default_string("quota", share, "infinite")
+        parse.set_string_default(s_loc, "quota", share, "infinite")
 
         owner = share.setdefault("owner", None)
         if owner:
@@ -320,7 +321,7 @@ def _validate_storage(cfg: dict):
 
 def _get_user_list(share: dict, type: str, group: str, user_names: set, location: str) -> set:
     plural = type + 's'
-    user_list = parse.read_string_list_plurals({type, plural}, share, location)
+    user_list = parse.get_string_list_plurals(location, {type, plural}, share)
     share.pop(type, None)  # remove singular; caller must ensure plural is set to this function's return value
 
     for i, user in enumerate(user_list, start=1):

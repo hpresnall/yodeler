@@ -8,7 +8,7 @@ def configure(cfg: dict):
     hostname = cfg["hostname"]
 
     # allow both 'alias' and 'aliases'; only store 'aliases'
-    aliases = parse.read_string_list_plurals({"alias", "aliases"}, cfg, "alias for " + cfg["hostname"])
+    aliases = parse.get_string_list_plurals(cfg["hostname"], {"alias", "aliases"}, cfg)
     cfg.pop("alias", None)
 
     # final set of aliases is all defined values plus role names & role aliases as set in make_unique()

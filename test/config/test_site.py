@@ -33,11 +33,11 @@ class TestSite(unittest.TestCase):
             site.validate({})
 
     def test_load_config_nonstr_name(self):
-        with self.assertRaises(KeyError):
+        with self.assertRaises(ValueError):
             site.validate({"site_name": 0})
 
     def test_load_config_empty_name(self):
-        with self.assertRaises(KeyError):
+        with self.assertRaises(ValueError):
             site.validate({"site_name": ""})
 
     def test_load_test_site(self):

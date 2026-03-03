@@ -157,7 +157,7 @@ class Router(Role):
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         """Create the scripts and configuration files for the given host's configuration."""
-        uplink = parse.non_empty_dict("router 'uplink'", self._cfg.get("uplink"))
+        uplink = parse.get_dict(f"{self._cfg['hostname']}", "uplink",  self._cfg)
 
         libvirt_interfaces = []
 

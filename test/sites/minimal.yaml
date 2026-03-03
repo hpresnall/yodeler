@@ -22,3 +22,37 @@ interfaces:
     vswitch: public
     vlan: 10
 profile: {}
+external_hosts:
+  - hostnames: [test.example, foo.local]
+    ipv4_address: 10.10.10.10
+    ipv6_address: 2001:db8:0:FFFF::1
+firewall:
+  ipsets:
+    - name: test
+      addresses: [192.168.100.0/22]
+  rules:
+    - comment: private has access to EVERYTHING
+      source:
+        vswitch: private
+        vlan: priv_test
+      destination:
+        vlan: all
+      allow-all: true
+    - comment: public have full internet access
+      source:
+        vswitch: public
+        vlan: pub_test
+      destination:
+        vlan: internet
+      allow-all: true
+    - comment: DNAT incoming
+      source:
+        vlan: internet
+        ipset: test
+      destination:
+        vswitch: public
+        vlan: pub_test
+        hostname: server
+      forward:
+        - { proto: udp, ports: 2000 }
+        - { proto: tcp, port: [3000, 4000] }

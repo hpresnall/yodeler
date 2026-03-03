@@ -29,7 +29,7 @@ def validate(cfg: dict):
         return
 
     # firewall config is a dict; rules is a list of dicts
-    firewall = parse.non_empty_dict("firewall", cfg.get("firewall"))
+    firewall = parse.get_dict(cfg["site_name"], "firewall", cfg)
     ipsets4, ipsets6 = _parse_ipsets(firewall)
 
     cfg["firewall"] = {
@@ -45,19 +45,20 @@ def _parse_ipsets(firewall: dict) -> tuple[dict, dict]:
     if not "ipsets" in firewall:
         return {}, {}
 
-    ipsets = parse.non_empty_list("firewall['ipsets']", firewall.get("ipsets"))
+    ipsets = parse.get_list("firewall", "ipsets", firewall)
 
     # return a dict of ipset name to object
     ipsets4 = {}
     ipsets6 = {}
 
     for idx, ipset in enumerate(ipsets, start=1):
-        if not isinstance(ipset, dict):
-            raise ValueError(f"ipsets[{idx}] must be an object")
+        location = f"firewall.ipsets[{idx}]"
 
-        name = parse.non_empty_string("name", ipset, f"ipset[{idx}]").lower()
-        addresses = ipset.get("addresses", [])
-        parse.non_empty_list(f"ipsets[{idx}]['addresses']", addresses)
+        if not isinstance(ipset, dict):
+            raise ValueError(f"{location} must be an object")
+
+        name = parse.get_string(location, "name", ipset).lower()
+        addresses = parse.get_list(location, "addresses", ipset)
 
         try:
             version, is_networks = address.check_addresses(addresses)
@@ -85,7 +86,7 @@ def _parse_rules(cfg: dict, firewall: dict) -> list[dict]:
         return []
 
     # rules is a list of dicts
-    rules = parse.non_empty_list("rules", firewall.get("rules"))
+    rules = parse.get_list("firewall", "rules", firewall)
     parsed_rules = []
 
     # each rule should be a pair of source(s)/destination(s) plus a list of actions
@@ -96,8 +97,8 @@ def _parse_rules(cfg: dict, firewall: dict) -> list[dict]:
 
         parse.non_empty_dict(location, rule)
 
-        sources = parse.read_dict_list_plurals({"source", "sources"}, rule, location + ".sources")
-        destinations = parse.read_dict_list_plurals({"destination", "destinations"}, rule, location + ".destinations")
+        sources = parse.get_dict_list_plurals(location, {"source", "sources"}, rule)
+        destinations = parse.get_dict_list_plurals(location, {"destination", "destinations"}, rule)
 
         sources = _parse_locations(cfg, sources, location + ".sources")
         destinations = _parse_locations(cfg, destinations, location + ".destinations")
@@ -106,7 +107,7 @@ def _parse_rules(cfg: dict, firewall: dict) -> list[dict]:
 
         if ("drop-all" in rule) and rule["drop-all"]:  # drop-all: true supercedes other rules
             actions.append({"action": "drop-all", "type": "drop-all", "ipv4": True, "ipv6": True})
-        elif ("allow-all" in rule) and rule["allow-all"]:  # allow-all: true supercedes other rules except drop
+        elif ("allow-all" in rule) and rule["allow-all"]:  # allow-all: true supercedes other rules except drop-all
             actions.append({"action": "allow-all", "type": "allow-all", "ipv4": True, "ipv6": True})
         elif "allow" in rule:
             actions.extend(_parse_action("allow", rule.get("allow"), location))
@@ -162,7 +163,7 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
             vlan_obj = _fw["vlan"]
             vlan = vlan_obj["name"]
         else:
-            vswitch = parse.non_empty_string("vswitch", loc, loc_name + f" for vlan '{vlan}'")
+            vswitch = parse.get_string(loc_name, "vswitch", loc)
 
             if vswitch not in cfg["vswitches"]:
                 raise ValueError(f"{loc_name} invalid vswitch '{vswitch}'")
@@ -189,7 +190,7 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
             elif ("ipv4_address" in loc) or ("ipv6_address" in loc):
                 raise KeyError(f"{loc_name} cannot set hostname and ip address")
 
-            hostname = parse.non_empty_string("hostname", loc, loc_name).lower()
+            hostname = parse.get_string(loc_name, "hostname", loc).lower()
 
             if vlan == "internet":
                 found = False
@@ -209,7 +210,7 @@ def _parse_locations(cfg: dict, locations: list[dict], location: str) -> list[di
             elif ("ipv4_address" in loc) or ("ipv6_address" in loc):
                 raise KeyError(f"{loc_name} cannot set ipset and ip address")
 
-            ipset = parse.non_empty_string("ipset", loc, loc_name).lower()
+            ipset = parse.get_string(loc_name, "ipset", loc).lower()
 
             if ipset in cfg["firewall"]["ipsets4"]:
                 parsed_location["ipset"] = ipset
@@ -557,18 +558,18 @@ def _action_proto_port(action: str, proto_port: dict, location="", ipv4: bool = 
     # action is a dict of protocol & ports
     # port(s) can be an int or a range separated by - or :
     if not location:
-        location = str(proto_port)
+        location = action + "." + str(proto_port)
 
     if not action:
-        raise ValueError(f"{location}action must be specified")
+        raise ValueError(f"{location} action must be specified")
     if not ipv4 and not ipv6:
         raise ValueError(f"{location} ipv4 and ipv6 cannot both be false")
     if action not in ["allow", "forward"]:
         raise ValueError(f"{location} action must be 'allow' or 'forward'")
 
-    parse.non_empty_dict("proto_port" if location == "{}" else location, proto_port)
+    parse.non_empty_dict(location, proto_port)
 
-    protocol = parse.non_empty_string("proto", proto_port, location)
+    protocol = parse.get_string(location, "proto", proto_port)
 
     if protocol not in ("tcp", "udp"):
         raise ValueError(f"{location}.proto must be 'tcp' or 'udp'")

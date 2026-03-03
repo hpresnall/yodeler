@@ -37,8 +37,9 @@ def load(site_cfg: dict, host_path: str | None) -> dict:
     _logger.info("loading host config from '%s'", os.path.basename(host_path))
 
     host_yaml = file.load_yaml(host_path)
+    host_yaml = parse.non_empty_dict("<host>.yaml", host_yaml)
 
-    parse.set_default_string("hostname", host_yaml, os.path.basename(host_path)[:-5])  # remove .yaml
+    parse.set_string_default("<host>.yaml", "hostname", host_yaml, os.path.basename(host_path)[:-5])  # remove .yaml
 
     host_cfg = validate(site_cfg, host_yaml)
 
@@ -47,7 +48,7 @@ def load(site_cfg: dict, host_path: str | None) -> dict:
     return host_cfg
 
 
-def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
+def validate(site_cfg: dict, host_yaml: dict) -> dict:
     """Validate the given YAML formatted host configuration.
 
     Returns a configuration file that is a combination of the site and host configuration.
@@ -55,11 +56,11 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     Exposed for testing. In normal usage this will be called as part of building the site.
     """
     site_cfg = parse.non_empty_dict("site_cfg", site_cfg)
-    host_yaml = parse.non_empty_dict("host_yaml", host_yaml)
+    host_yaml = parse.non_empty_dict("<host>.yaml", host_yaml)
 
     # basic hostname validation
     # full validation happens after all hosts / aliases are parsed in site.py
-    hostname = parse.non_empty_string("hostname", host_yaml, "host_yaml").lower()  # lowercase for consistency
+    hostname = parse.get_string("<host>.yaml", "hostname", host_yaml).lower()  # lowercase for consistency
 
     if dns.invalid_hostname(hostname):
         raise ValueError(f"invalid hostname '{hostname}'")
@@ -83,7 +84,7 @@ def validate(site_cfg: dict | str | None, host_yaml: dict | str | None) -> dict:
     # profile is dict of hostname -> overrides
     if site_cfg["profile"] and (hostname in site_cfg["profile"]):
         host_yaml["profile"] = site_cfg["profile"][hostname]
-        host_yaml["profile_name"] = site_cfg["profile"]["name"]
+        host_yaml["profile"]["name"] = site_cfg["profile"]["name"]
     else:
         host_yaml["profile"] = {}
 
@@ -213,17 +214,16 @@ def write_scripts(host_cfg: dict, output_dir: str):
     _preview_dir(host_dir)
 
 
-def validate_overridable_site_defaults(cfg: dict):
+def validate_overridable_site_defaults(location: str, cfg: dict):
     # overlay the profile values into the site config, if any
     for key in DEFAULT_SITE_CONFIG.keys():
         if key in cfg["profile"]:
             cfg[key] = cfg["profile"][key]
 
     # ensure overridden default values are the correct type and arrays only contain strings
-    parse.configure_defaults("site_yaml", DEFAULT_SITE_CONFIG, _DEFAULT_SITE_CONFIG_TYPES, cfg)
+    parse.configure_defaults(location, DEFAULT_SITE_CONFIG, _DEFAULT_SITE_CONFIG_TYPES, cfg)
 
-    cfg["alpine_repositories"] = parse.read_string_list(
-        "alpine_repositories", cfg, f"site '{cfg['site_name']}'")
+    cfg["alpine_repositories"] = parse.get_string_list(location, "alpine_repositories", cfg)
 
 
 def _set_defaults(cfg: dict):
@@ -245,17 +245,15 @@ def _set_defaults(cfg: dict):
             cfg[key] = cfg["profile"][key]
 
     # also called in site.py; this call ensures overridden values from the host are also valid
-    validate_overridable_site_defaults(cfg)
+    validate_overridable_site_defaults(cfg["hostname"], cfg)
 
     # validate required properties and types
     parse.configure_defaults(cfg["hostname"], DEFAULT_CONFIG, _DEFAULT_CONFIG_TYPES, cfg)
     parse.configure_defaults(cfg["hostname"], required_values, _REQUIRED_PROPERTIES, cfg)
 
     # confirm lists contain only strings
-    cfg["awall_disable"] = parse.read_string_list("awall_disable", cfg, f"'{cfg['hostname']}'")
-
-    cfg["kernel_params"] = parse.read_string_list_plurals(
-        {"kernel_param", "kernel_params"}, cfg, f"'{cfg['hostname']}'")
+    cfg["awall_disable"] = parse.get_string_list(cfg["hostname"], "awall_disable", cfg)
+    cfg["kernel_params"] = parse.get_string_list_plurals(cfg["hostname"], {"kernel_param", "kernel_params"}, cfg)
     cfg.pop("kernel_param", None)
 
     needs_site_build = False
@@ -301,7 +299,7 @@ def _set_defaults(cfg: dict):
             raise ValueError(f"'{cfg['vm_images_pat']}' vm_images_path value cannot contain spaces")
 
         # physical installs need an interface configured to download APKs and a disk to install the OS
-        parse.set_default_string("install_interfaces", cfg, """auto lo
+        parse.set_string_default("<host>.yaml", "install_interfaces", cfg, """auto lo
 iface lo inet loopback
 auto eth0
 iface eth0 inet dhcp""")
@@ -309,7 +307,7 @@ iface eth0 inet dhcp""")
         if "install_interfaces" in cfg["profile"]:
             cfg["install_interfaces"] = cfg["profile"]["install_interfaces"]
 
-        parse.non_empty_string("install_interfaces", cfg, cfg["hostname"])
+        parse.get_string(cfg["hostname"], "install_interfaces", cfg)
 
     aliases.configure(cfg)
 
@@ -318,7 +316,7 @@ def _load_roles(cfg: dict):
     # list of role names in yaml => list of Role subclass instances
 
     # allow both 'role' and 'roles'; only store 'roles'
-    role_names = set(parse.read_string_list_plurals({"role", "roles"}, cfg, "role for " + cfg["hostname"]))
+    role_names = set(parse.get_string_list_plurals(cfg["hostname"], {"role", "roles"}, cfg))
     cfg.pop("role", None)
 
     # Common _must_ be the first so it is configured and setup first
@@ -378,7 +376,7 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
         host_cfg["packages"] |= role.additional_packages()
 
     # update packages required for metrics
-    metrics.add_packages(host_cfg)
+    host_cfg["packages"] |= metrics.additional_packages(host_cfg)
 
     # resolve conflicts in favor of adding the package
     host_cfg["remove_packages"] -= host_cfg["packages"]
@@ -391,6 +389,7 @@ def _configure_packages(site_cfg: dict, host_yaml: dict, host_cfg: dict):
 
     if host_cfg["enable_testing_repository"]:
         host_cfg["alpine_repositories"].append(host_cfg["alpine_testing_repository"])
+
 
 def _configure_before_and_after_chroot(cfg: dict):
     # convert before & after chroot arrays into string for substitution in bootstrap scripts

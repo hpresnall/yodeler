@@ -61,7 +61,7 @@ def validate(cfg: dict):
     _validate(hostname, metrics, "libvirt", libvirt, 15)
     _validate(hostname, metrics, "pdns", pdns, 15)
 
-    # ipmi & smartmon are in the Alpine testing repo
+    # ipmi & smartmon packages are in the Alpine testing repo
     if metrics["ipmi"]["enabled"]:
         if cfg["is_vm"]:
             raise ValueError(f"{cfg['hostname']}: cannot enable IPMI metrics on VMs")
@@ -75,8 +75,8 @@ def validate(cfg: dict):
 
 def _validate(hostname: str, metrics: dict, type: str, default_enabled: bool, default_interval: int):
     if type in metrics:
-        location = f"{hostname}.metrics['{type}']"
-        metric_cfg = parse.non_empty_dict(location, metrics[type])
+        location = f"{hostname}.metrics"
+        metric_cfg = parse.get_dict(location, type, metrics)
     else:
         metrics[type] = {
             "enabled": default_enabled,
@@ -88,8 +88,10 @@ def _validate(hostname: str, metrics: dict, type: str, default_enabled: bool, de
     if "interval" in metric_cfg:
         default_enabled = True
 
-    enabled = parse.set_default_bool("enabled", metric_cfg, default_enabled)
-    interval = parse.set_default_int("interval", metric_cfg, default_interval)
+    location += "." + type
+
+    enabled = parse.set_bool_default(location, "enabled", metric_cfg, default_enabled)
+    interval = parse.set_int_default(location, "interval", metric_cfg, default_interval)
 
     metrics[type] = {
         "enabled": enabled,
@@ -97,22 +99,24 @@ def _validate(hostname: str, metrics: dict, type: str, default_enabled: bool, de
     }
 
 
-def add_packages(cfg: dict):
+def additional_packages(cfg: dict) -> set[str]:
     """Add additional packages for metrics."""
     if not cfg["metrics"]:
-        return
+        return set()
 
     metrics = cfg["metrics"]
 
-    cfg["packages"].add("prometheus-node-exporter")
+    packages = {"prometheus-node-exporter"}
 
     if metrics["libvirt"]["enabled"]:
-        cfg["packages"].add("prometheus-libvirt-exporter")
+        packages.add("prometheus-libvirt-exporter")
     if metrics["nvme"]["enabled"]:
-        cfg["packages"].add("nvme-cli")
+        packages.add("nvme-cli")
     if metrics["onewire"]["enabled"]:
-        cfg["packages"].add("owfs")
+        packages.add("owfs")
     if metrics["ipmi"]["enabled"]:
-        cfg["packages"].add("prometheus-ipmi-exporter")
+        packages.add("prometheus-ipmi-exporter")
     if metrics["smartmon"]["enabled"]:
-        cfg["packages"].add("prometheus-smartctl-exporter")
+        packages.add("prometheus-smartctl-exporter")
+
+    return packages

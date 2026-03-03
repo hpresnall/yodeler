@@ -44,6 +44,8 @@ class Build(Role):
                 build_disk = disk
                 break
 
+        hostname = self._cfg["hostname"]
+
         if build_disk:
             mountpoint = build_disk.get("mountpoint", None)
 
@@ -54,14 +56,14 @@ class Build(Role):
                 if build_dir:
                     build_disk["mountpoint"] = build_dir
                 else:  # set the build_dir to the mount point
-                    parse.set_default_string("build_dir", self._cfg, mountpoint)
+                    parse.set_string_default(hostname, "build_dir", self._cfg, mountpoint)
             else:
                 # no mount point, set both to the build_dir
-                build_dir = parse.set_default_string("build_dir", self._cfg, "/build")
+                build_dir = parse.set_string_default(hostname, "build_dir", self._cfg, "/build")
                 build_disk["mountpoint"] = build_dir
         else:
             # no disk; just default to /build on the system disk
-            build_dir = parse.set_default_string("build_dir", self._cfg, "/build")
+            build_dir = parse.set_string_default(hostname, "build_dir", self._cfg, "/build")
 
     def write_config(self, setup: shell.ShellScript, output_dir: str):
         build_dir = self._cfg["build_dir"]

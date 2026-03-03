@@ -38,11 +38,11 @@ def load(site_dir: str | None, profile_name: str | None = None) -> dict:
     _logger.info("loading site config from '%s'", site_dir)
 
     site_yaml = file.load_yaml(os.path.join(site_dir, "site.yaml"))
+    site_yaml = parse.non_empty_dict("site.yaml", site_yaml)
 
     site_yaml["site_name"] = os.path.basename(site_dir)
 
     if profile_name:
-        parse.non_empty_string("name", {"name": profile_name}, "profile")
         profile_yaml = file.load_yaml(os.path.join(site_dir, f"profile_{profile_name}.yaml"))
 
         _logger.info("using profile '%s' to configure site '%s'", profile_name, site_yaml["site_name"])
@@ -67,7 +67,7 @@ def load(site_dir: str | None, profile_name: str | None = None) -> dict:
     return site_cfg
 
 
-def validate(site_yaml: dict | str | None) -> dict:
+def validate(site_yaml: dict) -> dict:
     """Validate the given YAML formatted site configuration.
 
     This configuration _is not_ valid for creating a set of scripts for a specific host.
@@ -75,15 +75,15 @@ def validate(site_yaml: dict | str | None) -> dict:
     Exposed for testing. In normal usage this will be called as part of building the site.
     """
     site_yaml = parse.non_empty_dict("site_yaml", site_yaml)
+    site_name =  parse.get_string("site.yaml", "site_name", site_yaml)
 
-    parse.non_empty_string("site_name", site_yaml, "site_yaml")
-
+    # defensively ensure the config cannot be updated elsewhere
     site_cfg = copy.deepcopy(site_yaml)
 
-    host.validate_overridable_site_defaults(site_cfg)
+    host.validate_overridable_site_defaults(site_name ,site_cfg)
 
     # validate values that hosts cannot override
-    site_cfg["external_ntp"] = parse.read_string_list("external_ntp", site_cfg, f"site '{site_cfg['site_name']}'")
+    site_cfg["external_ntp"] = parse.get_string_list(site_name, "external_ntp", site_cfg)
 
     external_dns_ips = []
 
@@ -294,7 +294,7 @@ def _validate_external_hosts(cfg: dict):
             raise ValueError(f"{location}[{i}] must be a dict")
 
         # allow a list of hostnames to map to the same ip address
-        entry["hostnames"] = parse.read_string_list_plurals({"hostname", "hostnames"}, entry, location)
+        entry["hostnames"] = parse.get_string_list_plurals(location, {"hostname", "hostnames"}, entry)
         entry.pop("hostname", None)
 
         for hostname in entry["hostnames"]:

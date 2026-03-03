@@ -23,3 +23,10 @@ storage:
 disks:
   - name: storage1
     type: img
+  - name: build
+    type: img
+    mountpoint: /tmp
+java: true
+go: true
+build_dir: builder
+preferred_metrics_vlan: priv_test

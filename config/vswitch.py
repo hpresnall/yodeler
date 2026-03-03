@@ -10,7 +10,7 @@ _logger = logging.getLogger(__name__)
 
 def validate(cfg: dict):
     """Validate all the vswitches defined in the site configuration."""
-    vswitches = parse.non_empty_list("vswitches", cfg.get("vswitches"))
+    vswitches = parse.get_list(cfg["site_name"], "vswitches", cfg)
 
     # list of vswitches in yaml => dict of names to vswitches
     vswitches_by_name = cfg["vswitches"] = {}
@@ -28,18 +28,20 @@ def validate(cfg: dict):
     overrides = _configure_overrides(cfg)
 
     for i, vswitch in enumerate(vswitches, start=1):
-        parse.non_empty_dict("vswitch " + str(i), vswitch)
-        location = f"vswitch['{str(i).lower()}']"
+        location = f"vswitch[{i}]"
+
+        parse.non_empty_dict(location, vswitch)
 
         # name is required and must be unique; lowercase for consistency
-        vswitch_name = parse.non_empty_string("name", vswitch, location)
+        vswitch_name = parse.get_string(location, "name", vswitch)
         vswitch["name"] = vswitch_name
+        location = f"vswitch['{vswitch_name}']"
 
         if vswitches_by_name.get(vswitch_name) is not None:
             raise KeyError(f"{location} duplicate vswitch '{vswitch_name}' defined")
         vswitches_by_name[vswitch_name] = vswitch
 
-        vswitch_uplinks = parse.read_string_list_plurals({"uplink", "uplinks"}, vswitch, location + ".uplinks")
+        vswitch_uplinks = parse.get_string_list_plurals(location, {"uplink", "uplinks"}, vswitch)
         vswitch.pop("uplink", None)
 
         if (vswitch_name in overrides):
@@ -66,11 +68,14 @@ def _configure_overrides(cfg: dict) -> dict[str, dict]:
         o_loc = f"profile['{cfg['profile']['name']}'].vswitches"
 
         for i, vswitch in enumerate(cfg["profile"]["vswitches"], start=1):
-            vswitch_name = vswitch['name']
+            if "name" in vswitch:
+                vswitch_name = vswitch['name']
 
-            if ("name" in vswitch):
-                override_uplinks = parse.read_string_list_plurals(
-                    {"uplink", "uplinks"}, vswitch, f"{o_loc}['{vswitch_name}']")
+                if not vswitch_name:
+                    raise KeyError(f"{o_loc}[{i}] must set 'name'")
+
+                override_uplinks = parse.get_string_list_plurals(f"{o_loc}['{vswitch_name}']", {"uplink", "uplinks"}, vswitch)
                 overrides[vswitch_name] = {"uplinks": override_uplinks}
-
+            else:
+                raise KeyError(f"{o_loc}[{i}] must set 'name'")
     return overrides

@@ -9,13 +9,13 @@ _logger = logging.getLogger(__name__)
 
 def validate(cfg: dict):
     """Validate all the disks defined on the host."""
-    disks = cfg["disks"] = parse.read_dict_list_plurals({"disk", "disks"}, cfg, "disks")
+    disks = cfg["disks"] = parse.get_dict_list_plurals(cfg["hostname"], {"disk", "disks"}, cfg)
     cfg.pop("disk", None)
 
     if cfg["profile"] and (("disk" in cfg["profile"]) or ("disks" in cfg["profile"])):
         old_disks = disks
-        disks = cfg["disks"] = parse.read_dict_list_plurals({"disk", "disks"}, cfg["profile"], "disks")
-        _logger.debug(f"profile['{cfg['profile_name']}']['{cfg['hostname']}'].disks"
+        disks = cfg["disks"] = parse.get_dict_list_plurals(cfg["hostname"],{"disk", "disks"}, cfg["profile"])
+        _logger.debug(f"profile['{cfg['profile']['name']}']['{cfg['hostname']}'].disks"
                       f" overriding base config: {old_disks} -> {disks}")
 
     names = set()
@@ -25,14 +25,14 @@ def validate(cfg: dict):
     system_disk_idx = -1
 
     for i, disk in enumerate(disks, start=1):
-        location = f"cfg[{cfg['hostname']}].disks[{i}]"
+        location = f"{cfg['hostname']}.disks[{i}]"
 
         # if only one disk, assume it is the system disk
         # if there are no disks, it will be added below
         if (len(disks) == 1) and ("name" not in disk):
             disk["name"] = "system"
 
-        name = parse.non_empty_string("name", disk, location)
+        name = parse.get_string(location, "name", disk)
 
         if name in names:
             raise ValueError(f"duplicate disk name '{name}' for {location}")
@@ -49,7 +49,7 @@ def validate(cfg: dict):
             raise ValueError(f"{location}.mountpoint must be a string")
 
         # default to img for vms and device for physical
-        type = parse.set_default_string("type", disk, "img" if cfg["is_vm"] else "device")
+        type = parse.set_string_default(location, "type", disk, "img" if cfg["is_vm"] else "device")
 
         if type == "img":
             if not cfg["is_vm"]:
@@ -60,22 +60,22 @@ def validate(cfg: dict):
             # require path to image file on vmhost; optional size
             # system disk image is just named with the hostname
             postfix = "" if name == "system" else "_" + name
-            path = parse.set_default_string("path", disk, f"{cfg['vm_images_path']}/{cfg['hostname']}{postfix}.img")
+            path = parse.set_string_default(location, "path", disk, f"{cfg['vm_images_path']}/{cfg['hostname']}{postfix}.img")
 
-            parse.set_default_int("size_mb", disk, 1024)
+            parse.set_int_default(location, "size_mb", disk, 1024)
 
             disk["partition"] = ""
-            parse.set_default_string("fs_type", disk, "ext4")
+            parse.set_string_default(location, "fs_type", disk, "ext4")
             disk["format"] = bool(disk.get("format", True))
         elif type == "device":
             # require /dev/ path; optional partition
-            path = parse.non_empty_string("path", disk, location)
+            path = parse.get_string(location, "path", disk)
 
             if not path.startswith("/dev/"):
                 raise ValueError(f"{location}.path '{path}' does not start with /dev/")
 
             disk["partition"] = str(disk.setdefault("partition", ""))
-            parse.set_default_string("fs_type", disk, "ext4")
+            parse.set_string_default(location, "fs_type", disk, "ext4")
             disk["format"] = bool(disk.get("format", True))
         elif type == "passthrough":
             if not cfg["is_vm"]:
@@ -86,8 +86,8 @@ def validate(cfg: dict):
 
             # require path & PCI address
             # path is used during setup to mount the disk inside of chroot
-            path = parse.non_empty_string("path", disk, location)
-            address = parse.non_empty_string("pci_address", disk, location)
+            path = parse.get_string(location, "path", disk)
+            address = parse.get_string(location, "pci_address", disk)
 
             if not path.startswith("/dev/"):
                 raise ValueError(f"{location}.path '{path}' does not start with /dev/")

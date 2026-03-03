@@ -2,12 +2,15 @@
 import re
 
 # like 00:00.0
-_VALID_PCI_ADDRESS = re.compile("^([0-9A-F]{2,4}):([0-9A-F]{2})\\.([09-A-F])$")
+_VALID_PCI_ADDRESS = re.compile("^([0-9A-F]{2,4}):([0-9A-F]{2})\\.([0-9A-F])$")
 
 
 def split(address: str, location: str) -> tuple[int, int, int]:
     """Split the given PCI address into bus, slot and function as integers.
     Assumes PCI address in a form like '00:00.0' where each part is a hex digit."""
+    if not address:
+        raise ValueError(f"address must be specified for {location}")
+
     match = _VALID_PCI_ADDRESS.match(address.upper())
     if not match:
         raise ValueError(

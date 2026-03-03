@@ -43,7 +43,7 @@ class Metrics(Role):
         if not self._cfg["metrics"]:
             raise ValueError("metrics server must have metrics enabled")
 
-        parse.set_default_string("grafana_password", self._cfg, "m3trics!")
+        parse.set_string_default(self._cfg["hostname"], "grafana_password", self._cfg, "m3trics!")
 
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup Prometheus DB")
@@ -103,6 +103,7 @@ class Metrics(Role):
             else:
                 _logger.warning(f"no matching ipv4 address found for access to '{hostname}';"
                                 " no metrics will be collected")
+                continue
 
             for type, metric_cfg in host_cfg["metrics"].items():
                 if metric_cfg["enabled"]:

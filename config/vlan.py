@@ -13,8 +13,9 @@ _logger = logging.getLogger(__name__)
 def validate(domain: str, vswitch: dict, other_vswitch_vlans: set, other_ipv4_subnets: set, other_ipv6_subnets: set):
     """Validate all the vlans defined in the vswitch."""
     vswitch_name = vswitch["name"]
+    vswitch_loc = f"vswitch['{vswitch_name}']"
 
-    vlans = parse.non_empty_list("vlans", vswitch.get("vlans"))
+    vlans = parse.get_list(vswitch_loc, "vlans", vswitch)
 
     # list of vlans in yaml => dicts of names & ids to vswitches
     vlans_by_id = vswitch["vlans_by_id"] = {}
@@ -28,11 +29,12 @@ def validate(domain: str, vswitch: dict, other_vswitch_vlans: set, other_ipv4_su
     ipv6_pd_network_count = 1
 
     for i, vlan in enumerate(vlans, start=1):
-        location = f"vswitch['{vswitch_name}'].vlan[{i}]"
+        location = f"{vswitch_loc}.vlan[{i}]"
+
         parse.non_empty_dict(location, vlan)
 
         # name is required and must be unique; lowercase for consistency
-        vlan_name = parse.non_empty_string("name", vlan, location).lower()
+        vlan_name = parse.get_string(location, "name", vlan).lower()
         vlan["name"] = vlan_name
 
         if vlan_name in vlans_by_name:
@@ -145,6 +147,7 @@ def _validate_dhcp_reservations(vswitch_name: str, vlan: dict):
 
     for i, res in enumerate(reservations, start=1):
         location = f"{vlan_path}.dhcp_reservations[{i}]"
+
         parse.non_empty_dict(location, res)
 
         # hostname & mac address required; ip addresses are not
@@ -171,6 +174,7 @@ def _validate_static_hosts(vswitch_name: str, vlan: dict):
 
     for i, host in enumerate(hosts, start=1):
         location = f"{location}.static_hosts[{i}]"
+
         parse.non_empty_dict(location, host)
 
         # hostname and ipv4 address required
@@ -234,7 +238,7 @@ def _validate_ipaddress(ip_version: str, vlan: dict, cfg: dict, location: str, r
 
 
 def _validate_hostname(vlan: dict, cfg: dict, location: str):
-    hostname = parse.non_empty_string("hostname", cfg, location).lower()
+    hostname = parse.get_string(location, "hostname", cfg).lower()
 
     if hostname in vlan["known_aliases"]:
         raise ValueError(f"{location} duplicate hostname or alias '{hostname}'")
@@ -248,7 +252,7 @@ def _validate_hostname(vlan: dict, cfg: dict, location: str):
 
 
 def _validate_aliases(vlan: dict, cfg: dict, location: str):
-    aliases = parse.read_string_list_plurals({"alias", "aliases"}, cfg, location)
+    aliases = parse.get_string_list_plurals(location, {"alias", "aliases"}, cfg)
     cfg.pop("alias", None)
 
     cfg["aliases"] = set()
@@ -335,8 +339,6 @@ DEFAULT_VLAN_CONFIG = {
 }
 
 _DEFAULT_VLAN_CONFIG_TYPES = {
-    "name": str,
-    "id": int,
     "routable": bool,
     "domain": str,
     "ipv6_disabled": bool,

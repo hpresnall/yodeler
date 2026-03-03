@@ -99,7 +99,7 @@ class FakeISP(Role):
                     parent, "vlans on 'fakeisp' vswitch", "vswitch"))
 
             if (finet_vlan["id"] is not None):
-                parent = parse.non_empty_string("name", fakeinternet, "eth0")
+                parent = parse.get_string(f"{self._cfg["hostname"]}.iface", "name", fakeinternet)
                 # insert before fakeinternet
                 self._cfg["interfaces"].insert(0, config.interfaces.for_port(
                     parent, "vlans on 'fakeiternet' vswitch", "vswitch"))

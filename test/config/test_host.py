@@ -24,31 +24,31 @@ class TestHost(base.TestCfgBase):
 
     def test_load_config_str(self):
         with self.assertRaises(ValueError):
-            host.validate(site.validate(self._site_yaml), "")
+            host.validate(site.validate(self._site_yaml), "")  # type: ignore
 
     def test_load_config_none(self):
         with self.assertRaises(ValueError):
-            host.validate(site.validate(self._site_yaml), None)
+            host.validate(site.validate(self._site_yaml), None)  # type: ignore
 
     def test_load_config_no_hostname(self):
         with self.assertRaises(KeyError):
             host.validate(site.validate(self._site_yaml), {"value": 0})
 
     def test_load_config_nonstr_hostname(self):
-        with self.assertRaises(KeyError):
+        with self.assertRaises(ValueError):
             host.validate(site.validate(self._site_yaml), {"hostname": 0})
 
     def test_load_config_empty_hostname(self):
-        with self.assertRaises(KeyError):
+        with self.assertRaises(ValueError):
             host.validate(site.validate(self._site_yaml), {"hostname": ""})
 
     def test_validate_none_site(self):
         with self.assertRaises(ValueError):
-            host.validate(None, self._host_yaml)
+            host.validate(None, self._host_yaml)  # type: ignore
 
     def test_validate_non_dict_site(self):
         with self.assertRaises(ValueError):
-            host.validate("invalid", self._host_yaml)
+            host.validate("invalid", self._host_yaml)  # type: ignore
 
     def test_validate_empty_site(self):
         with self.assertRaises(ValueError):
