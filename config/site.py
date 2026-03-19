@@ -1,24 +1,20 @@
 """Site is responsible for loading all configuration for a given site.
 It also creates the final, static set of configuration files for each host at the site.
 """
-import logging
-import os
 import copy
 import errno
 import ipaddress
+import logging
+import os
 
-import role.roles as roles
-
-import config.vswitch as vswitch
 import config.firewall as firewall
 import config.host as host
-
+import config.vswitch as vswitch
+import role.roles as roles
+import script.shell as shell
 import util.dns as dns
 import util.file as file
 import util.parse as parse
-
-import script.shell as shell
-
 
 _logger = logging.getLogger(__name__)
 

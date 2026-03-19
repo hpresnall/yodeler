@@ -2,9 +2,8 @@
 """
 import logging
 
-import util.file as file
-
 import script.shell as shell
+import util.file as file
 
 _logger = logging.getLogger(__name__)
 

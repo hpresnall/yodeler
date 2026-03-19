@@ -5,6 +5,7 @@ import unittest
 
 import util.pci
 
+
 class TestPCI(unittest.TestCase):
     def test_valid(self):
         bus, slot, function = util.pci.split("1A:2B.C", "test")

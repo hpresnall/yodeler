@@ -1,10 +1,11 @@
 """Utility functions for handling files."""
 
-import os
-import string
-import yaml
 import json
+import os
 import shutil
+import string
+
+import yaml
 
 try:
     loader, dumper = yaml.CLoader, yaml.CDumper

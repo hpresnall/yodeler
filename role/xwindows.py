@@ -1,9 +1,8 @@
 """Configuration for an XFCE host."""
-from role.roles import Role
-
 import sys
 
 import script.shell as shell
+from role.roles import Role
 
 
 class XWindows(Role):

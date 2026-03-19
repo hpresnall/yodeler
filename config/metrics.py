@@ -1,6 +1,7 @@
 """Handles parsing and validating metrics configuration from host YAML files."""
-import logging
 import copy
+import logging
+
 from util import parse
 
 _logger = logging.getLogger(__name__)

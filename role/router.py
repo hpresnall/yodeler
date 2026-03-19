@@ -1,19 +1,16 @@
 """Configuration & setup for a Shorewall based router."""
-import os.path
 import os
+import os.path
 
-from role.roles import Role
-
-import util.file as file
-import util.parse as parse
-
+import config.firewall as fw
+import config.interfaces as interfaces
 import script.libvirt as libvirt
+import script.metrics as metrics
 import script.shell as shell
 import script.sysctl as sysctl
-import script.metrics as metrics
-
-import config.interfaces as interfaces
-import config.firewall as fw
+import util.file as file
+import util.parse as parse
+from role.roles import Role
 
 
 class Router(Role):

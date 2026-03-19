@@ -3,9 +3,7 @@
 These functions will raise ValueErrors or KeyErrors for invalid values.
 """
 import re
-
-from typing import cast
-from typing import Hashable
+from typing import Hashable, cast
 
 
 def non_empty_dict(location: str, value: None | dict) -> dict:

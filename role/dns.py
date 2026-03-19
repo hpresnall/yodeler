@@ -1,14 +1,11 @@
 """Configuration & setup for a PowerDNS server."""
-from role.roles import Role
-
-import util.file as file
-import util.address as address
-
+import config.firewall as fw
+import config.interfaces as interfaces
 import script.shell as shell
 import script.sysctl as sysctl
-
-import config.interfaces as interfaces
-import config.firewall as fw
+import util.address as address
+import util.file as file
+from role.roles import Role
 
 
 class Dns(Role):

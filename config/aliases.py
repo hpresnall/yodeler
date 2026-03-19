@@ -1,5 +1,4 @@
 import role.roles as roles
-
 import util.dns as dns
 import util.parse as parse
 

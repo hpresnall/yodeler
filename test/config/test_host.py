@@ -1,15 +1,12 @@
 # pylint: disable=missing-module-docstring
 # pylint: disable=missing-class-docstring
 # pylint: disable=missing-function-docstring
-import os.path
-
 import copy
-
+import os.path
 import test.config.base as base
 
-import config.site as site
 import config.host as host
-
+import config.site as site
 import config.vlan
 
 

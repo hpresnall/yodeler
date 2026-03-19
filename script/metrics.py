@@ -1,6 +1,5 @@
 """Create shell script fragments for setting up Prometheus metrics."""
 import script.shell as shell
-
 import util.file as file
 
 

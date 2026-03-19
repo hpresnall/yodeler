@@ -1,9 +1,8 @@
 """Yodeler - automated, self-contained, simple Alpine VM setup"""
-import sys
 import logging
+import sys
 
 import config.site as site
-
 import role.roles as roles
 
 

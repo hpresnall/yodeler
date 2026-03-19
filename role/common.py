@@ -1,20 +1,17 @@
 """Common configuration & setup for all Alpine servers."""
-from role.roles import Role
-
-import util.file as file
-
+import config.firewall as fw
 import script.awall as awall
 import script.chrony as chrony
-import script.disks as disks
 import script.dhcpcd as dhcpcd
+import script.disks as disks
 import script.interfaces as interfaces
 import script.libvirt as libvirt
 import script.metrics as metrics
 import script.resolv as resolv
 import script.shell as shell
 import script.sysctl as sysctl
-
-import config.firewall as fw
+import util.file as file
+from role.roles import Role
 
 
 class Common(Role):

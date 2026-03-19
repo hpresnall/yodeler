@@ -1,25 +1,21 @@
 """Handles parsing and validating host configuration from YAML files."""
+import copy
+import ipaddress
 import logging
 import os
-import copy
 import shutil
 import sys
-import ipaddress
-
-import role.roles as roles
-
-import util.file as file
-import util.parse as parse
-import util.dns as dns
-
-import script.shell as shell
 
 import config.aliases as aliases
-import config.interfaces as interfaces
 import config.disks as disks
+import config.interfaces as interfaces
 import config.metrics as metrics
-
+import role.roles as roles
 import script.disks
+import script.shell as shell
+import util.dns as dns
+import util.file as file
+import util.parse as parse
 
 _logger = logging.getLogger(__name__)
 

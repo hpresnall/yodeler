@@ -1,12 +1,10 @@
 """Configuration & setup for a Chrony NTP server."""
 import logging
 
-from role.roles import Role
-
-import script.shell as shell
-
-import config.interfaces as interfaces
 import config.firewall as fw
+import config.interfaces as interfaces
+import script.shell as shell
+from role.roles import Role
 
 _logger = logging.getLogger(__name__)
 

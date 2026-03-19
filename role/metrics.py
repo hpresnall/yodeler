@@ -1,17 +1,13 @@
 """Configuration for server that gathers Prometheus metrics from other hosts in the site."""
-from role.roles import Role
-
 import logging
-
-import script.shell as shell
 
 import config.interfaces as interfaces
 import config.vlan as vlan
-
+import script.metrics as metrics
+import script.shell as shell
 import util.file as file
 import util.parse as parse
-
-import script.metrics as metrics
+from role.roles import Role
 
 _logger = logging.getLogger(__name__)
 

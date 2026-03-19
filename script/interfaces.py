@@ -5,11 +5,9 @@ Files created by this module are usable by the ifupdown-ng package.
 It _will not_ be usable by the Alpine's default BusyBox ifupdown command or by
 Debian's version from the ifupdown package."""
 import config.interfaces
-
+import script.shell as shell
 import util.file as file
 import util.parse as parse
-
-import script.shell as shell
 
 
 def from_config(cfg: dict, output_dir: str):

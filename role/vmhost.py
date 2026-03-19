@@ -1,17 +1,14 @@
 """Configuration & setup for the main KVM & Openvswitch Alpine server that runs other roles as VMs."""
-from role.roles import Role
-
 import os
 import string
 
 import config.interfaces as interfaces
 import config.vlan as vlan
-
-import util.file as file
-
-import script.shell as shell
 import script.libvirt as libvirt
+import script.shell as shell
 import script.sysctl as sysctl
+import util.file as file
+from role.roles import Role
 
 
 class VmHost(Role):

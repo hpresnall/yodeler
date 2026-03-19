@@ -1,15 +1,12 @@
 """Handles parsing and validating firewall configuration from site YAML files."""
-import logging
 import ipaddress
+import logging
 
+import config.vlan as vlans
+import role.roles as roles
 import util.address as address
 import util.dns as dns
 import util.parse as parse
-
-import role.roles as roles
-
-import config.vlan as vlans
-
 
 _logger = logging.getLogger(__name__)
 

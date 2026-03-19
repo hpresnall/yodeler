@@ -2,8 +2,8 @@
 
 Requires <path_to_xml> as a command line argument.
 """
-import xml.etree.ElementTree as xml
 import sys
+import xml.etree.ElementTree as xml
 
 if len(sys.argv) == 1:
     print("virsh domain xml required")

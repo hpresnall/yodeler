@@ -1,7 +1,6 @@
 """Create /etc/resolv.conf based on host domain settings & site DNS configuration."""
-import util.file as file
-
 import config.interfaces as interfaces
+import util.file as file
 
 
 def create_conf(cfg: dict) -> str:

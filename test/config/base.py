@@ -1,16 +1,13 @@
 # pylint: disable=missing-module-docstring
+import copy
+import logging
+import os.path
 import unittest
 
-import logging
-
-import os.path
-import copy
-
-import util.file as file
-
-import config.site as site
 import config.host as host
+import config.site as site
 import role.roles as roles
+import util.file as file
 
 
 class TestCfgBase(unittest.TestCase):

@@ -1,13 +1,11 @@
 """Utility for awall configuration."""
-from role.roles import Role
-
 import logging
 import os
 
-import util.file as file
-
-import script.shell as shell
 import script.metrics as metrics
+import script.shell as shell
+import util.file as file
+from role.roles import Role
 
 _logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 """Utility functions for creating & manipulating libvirt XML files."""
-import xml.etree.ElementTree as xml
 import os.path
+import xml.etree.ElementTree as xml
 
 
 def write_vm_xml(cfg: dict, output_dir: str) -> None:

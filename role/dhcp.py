@@ -1,14 +1,10 @@
 """Configuration & setup for a Kea DHCP server."""
-from role.roles import Role
-
-import util.file as file
-import util.address as address
-
-import script.shell as shell
-
-import config.interfaces as interfaces
-
 import config.firewall as fw
+import config.interfaces as interfaces
+import script.shell as shell
+import util.address as address
+import util.file as file
+from role.roles import Role
 
 
 class Dhcp(Role):

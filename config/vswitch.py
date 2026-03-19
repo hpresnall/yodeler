@@ -2,7 +2,6 @@
 import logging
 
 import config.vlan as vlan
-
 import util.parse as parse
 
 _logger = logging.getLogger(__name__)

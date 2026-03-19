@@ -1,10 +1,9 @@
 """Defines the abstract Role class and helper functions for finding & loading implementations.
 A role represents various configurations that can be applied to a host to implement a specific functionality."""
-import os
 import importlib
 import inspect
 import logging
-
+import os
 from abc import ABC, abstractmethod
 
 import script.shell as shell

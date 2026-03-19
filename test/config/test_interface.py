@@ -2,7 +2,6 @@
 # pylint: disable=missing-class-docstring
 # pylint: disable=missing-function-docstring
 import copy
-
 import test.config.base as base
 
 import config.interfaces as interfaces

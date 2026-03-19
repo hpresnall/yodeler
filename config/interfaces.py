@@ -1,12 +1,10 @@
 """Handles parsing and validating interface configuration from host YAML files."""
-import logging
 import ipaddress
+import logging
 import random
-
 from typing import Callable
 
 import config.vlan as vlan
-
 import util.parse as parse
 import util.pci as pci
 

@@ -2,19 +2,16 @@
 The purpose of this role is to add a buffer between and existing Yodeler side and a testbed site
 using the _same_ network configuration. The fake ISP can be configured to serve IPv4 addresses and IPv6 addresses
 that match the current Yodeler site's upstream (wan) ISP configuration."""
-import logging
 import ipaddress
+import logging
 
-from role.roles import Role
-
-import config.vlan as vlan
 import config.interfaces
-
-import util.parse as parse
-import util.file as file
-
+import config.vlan as vlan
 import script.shell as shell
 import script.sysctl as sysctl
+import util.file as file
+import util.parse as parse
+from role.roles import Role
 
 _logger = logging.getLogger(__name__)
 

@@ -1,9 +1,7 @@
 """Configuration for ZFS based NAS server running Samba."""
+import script.shell as shell
 import util.file as file
 import util.parse as parse
-
-import script.shell as shell
-
 from role.roles import Role
 
 

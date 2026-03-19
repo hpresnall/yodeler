@@ -1,7 +1,6 @@
 """Create crony.conf for a host from Yodeler configuration for NTP. Handles client & server configuration."""
-import util.file as file
-
 import config.interfaces as interfaces
+import util.file as file
 
 
 def create_conf(cfg: dict, output_dir: str):

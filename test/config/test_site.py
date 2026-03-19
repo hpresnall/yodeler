@@ -1,9 +1,9 @@
 # pylint: disable=missing-module-docstring
 # pylint: disable=missing-class-docstring
 # pylint: disable=missing-function-docstring
-import unittest
 import os.path
 import tempfile
+import unittest
 
 import config.site as site
 import role.roles as role

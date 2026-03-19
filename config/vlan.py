@@ -1,11 +1,10 @@
 """Handles parsing and validating vlan configuration from site YAML files."""
-import logging
 import ipaddress
-
-import util.dns as dns
-import util.parse as parse
+import logging
 
 import role.roles as roles
+import util.dns as dns
+import util.parse as parse
 
 _logger = logging.getLogger(__name__)
 
