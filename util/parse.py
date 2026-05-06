@@ -6,16 +6,16 @@ import re
 from typing import Hashable, cast
 
 
-def non_empty_dict(location: str, value: None | dict) -> dict:
-    return cast(dict, _non_empty(location, value, dict))
+def non_empty_dict(location: str, value: None | dict):
+    _non_empty(location, value, dict)
 
 
-def non_empty_list(location: str, value: None | list) -> list:
-    return cast(list, _non_empty(location, value, list))
+def non_empty_list(location: str, value: None | list):
+    _non_empty(location, value, list)
 
 
-def non_empty_string(location: str, value: None | str) -> str:
-    return cast(str, _non_empty(location, value, str))
+def non_empty_string(location: str, value: None | str):
+    _non_empty(location, value, str)
 
 
 def get_dict(location: str, key: str, cfg: None | dict) -> dict:
@@ -42,7 +42,7 @@ def _non_empty_from_key(location: str, key: str, cfg: None | dict, kind: type) -
     if not key in cfg:
         raise KeyError(f"'{key}' not in {location}")
 
-    return _non_empty("" if not location else f"{location}['{key}']", cfg[key], kind)
+    return _non_empty(key if not location else f"{location}['{key}']", cfg[key], kind)
 
 
 def _non_empty(location: str, value, kind: type) -> object:
@@ -80,6 +80,7 @@ def _set_default(location: str, key: str, cfg: dict | None, default: object, kin
         raise KeyError(f"key cannot be empty for {location}")
 
     location = f"{location}['{key}']"
+
     if cfg is None:
         raise ValueError(f"cfg must be defined for {location}")
 

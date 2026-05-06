@@ -275,7 +275,7 @@ def _parse_action(action_type: str, actions: str | dict | list, location: str) -
         return [_action_proto_port(action_type, actions, base)]
     # else assume list
 
-    actions = parse.non_empty_list(location, actions)
+    parse.non_empty_list(location, actions)
     parsed_actions = []
 
     for i, action in enumerate(actions, start=1):

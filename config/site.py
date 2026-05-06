@@ -34,7 +34,7 @@ def load(site_dir: str | None, profile_name: str | None = None) -> dict:
     _logger.info("loading site config from '%s'", site_dir)
 
     site_yaml = file.load_yaml(os.path.join(site_dir, "site.yaml"))
-    site_yaml = parse.non_empty_dict("site.yaml", site_yaml)
+    parse.non_empty_dict("site.yaml", site_yaml)
 
     site_yaml["site_name"] = os.path.basename(site_dir)
 
@@ -44,7 +44,7 @@ def load(site_dir: str | None, profile_name: str | None = None) -> dict:
         _logger.info("using profile '%s' to configure site '%s'", profile_name, site_yaml["site_name"])
 
         site_yaml["profile"] = profile_yaml
-        site_yaml["profile"]["name"] = profile_name
+        site_yaml["profile"]["name"] = profile_name  # do not allow overwriting the profile name
 
         profile_yaml.pop("site_name", None)  # do not allow overwriting the site name
         site_yaml["site_name"] += "-" + profile_name
@@ -68,15 +68,15 @@ def validate(site_yaml: dict) -> dict:
 
     This configuration _is not_ valid for creating a set of scripts for a specific host.
     Instead, this configuration must be used as the base for loading host YAML files.
-    Exposed for testing. In normal usage this will be called as part of building the site.
+    Exposed for testing. In normal usage this will be called as part of load().
     """
-    site_yaml = parse.non_empty_dict("site_yaml", site_yaml)
-    site_name =  parse.get_string("site.yaml", "site_name", site_yaml)
+    parse.non_empty_dict("site_yaml", site_yaml)
+    site_name = parse.get_string("site.yaml", "site_name", site_yaml)
 
     # defensively ensure the config cannot be updated elsewhere
     site_cfg = copy.deepcopy(site_yaml)
 
-    host.validate_overridable_site_defaults(site_name ,site_cfg)
+    host.validate_overridable_site_defaults(site_name, site_cfg)
 
     # validate values that hosts cannot override
     site_cfg["external_ntp"] = parse.get_string_list(site_name, "external_ntp", site_cfg)
@@ -90,7 +90,7 @@ def validate(site_yaml: dict) -> dict:
             raise KeyError(f"invalid 'external_dns' IP address {dns}") from ve
     site_cfg["external_dns"] = external_dns_ips
 
-    # order matters here; external hosts checks against vlan hosts, firewall needs external hosts
+    # order matters here; external hosts checked against vlan hosts, firewall needs external hosts
     vswitch.validate(site_cfg)
     _validate_external_hosts(site_cfg)
     firewall.validate(site_cfg)
@@ -279,11 +279,8 @@ def _validate_external_hosts(cfg: dict):
         cfg["external_hosts"] = []
         return
 
-    external = cfg["external_hosts"]
     location = "external_hosts"
-
-    if not isinstance(external, list):
-        raise ValueError(f"{location} must be a list")
+    external = parse.get_list("", location, cfg)  # empty location here for proper error formatting
 
     for i, entry in enumerate(external, start=1):
         if not isinstance(entry, dict):

@@ -34,7 +34,7 @@ def load(site_cfg: dict, host_path: str | None) -> dict:
     _logger.info("loading host config from '%s'", os.path.basename(host_path))
 
     host_yaml = file.load_yaml(host_path)
-    host_yaml = parse.non_empty_dict("<host>.yaml", host_yaml)
+    parse.non_empty_dict("<host>.yaml", host_yaml)
 
     parse.set_string_default("<host>.yaml", "hostname", host_yaml, os.path.basename(host_path)[:-5])  # remove .yaml
 
@@ -50,10 +50,10 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
 
     Returns a configuration file that is a combination of the site and host configuration.
     This merged configuration is valid for creating a set of scripts for a specific host.
-    Exposed for testing. In normal usage this will be called as part of building the site.
+    Exposed for testing. In normal usage this will be called as part of load().
     """
-    site_cfg = parse.non_empty_dict("site_cfg", site_cfg)
-    host_yaml = parse.non_empty_dict("<host>.yaml", host_yaml)
+    parse.non_empty_dict("site_cfg", site_cfg)
+    parse.non_empty_dict("<host>.yaml", host_yaml)
 
     # basic hostname validation
     # full validation happens after all hosts / aliases are parsed in site.py
@@ -61,12 +61,13 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
 
     if dns.invalid_hostname(hostname):
         raise ValueError(f"invalid hostname '{hostname}'")
-    if hostname in site_cfg["hosts"]:
-        raise ValueError(f"duplicate hostname '{hostname}'")
     if (hostname == "site") or (hostname == "profile") or (hostname == "build"):
         raise ValueError(f"invalid hostname '{hostname}'")
+    if hostname in site_cfg["hosts"]:
+        raise ValueError(f"duplicate hostname '{hostname}'")
     host_yaml["hostname"] = hostname
 
+    # defensively ensure the config cannot be updated elsewhere
     host_cfg = copy.deepcopy(host_yaml)
 
     # silently ignore attempts to overwrite site config
@@ -298,15 +299,13 @@ def _set_defaults(cfg: dict):
             raise ValueError(f"'{cfg['vm_images_pat']}' vm_images_path value cannot contain spaces")
 
         # physical installs need an interface configured to download APKs and a disk to install the OS
+        if "install_interfaces" in cfg["profile"]:
+            cfg["install_interfaces"] = cfg["profile"]["install_interfaces"]
+
         parse.set_string_default("<host>.yaml", "install_interfaces", cfg, """auto lo
 iface lo inet loopback
 auto eth0
 iface eth0 inet dhcp""")
-
-        if "install_interfaces" in cfg["profile"]:
-            cfg["install_interfaces"] = cfg["profile"]["install_interfaces"]
-
-        parse.get_string(cfg["hostname"], "install_interfaces", cfg)
 
     aliases.configure(cfg)
 

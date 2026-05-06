@@ -231,7 +231,7 @@ class Storage(Role):
 
 def _validate_storage(cfg: dict):
     storage_loc = cfg["hostname"] + ".storage"
-    storage = parse.non_empty_dict(storage_loc, cfg.get("storage"))
+    storage = parse.get_dict(storage_loc, "storage", cfg)
 
     base_dir = parse.set_string_default(storage_loc, "base_dir", storage, "/storage")
     if not base_dir.startswith("/"):

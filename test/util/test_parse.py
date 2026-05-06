@@ -48,12 +48,10 @@ class TestParse(unittest.TestCase):
             parse.non_empty_list("test", [])
 
     def test_get_string_none_location(self):
-        with self.assertRaises(ValueError):
-            parse.get_string(None, "test", {"test": "value"})  # type: ignore
+        self.assertEqual("value", parse.get_string(None, "test", {"test": "value"}))  # type: ignore
 
     def test_get_string_empty_location(self):
-        with self.assertRaises(ValueError):
-            parse.get_string("", "test", {"test": "value"})
+        self.assertEqual("value", parse.get_string("", "test", {"test": "value"}))
 
     def test_get_string_none_key(self):
         with self.assertRaises(KeyError):

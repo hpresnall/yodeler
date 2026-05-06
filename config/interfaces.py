@@ -157,7 +157,7 @@ def _validate_iface(iface: dict, location: str):
         iface["ipv6_address"] = None
 
     additional = parse.get_string_list_plurals(f"{location}.additional_ipv6_addresses",
-        {"additional_ipv6_address", "additional_ipv6_address"}, iface)
+                                               {"additional_ipv6_address", "additional_ipv6_address"}, iface)
     iface.pop("additional_ipv6_address", None)
     iface["additional_ipv6_addresses"] = []
 
@@ -424,12 +424,12 @@ def configure_uplink(cfg: dict):
     or a 'vswitch' + 'vlan' to use for connectivity."""
     location = f"{cfg['hostname']}.uplink"
 
-    uplink = parse.get_dict(location, "uplink",cfg)
+    uplink = parse.get_dict(location, "uplink", cfg)
 
     if "uplink" in cfg["profile"]:
         o_loc = f"profile['{cfg['profile']['name']}']['{cfg['hostname']}'].uplink"
 
-        new_uplink = parse.non_empty_dict(o_loc, cfg["profile"]["uplink"])
+        new_uplink = parse.get_dict(o_loc, "uplink", cfg["profile"])
         old_uplink = dict(uplink)
 
         # remove old connection methods
