@@ -32,7 +32,7 @@ def validate(cfg: dict):
         parse.non_empty_dict(location, vswitch)
 
         # name is required and must be unique; lowercase for consistency
-        vswitch_name = parse.get_string(location, "name", vswitch)
+        vswitch_name = parse.get_string(location, "name", vswitch).lower()
         vswitch["name"] = vswitch_name
         location = f"vswitch['{vswitch_name}']"
 
@@ -73,7 +73,8 @@ def _configure_overrides(cfg: dict) -> dict[str, dict]:
                 if not vswitch_name:
                     raise KeyError(f"{o_loc}[{i}] must set 'name'")
 
-                override_uplinks = parse.get_string_list_plurals(f"{o_loc}['{vswitch_name}']", {"uplink", "uplinks"}, vswitch)
+                override_uplinks = parse.get_string_list_plurals(
+                    f"{o_loc}['{vswitch_name}']", {"uplink", "uplinks"}, vswitch)
                 overrides[vswitch_name] = {"uplinks": override_uplinks}
             else:
                 raise KeyError(f"{o_loc}[{i}] must set 'name'")

@@ -26,10 +26,12 @@ def make_unique(cfg: dict, role: roles.Role):
     """Add unique role-based aliases to the host.
     The aliases will be numbered if other hosts in the site have the same role.
     Note this does not check for non-role aliases defined in the host; validate() will ensure those are not duplicated."""
-    _make_unique(cfg, role.name, role.name)
+    _make_unique(cfg, role.name, role.name)  # role are already lowercase from roles.py
 
     for alias in role.additional_aliases():
-        _make_unique(cfg, role.name, alias)
+        if dns.invalid_hostname(alias):
+            raise ValueError(f"invalid alias '{alias}' for role '{role.name}'; not a valid DNS name")
+        _make_unique(cfg, role.name, alias.lower())
 
 
 def _make_unique(cfg: dict, role: str, alias: str):
@@ -59,7 +61,7 @@ def validate(cfg: dict):
     vlan's. Does not check against all aliases in the site since all hosts may not have been defined."""
     hostname = cfg["hostname"]
 
-    for alias in cfg["aliases"]:
+    for alias in cfg["aliases"]:  # aliases already lowercased in configure()
         # ensure no clashes with other hosts
         for other_hostname, other_host in cfg["hosts"].items():
             if other_hostname == hostname:

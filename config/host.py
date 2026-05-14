@@ -36,6 +36,7 @@ def load(site_cfg: dict, host_path: str | None) -> dict:
     host_yaml = file.load_yaml(host_path)
     parse.non_empty_dict("<host>.yaml", host_yaml)
 
+    # hostname can be set differently than the filename; validate ensures it is lowercase
     parse.set_string_default("<host>.yaml", "hostname", host_yaml, os.path.basename(host_path)[:-5])  # remove .yaml
 
     host_cfg = validate(site_cfg, host_yaml)
@@ -57,7 +58,10 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
 
     # basic hostname validation
     # full validation happens after all hosts / aliases are parsed in site.py
-    hostname = parse.get_string("<host>.yaml", "hostname", host_yaml).lower()  # lowercase for consistency
+    hostname = parse.get_string("<host>.yaml", "hostname", host_yaml)
+
+    # lowercase for consistency
+    host_yaml["hostname"] = hostname = hostname.lower()
 
     if dns.invalid_hostname(hostname):
         raise ValueError(f"invalid hostname '{hostname}'")
@@ -314,8 +318,11 @@ def _load_roles(cfg: dict):
     # list of role names in yaml => list of Role subclass instances
 
     # allow both 'role' and 'roles'; only store 'roles'
-    role_names = set(parse.get_string_list_plurals(cfg["hostname"], {"role", "roles"}, cfg))
+    role_names = parse.get_string_list_plurals(cfg["hostname"], {"role", "roles"}, cfg)
     cfg.pop("role", None)
+
+    # normalize to lowercase to match roles loaded in roles.py
+    role_names = set([role_name.lower() for role_name in role_names])
 
     # Common _must_ be the first so it is configured and setup first
     common = roles.load("common", cfg)
@@ -341,7 +348,6 @@ def _load_roles(cfg: dict):
     for role_name in ordered_roles:
         _logger.debug("adding role '%s' to '%s'", role_name, cfg["hostname"])
 
-        role_name = role_name.lower()
         role = roles.load(role_name, cfg)
 
         cfg["roles"].append(role)

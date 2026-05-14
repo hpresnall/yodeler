@@ -93,10 +93,11 @@ def load(role_name: str, host_cfg: dict) -> Role:
 
 
 _role_class_by_name = {}
+_all_role_names = []
 
 
 def names() -> list[str]:
-    return sorted(_role_class_by_name.keys())
+    return _all_role_names
 
 
 def class_for_name(name: str) -> Role:
@@ -125,3 +126,6 @@ def load_all():
                 role_name = clazz[0].lower()
                 _logger.debug("loaded role '%s' from '%s'", role_name, file)
                 _role_class_by_name[role_name] = clazz[1]
+
+        global _all_role_names
+        _all_role_names = sorted(_role_class_by_name.keys())

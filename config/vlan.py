@@ -263,7 +263,7 @@ def _validate_aliases(vlan: dict, cfg: dict, location: str):
         alias = alias.lower()
 
         if alias == hostname:
-            continue
+            continue  # silently ignore
         elif alias in vlan["known_aliases"]:
             raise ValueError(f"{location} duplicate hostname or alias '{alias}'")
         elif alias in role_names:
