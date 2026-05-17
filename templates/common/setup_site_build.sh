@@ -61,5 +61,5 @@ else
   mount --bind "$$(realpath /etc/apk/cache)" tmp/apk_cache
   log "Build image mounted at $$SITE_BUILD_MOUNT"
 
-  cd -
+  cd - > /dev/null
 fi

@@ -49,7 +49,7 @@ class Common(Role):
 
         # use smartd to monitor physical disks
         for disk in self._cfg["disks"]:
-            if disk["type"] != "img": # device or passthrough
+            if disk["type"] != "img":  # device or passthrough
                 packages.add("smartmontools")
                 break
 
@@ -59,7 +59,7 @@ class Common(Role):
         if self._cfg["backup"]:
             self._cfg["backup_script"].comment("backup auth logs")
             self._cfg["backup_script"].append(f"cp /var/log/auth* {self._cfg['backup_dir']}")
-            self._cfg["backup_script"].blank()  
+            self._cfg["backup_script"].blank()
 
         if self._cfg["is_vm"] and self._cfg["vm_use_efi"]:
             # use serial console to display uEFI boot output
@@ -112,7 +112,7 @@ class Common(Role):
         file.write("packages", " ".join(self._cfg["packages"]), output_dir)
 
         # configure Alpine repositories config, if needed
-        _setup_repos(self._cfg, setup) 
+        _setup_repos(self._cfg, setup)
 
         if self._cfg["is_vm"]:
             # VMs will use host's configured repositories & APK cache
@@ -123,7 +123,7 @@ class Common(Role):
                 # insert to ensure before any other roles run builds, assume common runs first
                 # source so SITE_BUILD_MOUNT is exposed to the rest of setup
                 self._cfg["before_chroot"].insert(0, "# create & mount the site build image\n"
-                                                  "source $SITE_DIR/build/setup_site_build.sh\n")
+                                                  "source $SITE_DIR/site_build/setup_site_build.sh\n")
                 # setup_site_build.sh is on the _vmhost_; no need to install in the vm itself
         else:
             # for physical servers, add packages manually
@@ -138,13 +138,9 @@ class Common(Role):
             setup.blank()
 
             if self._cfg["needs_site_build"]:
-                setup.comment("ensure site build scripts are executable")
-                setup.append("chmod +x $SITE_DIR/build/setup_site_build.sh")
-                setup.append("chmod +x $SITE_DIR/build/unmount_site_build.sh")
-                setup.blank()
                 setup.comment("create & mount the site build image")
                 # source so SITE_BUILD_MOUNT is exposed to the rest of setup
-                setup.append("source $SITE_DIR/build/setup_site_build.sh")
+                setup.append("source $SITE_DIR/site_build/setup_site_build.sh")
                 setup.blank()
 
         if (self._cfg["remove_packages"]):
@@ -228,15 +224,15 @@ def _setup_repos(cfg: dict, setup: shell.ShellScript):
         if set(cfg["hosts"][cfg["vmhost"]]["alpine_repositories"]) == set(cfg["alpine_repositories"]):
             # repo config is the same, use vm host's
             cfg["repositories_file"] = "/etc/apk/repositories"
-            return # no setup needed
+            return  # no setup needed
         else:
             # create file for this vm before chroot
             repo_file = cfg["repositories_file"] = "$SETUP_TMP/repositories"
-            repo_writer = lambda r: cfg["before_chroot"].append(r)
+            repo_writer = (lambda r: cfg["before_chroot"].append(r))
     else:
         # create during setup
         repo_file = "/etc/apk/repositories"
-        repo_writer = lambda r: setup.append(r)
+        repo_writer = (lambda r: setup.append(r))
 
     repo_writer("log \"Setting up APK repositories\"")
     repo_writer("")
@@ -278,4 +274,3 @@ def _configure_backups(cfg: dict, setup: shell.ShellScript):
     setup.append("  chown root:wheel /var/log/auth*")
     setup.append("  chmod 640 /var/log/auth*")
     setup.append("fi")
-

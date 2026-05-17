@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import stat
 import string
 
 import yaml
@@ -21,13 +22,16 @@ def read_template(role_name: str, template: str) -> str:
         return file.read()
 
 
-def write(path: str, data_str: str, base_dir: str | None = None):
+def write(path: str, data_str: str, base_dir: str | None = None, executable=False):
     """Write the given string to a file."""
     if base_dir is not None:
         path = os.path.join(base_dir, path)
 
     with open(path, "w", newline='\n') as file:
-        return file.write(data_str)
+        file.write(data_str)
+
+    if executable:
+        os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP)
 
 
 def substitute(role_name: str, file_name: str, cfg: dict) -> str:
@@ -38,12 +42,12 @@ def substitute(role_name: str, file_name: str, cfg: dict) -> str:
     return template.substitute(**upper_cfg)
 
 
-def substitute_and_write(role_name: str, file_name: str, cfg: dict, base_dir: str | None = None, new_name: str | None = None):
+def substitute_and_write(role_name: str, file_name: str, cfg: dict, base_dir: str | None = None, new_name: str | None = None, executable: bool = False):
     """Read the given file and do $variable substitution from the given config. Write the file to the given location."""
     if not new_name:
         new_name = file_name
 
-    write(new_name, substitute(role_name, file_name, cfg), base_dir)
+    write(new_name, substitute(role_name, file_name, cfg), base_dir, executable)
 
 
 def load_yaml(path: str):

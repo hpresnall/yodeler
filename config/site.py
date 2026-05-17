@@ -189,7 +189,7 @@ def write_host_scripts(site_cfg: dict, output_dir: str):
         host.write_scripts(host_cfg, output_dir)
 
     if ("alpine_make_vm_image" in site_cfg) or needs_site_build:
-        build_dir = os.path.join(output_dir, "build")
+        build_dir = os.path.join(output_dir, "site_build")
         os.makedirs(build_dir, exist_ok=True)
 
         # patch for alpine-make-vm-image if it exists
@@ -322,10 +322,10 @@ def _validate_external_hosts(cfg: dict):
 
 
 def _setup_site_build_scripts(cfg: dict, build_dir: str):
-    file.substitute_and_write("common", "setup_site_build.sh", cfg, build_dir)
+    file.substitute_and_write("common", "setup_site_build.sh", cfg, build_dir, executable=True)
 
     # helper script to unmount the build_image
-    unmount_build = shell.ShellScript("unmount_site_build.sh")
+    unmount_build = shell.ShellScript("umount_site_build.sh")
     unmount_build.append(f"SITE_BUILD_MOUNT=\"/media/{cfg['site_name']}_build\"")
     unmount_build.blank()
     unmount_build.append("umount $SITE_BUILD_MOUNT/tmp/apk_cache")

@@ -1,4 +1,4 @@
-SITE_BUILD_DIR=$SITE_DIR/build
+SITE_BUILD_DIR=$SITE_DIR/site_build
 mkdir -p $SITE_BUILD_DIR
 
 if [ ! -d "$SITE_BUILD_DIR/alpine-make-vm-image" ]; then

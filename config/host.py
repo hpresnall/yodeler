@@ -65,7 +65,7 @@ def validate(site_cfg: dict, host_yaml: dict) -> dict:
 
     if dns.invalid_hostname(hostname):
         raise ValueError(f"invalid hostname '{hostname}'")
-    if (hostname == "site") or (hostname == "profile") or (hostname == "build"):
+    if (hostname == "site") or (hostname == "profile") or (hostname == "site_build"):
         raise ValueError(f"invalid hostname '{hostname}'")
     if hostname in site_cfg["hosts"]:
         raise ValueError(f"duplicate hostname '{hostname}'")
