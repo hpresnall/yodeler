@@ -151,6 +151,7 @@ class VmHost(Role):
 
                 if disk["type"] == "passthrough":
                     address = disk["pci_address"]
+
                     if address in addresses:
                         raise ValueError(f"cannot reuse PCI address '{address}' for disk {location}")
 

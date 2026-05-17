@@ -491,6 +491,14 @@ def _bootstrap_vm(cfg: dict, output_dir: str):
     start_vm.substitute("vm", "start_vm.sh", cfg)
     start_vm.write_file(output_dir)
 
+    # helper scripts to mount & unmount a VM disk image
+    mount_vm = shell.ShellScript("mount_vm.sh")
+    mount_vm.substitute("vm", "mount_vm.sh", cfg)
+    mount_vm.write_file(output_dir)
+    umount_vm = shell.ShellScript("umount_vm.sh")
+    umount_vm.substitute("vm", "umount_vm.sh", cfg)
+    umount_vm.write_file(output_dir)
+
 
 def _concat_and_indent(data: list[str], indent="", extra_blank=True) -> str:
     concat = ""
