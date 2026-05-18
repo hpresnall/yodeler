@@ -1,4 +1,4 @@
-"""Helper script to update a virsh vm definition, removing the data added by add_boot_iso.py.
+"""Helper script to update a virsh VM definition, removing the data added by add_boot_iso.py.
 
 Requires <path_to_xml> as a command line argument.
 """

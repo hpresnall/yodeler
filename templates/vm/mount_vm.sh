@@ -1,5 +1,5 @@
 if [ "$$(virsh domstate $HOSTNAME)" == "running" ]; then
-    echo "cannot mount VM image when $HOSTNAME is running"
+    echo "cannot mount VM disk image when $HOSTNAME is running"
     exit 1
 fi
 

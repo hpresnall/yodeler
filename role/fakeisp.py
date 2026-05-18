@@ -179,7 +179,7 @@ class FakeISP(Role):
                 {
                     "library": "/usr/lib/kea/hooks/libdhcp_run_script.so",
                     "parameters": {
-                        "name": "/usr/lib/kea/hooks/pdroute.sh"
+                        "name": "/usr/share/kea/scripts/pdroute.sh"
                     }
                 }
             ]
@@ -194,7 +194,7 @@ class FakeISP(Role):
             file.copy_template(self.name, "pdroute.sh", output_dir)
             setup.comment("allow kea to modify routes for prefix delegation")
             setup.append("echo \"permit nopass kea cmd /sbin/ip\" >> /etc/doas.d/doas.conf")
-            setup.append("install -o kea -g kea -m 750 $DIR/pdroute.sh /usr/lib/kea/hooks/")
+            setup.append("install -o kea -g kea -m 750 $DIR/pdroute.sh /usr/share/kea/scripts/")
             setup.blank()
 
             # setup radvd on the fakeisp interface

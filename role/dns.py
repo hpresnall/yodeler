@@ -260,7 +260,7 @@ def _add_zone(setup: shell.ShellScript, vlan: dict, dns_domain: str, dns_server:
 
         # delegation record
         domain = vlan["domain"][:vlan["domain"].index(".") + 1]  # + 1 to include the .
-        setup.append(f"pdnsutil add-record {dns_domain} {domain} NS {dns_server}")
+        setup.append(f"pdnsutil add-record {dns_domain} {domain}{dns_domain} NS {dns_server}")
 
     # forward zone
     setup.append(f"pdnsutil create-zone {vlan['domain']} {dns_server}")
@@ -306,22 +306,22 @@ def _add_entry(setup: shell.ShellScript, host: dict, add_ptr: bool = True) -> bo
     output = False
 
     if host["ipv4_address"] != "dhcp":
-        setup.append(f"pdnsutil add-record {domain} {name} A {str(host['ipv4_address'])}")
+        setup.append(f"pdnsutil add-record {domain} {name}.{domain} A {str(host['ipv4_address'])}")
 
         if add_ptr:
             rdomain = address.rptr_ipv4(host["ipv4_subnet"])
             ptr = address.hostpart_ipv4(host["ipv4_address"])
-            setup.append(f"pdnsutil add-record {rdomain} {ptr} PTR {name}.{domain}")
+            setup.append(f"pdnsutil add-record {rdomain} {ptr}.{rdomain} PTR {name}.{domain}")
 
         output = True
 
     if host["ipv6_address"]:
-        setup.append(f"pdnsutil add-record {domain} {name} AAAA {str(host['ipv6_address'])}")
+        setup.append(f"pdnsutil add-record {domain} {name}.{domain} AAAA {str(host['ipv6_address'])}")
 
         if add_ptr:
             rdomain = address.rptr_ipv6(host["ipv6_subnet"])
             ptr = address.hostpart_ipv6(host["ipv6_address"], host["ipv6_subnet"].prefixlen)
-            setup.append(f"pdnsutil add-record {rdomain} {ptr} PTR {name}.{domain}")
+            setup.append(f"pdnsutil add-record {rdomain} {ptr}.{rdomain} PTR {name}.{domain}")
 
         output = True
 
@@ -331,7 +331,7 @@ def _add_entry(setup: shell.ShellScript, host: dict, add_ptr: bool = True) -> bo
 def _add_cname(setup: shell.ShellScript,  alias: str, host: dict):
     # create CNAMEs for aliases
     domain = host['domain']
-    setup.append(f"pdnsutil add-record {domain} {alias} CNAME {host['name']}.{domain}")
+    setup.append(f"pdnsutil add-record {domain} {alias}.{domain} CNAME {host['name']}.{domain}")
 
 
 def _create_host_entries(setup: shell.ShellScript, cfg: dict, dns_domain: str):
@@ -349,7 +349,7 @@ def _create_host_entries(setup: shell.ShellScript, cfg: dict, dns_domain: str):
                 # 'dns' entry already covered by glue record
                 if alias != "dns":
                     hostname = host_cfg['hostname'] + '.' + host_domain
-                    setup.append(f"pdnsutil add-record {domain} {alias} CNAME {hostname}")
+                    setup.append(f"pdnsutil add-record {domain} {alias}.{domain} CNAME {hostname}")
                     output = True
 
             if output:

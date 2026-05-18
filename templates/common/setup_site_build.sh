@@ -59,6 +59,11 @@ else
     ln -s /tmp/apk_cache etc/apk/cache
   fi
   mount --bind "$$(realpath /etc/apk/cache)" tmp/apk_cache
+
+  # fake /dev/null needed by git and other programs
+  # not cleaned up, assume minimal output
+  touch $$SITE_BUILD_MOUNT/dev/null
+  
   log "Build image mounted at $$SITE_BUILD_MOUNT"
 
   cd - > /dev/null

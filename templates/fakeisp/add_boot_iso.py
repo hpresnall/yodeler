@@ -1,4 +1,4 @@
-"""Helper script to update a virsh vm definition to boot from a CD.
+"""Helper script to update a virsh VM definition to boot from a CD.
 
 Assumes the following commands have already been run:
 virsh attach-disk <vm> <iso_file> hdc --config --type cdrom --targetbus sata
